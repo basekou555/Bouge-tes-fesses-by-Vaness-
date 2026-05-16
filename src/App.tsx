@@ -214,56 +214,131 @@ export default function App() {
   return (
     <div style={{ minHeight: '100svh', backgroundColor: '#FDFAF3', fontFamily: "'Nunito', sans-serif" }}>
 
-      {/* ── HEADER (intact) ── */}
+      {/* ── HEADER ── */}
       <header
         style={{
-          background: 'linear-gradient(160deg, #F5C418 0%, #f7d040 100%)',
-          padding: '24px 16px 28px',
+          background: 'linear-gradient(160deg, #F5C418 0%, #f0bc10 100%)',
+          padding: '32px 16px 36px',
           textAlign: 'center',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ fontSize: '32px', marginBottom: '4px', opacity: 0.6, userSelect: 'none', letterSpacing: '8px' }}>
-          🌼🌼🌼
+        {/* Daisy SVG — top left, large */}
+        <svg
+          width="130" height="130" viewBox="0 0 100 100"
+          style={{ position: 'absolute', top: '-20px', left: '-20px', opacity: 0.92, pointerEvents: 'none' }}
+          aria-hidden="true"
+        >
+          {[0,40,80,120,160,200,240,280,320].map((angle) => (
+            <ellipse
+              key={angle}
+              cx="50" cy="22" rx="7" ry="22"
+              fill="white"
+              transform={`rotate(${angle} 50 50)`}
+            />
+          ))}
+          <circle cx="50" cy="50" r="14" fill="#F5C418" />
+          <circle cx="50" cy="50" r="11" fill="#d4a800" />
+        </svg>
+
+        {/* Daisy SVG — top right, medium */}
+        <svg
+          width="100" height="100" viewBox="0 0 100 100"
+          style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.85, pointerEvents: 'none' }}
+          aria-hidden="true"
+        >
+          {[0,40,80,120,160,200,240,280,320].map((angle) => (
+            <ellipse
+              key={angle}
+              cx="50" cy="22" rx="7" ry="22"
+              fill="white"
+              transform={`rotate(${angle} 50 50)`}
+            />
+          ))}
+          <circle cx="50" cy="50" r="14" fill="#F5C418" />
+          <circle cx="50" cy="50" r="11" fill="#d4a800" />
+        </svg>
+
+        {/* Daisy SVG — bottom right, small */}
+        <svg
+          width="72" height="72" viewBox="0 0 100 100"
+          style={{ position: 'absolute', bottom: '-12px', right: '80px', opacity: 0.75, pointerEvents: 'none' }}
+          aria-hidden="true"
+        >
+          {[0,40,80,120,160,200,240,280,320].map((angle) => (
+            <ellipse
+              key={angle}
+              cx="50" cy="22" rx="7" ry="22"
+              fill="white"
+              transform={`rotate(${angle} 50 50)`}
+            />
+          ))}
+          <circle cx="50" cy="50" r="14" fill="#F5C418" />
+          <circle cx="50" cy="50" r="11" fill="#d4a800" />
+        </svg>
+
+        {/* Daisy SVG — bottom left, medium */}
+        <svg
+          width="88" height="88" viewBox="0 0 100 100"
+          style={{ position: 'absolute', bottom: '-16px', left: '60px', opacity: 0.8, pointerEvents: 'none' }}
+          aria-hidden="true"
+        >
+          {[0,40,80,120,160,200,240,280,320].map((angle) => (
+            <ellipse
+              key={angle}
+              cx="50" cy="22" rx="7" ry="22"
+              fill="white"
+              transform={`rotate(${angle} 50 50)`}
+            />
+          ))}
+          <circle cx="50" cy="50" r="14" fill="#F5C418" />
+          <circle cx="50" cy="50" r="11" fill="#d4a800" />
+        </svg>
+
+        {/* Text content */}
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1
+            style={{
+              fontFamily: "'Pacifico', cursive",
+              fontSize: 'clamp(28px, 8vw, 54px)',
+              color: '#1B4FA0',
+              textShadow: '3px 3px 0px rgba(255,255,255,0.5), -1px -1px 0px rgba(255,255,255,0.3)',
+              margin: '0 0 4px',
+              lineHeight: 1.15,
+            }}
+          >
+            🌺 Bouge tes fesses
+          </h1>
+          <p
+            style={{
+              fontFamily: "'Pacifico', cursive",
+              fontSize: 'clamp(16px, 5vw, 32px)',
+              color: '#1B4FA0',
+              textShadow: '2px 2px 0px rgba(255,255,255,0.4)',
+              margin: '0 0 14px',
+            }}
+          >
+            by Vaness'
+          </p>
+          <div
+            style={{
+              display: 'inline-block',
+              backgroundColor: '#1B4FA0',
+              borderRadius: '10px',
+              padding: '7px 18px',
+              marginBottom: '8px',
+              boxShadow: '0 2px 8px rgba(27,79,160,0.25)',
+            }}
+          >
+            <span style={{ color: '#ffffff', fontWeight: 700, fontSize: 'clamp(12px, 3.5vw, 16px)' }}>
+              Les p'tites sorties du Pays de Lorient 🌻
+            </span>
+          </div>
+          <p style={{ margin: '6px 0 0', color: '#1B4FA0', opacity: 0.7, fontWeight: 600, fontSize: '13px' }}>
+            Semaine du 11 au 17 mai 2025
+          </p>
         </div>
-        <h1
-          style={{
-            fontFamily: "'Pacifico', cursive",
-            fontSize: 'clamp(26px, 8vw, 52px)',
-            color: '#1B4FA0',
-            textShadow: '2px 3px 0px rgba(255,255,255,0.4)',
-            margin: '4px 0 2px',
-            lineHeight: 1.2,
-          }}
-        >
-          🌺 Bouge tes fesses
-        </h1>
-        <p
-          style={{
-            fontFamily: "'Pacifico', cursive",
-            fontSize: 'clamp(15px, 5vw, 30px)',
-            color: '#1B4FA0',
-            opacity: 0.82,
-            margin: '0 0 10px',
-          }}
-        >
-          by Vaness'
-        </p>
-        <div
-          style={{
-            display: 'inline-block',
-            backgroundColor: '#1B4FA0',
-            borderRadius: '10px',
-            padding: '6px 16px',
-            marginBottom: '6px',
-          }}
-        >
-          <span style={{ color: '#ffffff', fontWeight: 700, fontSize: 'clamp(12px, 3.5vw, 16px)' }}>
-            Les p'tites sorties du Pays de Lorient 🌻
-          </span>
-        </div>
-        <p style={{ margin: '6px 0 0', color: '#1B4FA0', opacity: 0.65, fontWeight: 600, fontSize: '13px' }}>
-          Semaine du 11 au 17 mai 2025
-        </p>
       </header>
 
       {/* ── STICKY FILTERS ── */}
