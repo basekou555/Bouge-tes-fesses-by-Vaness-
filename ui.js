@@ -30,6 +30,22 @@ function continueGame(kind){ const s=lsGet(kind==='player'?KEYS.player:KEYS.coac
 /* ---------- Création ---------- */
 function progressHTML(i,n){ return `<div class="creation-progress"><span>Étape ${i+1}/${n}</span><div class="track"><i style="width:${Math.round((i+1)/n*100)}%"></i></div></div>`; }
 function bonusChips(bonus,labels){ return `<div class="chip-row">${Object.entries(bonus||{}).filter(([k,v])=>v).map(([k,v])=>`<span class="chip ${v>0?'good':'bad'}">${labels[k]||k} ${v>0?'+':''}${v}</span>`).join('')}</div>`; }
+// Effets mécaniques d'une qualité, d'un défaut ou d'un trait, rendus visibles dès la création
+function perkChips(o){
+  const chips=[];
+  const gaugeLabels={...Object.fromEntries(Object.entries(GAUGE_INFO).map(([k,v])=>[k,v.icon+' '+v.label])),...Object.fromEntries(Object.entries(PGAUGE).map(([k,v])=>[k,v.icon+' '+v.label]))};
+  Object.entries(o.gauge||o.gauges||{}).forEach(([k,v])=>chips.push([`${gaugeLabels[k]||k} ${v>0?'+':''}${v}`,v>0]));
+  if(o.pressureRes) chips.push([`Pression ${o.pressureRes>0?'−':'+'}${Math.abs(o.pressureRes)}`,o.pressureRes>0]);
+  if(o.incidentMult&&o.incidentMult!==1) chips.push([`Incidents ${o.incidentMult>1?'+':'−'}${Math.round(Math.abs(o.incidentMult-1)*100)} %`,o.incidentMult<1]);
+  if(o.budgetLeak) chips.push([`Budget −${Math.round(o.budgetLeak*100)} %`,false]);
+  if(o.scamRes) chips.push([`Arnaques ${o.scamRes>0?'−':'+'}${Math.round(Math.abs(o.scamRes)*100)} %`,o.scamRes>0]);
+  if(o.confidenceRes) chips.push([`Confiance du président ${o.confidenceRes>0?'protégée':'fragile'}`,o.confidenceRes>0]);
+  if(o.growth) chips.push([`Progression +${Math.round(o.growth*100)} %`,true]);
+  if(o.injury) chips.push([`Blessures +${Math.round(o.injury*100)} %`,false]);
+  if(o.scandal) chips.push(['Scandales possibles',false]);
+  if(o.youthBonus) chips.push([`🎓 Formation +${o.youthBonus}`,true]);
+  return chips.length?`<div class="chip-row">${chips.map(([t,good])=>`<span class="chip ${good?'good':'bad'}">${t}</span>`).join('')}</div>`:'';
+}
 function eraPickHTML(cb){ return `<div class="era-grid">${ERAS.map((e,i)=>`<button class="era-card" onclick="${cb}(${i})"><div class="ico">${e.icon}</div><span class="years">${e.start} – ${e.end}</span><b>${e.name}</b><p>${e.tagline}</p><ul>${e.rules.map(r=>`<li>${r}</li>`).join('')}</ul></button>`).join('')}</div>`; }
 const C_STEPS=['name','era','mode','origin','nationality','style','mentor','quality','flaw','summary'];
 function startCoachCreation(){ creation={kind:'coach',step:0,name:''}; state=null; renderCreation(); }
@@ -38,7 +54,7 @@ function cBack(){ if(creation.step>0){ creation.step--; renderCreation(); } else
 function renderCreation(){
   showGameBanner(); document.documentElement.setAttribute('data-theme',creation.kind==='player'?'player':'coach'); editionLabelEl.textContent=creation.era?`${creation.era.icon} ${creation.era.name}`:'Nouvelle carrière';
   const steps=creation.kind==='coach'?C_STEPS:P_STEPS, step=steps[creation.step]; const back=`<div class="btn-row"><button class="btn secondary" onclick="cBack()">← Retour</button></div>`; let html='';
-  const modeCard=(list,key,labels)=>`<div class="mode-grid">${list.map((m,i)=>`<button class="mode-card" onclick="cPick('${key}',${key==='mode'?'COACH_MODES':key==='origin'?(creation.kind==='coach'?'COACH_ORIGINS':'PLAYER_ORIGINS'):key==='quality'?'COACH_QUALITIES':key==='flaw'?'COACH_FLAWS':key==='trait'?'PLAYER_TRAITS':key==='nationality'?'NATIONALITIES':key==='style'?'STYLES':key==='pos'?'PLAYER_POS':'MENTORS_CUR'}[${i}])"><div class="mode-icon">${m.icon||''}</div><div class="mode-copy">${m.difficulty?`<small>${m.difficulty}</small>`:''}<b>${m.name}</b><span>${m.desc||m.style||''}</span>${m.details?`<span class="mode-rules">${m.details.map(d=>`<i>${d}</i>`).join('')}</span>`:''}${m.bonus?bonusChips(m.bonus,labels):''}${m.favoredStyleIds?`<span class="chip-row">${m.favoredStyleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>`:''}${m.styleIds?`<span class="chip-row">${m.styleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>`:''}</div></button>`).join('')}</div>`;
+  const modeCard=(list,key,labels)=>`<div class="mode-grid">${list.map((m,i)=>`<button class="mode-card" onclick="cPick('${key}',${key==='mode'?'COACH_MODES':key==='origin'?(creation.kind==='coach'?'COACH_ORIGINS':'PLAYER_ORIGINS'):key==='quality'?'COACH_QUALITIES':key==='flaw'?'COACH_FLAWS':key==='trait'?'PLAYER_TRAITS':key==='nationality'?'NATIONALITIES':key==='style'?'STYLES':key==='pos'?'PLAYER_POS':'MENTORS_CUR'}[${i}])"><div class="mode-icon">${m.icon||''}</div><div class="mode-copy">${m.difficulty?`<small>${m.difficulty}</small>`:''}<b>${m.name}</b><span>${m.desc||m.style||''}</span>${m.details?`<span class="mode-rules">${m.details.map(d=>`<i>${d}</i>`).join('')}</span>`:''}${m.bonus?bonusChips(m.bonus,labels):''}${perkChips(m)}${m.favoredStyleIds?`<span class="chip-row">${m.favoredStyleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>`:''}${m.styleIds?`<span class="chip-row">${m.styleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>`:''}</div></button>`).join('')}</div>`;
   if(step==='name') html=`<div class="card"><h2 class="display">${creation.kind==='coach'?"Ton nom d'entraîneur·euse":"Ton nom de joueur·euse"}</h2><input type="text" id="cName" maxlength="28" placeholder="Ex. Vanessa Le Bris" value="${escapeHtml(creation.name)}"><div class="btn-row"><button class="btn secondary" onclick="renderStart()">Accueil</button><button class="btn" onclick="cPick('name',document.getElementById('cName').value.trim()||'Anonyme')">Continuer →</button></div></div>`;
   else if(step==='era') html=`<div class="card"><h2 class="display">Choisis ton époque</h2><p class="hint">Les joueurs disponibles, les règles du football et l'argent en jeu dépendent de l'époque. Une longue carrière traverse la suivante.</p>${eraPickHTML('cPickEra')}${back}</div>`;
   else if(step==='mode') html=`<div class="card"><h2 class="display">Choisis ta campagne</h2><p class="hint">Elle règle les budgets, la patience des présidents, la variance et la fréquence des incidents.</p>${modeCard(COACH_MODES,'mode',CSTAT)}${back}</div>`;
