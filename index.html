@@ -1,17 +1,35 @@
 <!doctype html>
 <html lang="fr">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌺</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Les p'tites sorties du Pays de Lorient — by Vaness'" />
-    <title>🌺 Bouge tes fesses by Vaness'</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Absolut Coach, jeu de simulation de carrière dans le football : entraîneur·euse ou joueur·euse, de la N3 aux super-clubs.">
+  <meta name="theme-color" content="#0b1210">
+  <title>Absolut Coach</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="credit-strip" id="homeCreditStrip">
+    <span>Concept de jeu inspiré d'<b>Absolut Director</b> (Feuille2Cedric) · adaptation football</span>
+  </div>
+
+  <div class="filmstrip" id="filmstrip" style="display:none;"></div>
+
+  <header id="gameTopBanner" class="game-banner" style="display:none;">
+    <button class="brand display brand-button" type="button" onclick="goHomeFromGame()" title="Retour à l'accueil">
+      ABSOLUT COACH<span>.</span>
+    </button>
+    <div class="edition-label" id="editionLabel">Une vie de football</div>
+  </header>
+
+  <main class="app" id="app" aria-live="polite"></main>
+
+  <noscript>Ce jeu nécessite JavaScript pour fonctionner.</noscript>
+  <script src="data.js"></script>
+  <script src="engine.js"></script>
+  <script src="events.js"></script>
+  <script src="player.js"></script>
+  <script src="ui.js"></script>
+</body>
 </html>
