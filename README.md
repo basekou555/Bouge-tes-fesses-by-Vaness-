@@ -2,11 +2,11 @@
 
 # ⚽ ABSOLUT COACH
 
-### Une vie de football, de 30 à 75 ans
+### Une vie de football à travers les époques
 
-**Choisis tes clubs. Dirige tes vestiaires. Survis aux présidents. Construis une œuvre.**
+**Choisis ton époque. Choisis tes clubs et tes joueurs. Survis aux présidents. Construis une œuvre.**
 
-`100 % LOCAL` · `AUCUNE INSTALLATION` · `FRANÇAIS` · `BADGES ET PANTHÉON PERSISTANTS`
+`7 ÉPOQUES` · `VRAIS CLUBS, VRAIS JOUEURS` · `100 % LOCAL` · `FRANÇAIS`
 
 > Le jeu ne cherche pas « le bon bouton ». Chaque décision déplace des probabilités, puis le football fait ce qu'il sait faire de mieux : surprendre.
 
@@ -18,131 +18,80 @@ Concept de jeu inspiré d'[Absolut Director](https://github.com/Feuille2Cedric/a
 
 ## 🚀 Lancer le jeu
 
-Aucune installation et aucune connexion ne sont nécessaires.
-
-1. Ouvre [`index.html`](./index.html) dans Chrome, Edge ou Firefox.
-2. Clique sur **Commencer une carrière d'entraîneur·euse** ou **Commencer une carrière de joueur·euse**.
-3. Pour conserver correctement badges, sauvegarde et Panthéon, joue toujours depuis le même navigateur.
-
-Le [workflow GitHub Pages](.github/workflows/pages.yml) publie automatiquement le jeu après chaque push sur `main` (à activer dans les réglages du dépôt : Settings → Pages → Source : GitHub Actions).
+Aucune installation et aucune connexion ne sont nécessaires : ouvre [`index.html`](./index.html) dans Chrome, Edge ou Firefox. Sauvegarde, badges et Panthéon restent dans le navigateur.
 
 ```text
 absolut-coach/
-├── index.html   coquille de la page
-├── styles.css   thème sombre vert et or (thème bleu pour le mode joueur·euse)
-├── data.js      styles de jeu, campagnes, origines, clubs, recrues, tactiques, incidents…
-├── engine.js    état, offres, jauges, résolution de saison, pression, enveloppe, fins, badges
-├── events.js    intersaison : amende écologique, roulette, plans, dilemmes, coups du sort
-├── player.js    carrière de joueur·euse (17 → 38 ans)
-└── ui.js        écrans et rendu
+├── index.html    coquille de la page
+├── styles.css    thème vert et or (bleu pour le mode joueur·euse)
+├── profile.js    styles de jeu et nationalités
+├── players.js    près de 400 joueurs réels, des années 50 à aujourd'hui
+├── eras.js       les sept époques et leurs règles, les clubs réels, les entraîneurs réels
+├── content.js    incidents, coups du sort, dilemmes, roulettes, arnaques du mercato
+├── core.js       moteur partagé : joueurs, effectifs, marché, championnats, coupes
+├── coach.js      carrière d'entraîneur·euse
+├── player.js     carrière de joueur·euse
+└── ui.js         écrans
 ```
 
 ---
 
-## 🧢 Carrière d'entraîneur·euse
+## ⏳ Les sept époques
 
-Tu incarnes un·e entraîneur·euse au début de sa carrière (30 ans). Tu choisis une **campagne**, une **origine**, une **nationalité**, un **style de jeu favori**, une **inspiration**, une **qualité** et un **défaut**. Ces éléments façonnent tes statistiques et tes affinités, mais ne garantissent jamais le résultat d'une saison.
-
-À chaque période :
-
-1. tu analyses les projets proposés (club, palier, style demandé, objectif, capital à engager) ;
-2. tu choisis une recrue phare (star, valeur sûre, jeune, pari libre ou promotion interne) ;
-3. tu décides de la gestion du vestiaire, du système de jeu, du staff et des infrastructures ;
-4. la saison peut rencontrer un incident (blessure, président envahissant, ultras, grève, scandale…) ;
-5. tu choisis ta communication ;
-6. le classement final, la presse, les supporters, les coupes et les récompenses tombent ;
-7. ta carrière, ton staff et ton club conservent les conséquences de tes décisions.
-
-### Les paliers de projets
-
-| Palier | Capital engagé | Accès |
+| Époque | Années | Ce qui change |
 |---|---|---|
-| Projet louche (club en perdition) | 10 à 80 k€ | toujours, mais handicap énorme |
-| Club amateur ambitieux (N3 / N2) | 50 à 400 k€ | dès le début |
-| National / Ligue 2 | 1 à 8 M€ | après une saison |
-| Ligue 1 | 12 à 50 M€ | deux saisons et une réputation |
-| Championnat étranger émergent | 4 à 60 M€ | réseau ou cote suffisants |
-| Club européen | 10 à 80 M€ | réputation solide ou expérience internationale |
-| Super-club mondial | 70 à 220 M€ | cote, réseau et gestion au sommet |
+| 📻 Années 50-60 | 1958-1969 | Aucun remplaçant, 2 étrangers, transferts rares, francs |
+| 📺 Années 70 | 1970-1981 | 2 remplaçants, football total, mercato limité |
+| 📼 Années 80 | 1982-1993 | 3 étrangers, tacles par derrière, affaires |
+| 💿 Années 90 | 1994-2003 | Arrêt Bosman en 1996, Ligue des champions, mercato d'hiver dès 2000 |
+| 📱 Années 2000 | 2004-2013 | Agents tout-puissants, premiers fonds étrangers, euros |
+| 📊 Années 2010 | 2014-2023 | Fair-play financier, data, VAR, réseaux sociaux |
+| 🛰️ Aujourd'hui | 2024- | Golfe, MLS, multipropriété, 5 remplaçants, transferts à 100 M€ |
 
-Un **intérim de sauvetage** (le club paie tout) est proposé après deux saisons ratées d'affilée. **Rester dans le même club** fidélise le public, mais à partir de la 4e saison le discours s'use.
-
-### Les cinq campagnes
-
-| Campagne | Sensation de jeu |
-|---|---|
-| **★☆☆☆☆ Carrière classique** | Économie neutre, quatre saisons ratées tolérées, intérim et enveloppe disponibles |
-| **★★☆☆☆ Bâtisseur·euse incompris·e** | 35 % de capital en moins, supporters plus difficiles, presse plus réceptive |
-| **★★★☆☆ Machine à trophées** | Capital ×4, frais fixes et usure renforcés ; une saison impopulaire fait bondir la pression |
-| **★★★★☆ Football chaos** | Variance presque doublée, incidents très fréquents, pression erratique |
-| **★★★★★ Dernier contrat** | 55 % de capital en moins, trois saisons ratées suffisent, ni intérim ni enveloppe |
-
-Tous les cinq projets, une **stratégie de carrière** oriente trois saisons : philosophie, tribunes, organisation, rupture, style favori, international, noyau dur ou survie.
-
-### Les statistiques
-
-- **Tactique** : lecture du jeu, idées, capacité à transformer un effectif en équipe.
-- **Gestion** : maîtrise d'un groupe, d'un staff et d'un calendrier chargé.
-- **Réseau** : accès aux clubs, agents, joueurs et opportunités à l'étranger.
-- **Réputation presse** : crédit auprès des journalistes et des jurys.
-- **Cote supporters** : popularité, accès aux gros projets.
-- **Moral** : endurance personnelle.
-- **Capital** : ce que le football accepte de te confier. Chaque projet engage une part du capital, les recettes de saison (primes, billetterie, plus-values) y reviennent. À zéro, plus aucun président ne te fait confiance.
-- **Pression** : fatigue industrielle et personnelle. Elle pénalise progressivement les saisons et peut devenir fatale.
-
-### Les six jauges du club
-
-| Jauge | Effet concret |
-|---|---|
-| ⚖️ **Intégrité** | Une valeur basse nourrit les scandales et le risque de licenciement conflictuel en cours de saison. |
-| 🌱 **Écologie** | Surcoûts logistiques, pression et moral. Chaque saison lui retire 2 points. Sous 10, la Ligue des défenseurs de la planète peut infliger une amende. |
-| ✊ **Vestiaire** | Loyauté, moral, qualité collective, grèves. Avec l'intégrité, détermine le risque de rupture du groupe. |
-| ❤️ **Direction & staff** | Coordination et loyauté du staff. Sous 50, risque croissant que la saison s'enlise (durée et budget doublés). |
-| 🌌 **Identité de jeu** | Fidélise les supporters et augmente les recettes, surtout lorsque tu restes au même club. |
-| 🎓 **Formation** | Réduit le coût du recrutement, renforce les projets de formation et le regard de la presse. |
-
-Chaque saison use toutes les jauges. Une jauge à 100 débloque un statut permanent (autorité morale, club régénératif, vestiaire modèle, staff indéfectible, architecte de projet, école reconnue). À partir du troisième projet, chaque offre reçoit un **surcoût caché de 5 à 70 %**, tiré vers le haut quand les jauges sont mauvaises.
-
-### Pression, roulette, enveloppe
-
-- Dès 25, la pression réduit la qualité ; à 60 elle dégrade le moral ; entre 90 et 99, **1 % de risque de mort** par période critique ; à 100, une crise impose un choix, et « continuer coûte que coûte » déclenche **50 % de risque de mort**.
-- La **roulette du destin** devient éligible après trois saisons (20 % de chance d'apparaître, quatre saisons de délai). Quatre issues cachées : fin, jackpot, petit bonus, malus.
-- Quand le capital atteint zéro, un mécène propose une **enveloppe de secours** unique : deux échéances, 10 % d'intérêts avant chacune, radiation si tout n'est pas soldé.
-
-### Comment une carrière peut se terminer
-
-75 ans · capital épuisé · radiation pour dettes · série de saisons ratées · trois périodes en rupture structurelle · plus aucune offre après 55 ans avec une réputation faible · arrestation écologique · roulette · mort par pression · retraite volontaire.
+Les joueurs réels (Kopa, Platini, Zidane, Mbappé, Yamal…) apparaissent selon leur âge dans l'année en cours, avec un niveau proche de leur réalité et une part de hasard. Une longue carrière traverse l'époque suivante.
 
 ---
 
-## 👟 Carrière de joueur·euse
+## 🧢 Carrière d'entraîneur·euse (30 → 75 ans)
 
-De 17 à 38 ans. Tu choisis un poste, une origine et un trait de caractère. Ton agent te propose des clubs et des rôles (titulaire, rotation, remplaçant·e) ; tu choisis ta préparation estivale et ton attitude ; un incident peut survenir ; la saison décide de tes matchs, buts, passes, note, sélection nationale, trophées et gains. La **forme physique** remplace le capital : à zéro, le corps lâche. Les qualités progressent vite avant 24 ans, plafonnent, puis déclinent après 31 ans. Le **Ballon de platine** récompense les saisons exceptionnelles dans les grands clubs.
+1. **Les offres** : des clubs réels (Reims 1958, Bordeaux 1985, Lyon 2005, Inter Miami 2024…) avec leur championnat, un objectif de classement, un budget de transferts et un président qui a son caractère (patient, impulsif, ambitieux, comptable, romantique, étranger).
+2. **Le mercato** : libre, mais cohérent. Vends, recrute des stars si ta crédibilité le permet, des pros, des pépites venues d'une vidéo ou d'un cousin (certaines sont des arnaques : faux âge, blessure cachée, joueur fantôme, commission occulte…), des joueurs libres ou des jeunes du centre. Un « gros coup » coûte cher et exige une place de titulaire. Plafond salarial et quota d'étrangers de l'époque s'appliquent.
+3. **Le plan de jeu** : une formation et un style. Suivre le style demandé par le club et jouer ton style favori renforcent l'équipe.
+4. **La saison en quatre phases** : un vrai calendrier, tes scores, le classement, une explication du résultat (onze type, vestiaire, style, tactique, blessés, dynamique) et l'évolution de la **confiance du président**. Mercato d'hiver à la trêve quand l'époque le permet.
+5. **Le bilan** : classement final, coupe nationale, coupe d'Europe, récompenses, progressions des jeunes, contrats, verdict du président, montée ou descente.
+
+**La confiance du président** remplace le capital : elle monte quand tu dépasses l'objectif, chute quand tu es en dessous ou que la masse salariale explose. À zéro, licenciement immédiat. Sous 35 en fin de saison, pas de prolongation. L'objectif se recalcule chaque saison sur la vraie force de ton effectif : bâtir une armada relève l'attente.
+
+**Quatre jauges du club** : ✊ Vestiaire (force de l'équipe), 📣 Supporters (pression et patience), 🎓 Formation (jeunes, arnaques), 🧑‍🤝‍🧑 Staff (blessures, progression). Une jauge basse déclenche des dilemmes.
+
+**Pression, roulette, fins** : à 100 de pression, une crise impose un choix (dont un à 50 % de risque de mort). La roulette du destin peut apparaître deux fois par carrière, avec une issue parfois fatale. La carrière s'arrête à 75 ans, après quatre licenciements d'affilée, deux années sans offre, ou par retraite.
+
+### Les cinq campagnes
+
+| Campagne | Effet |
+|---|---|
+| ⚽ Carrière classique | Budgets et présidents normaux |
+| 🌱 Bâtisseur·euse | Budgets −40 %, présidents +30 % de patience, formation valorisée |
+| 🏟️ Machine à trophées | Budgets +60 %, présidents −40 % de patience, objectifs relevés |
+| 🎲 Football chaos | Variance +60 %, incidents +50 % |
+| 💀 Dernier contrat | Budgets −50 %, présidents −50 % de patience, pression +50 % |
+
+---
+
+## 👟 Carrière de joueur·euse (17 → 38 ans)
+
+Tu rejoins des clubs réels avec un rôle promis (titulaire, rotation, remplaçant·e) et un coach, parfois réel. Ton temps de jeu dépend de ta note face aux concurrents à ton poste et de la **confiance du coach**. Chaque phase : un incident possible, tes matchs, buts, passes, note. Quatre jauges : 🩻 Corps (à zéro, fin de carrière), ✊ Vestiaire, 📣 Supporters, 👪 Entourage. Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.
 
 ---
 
 ## 🏅 Badges et Panthéon
 
-La salle des badges conserve les accomplissements dans le navigateur : campagnes, trophées, récompenses, saisons mémorables, jauges, pression, roulette, finances, fins de carrière et mode joueur·euse. Certains badges récompensent une réussite ; d'autres immortalisent une catastrophe. Le Panthéon garde les carrières terminées avec leur score.
-
----
-
-## 🧠 Conseils sans révéler les solutions
-
-1. Ne choisis pas automatiquement le plus gros projet : le capital engagé, la difficulté et la durée doivent correspondre à ta situation.
-2. Un système de jeu cohérent avec le style demandé par le club vaut plus qu'une star.
-3. Regarde les jauges comme des risques futurs, pas comme une note morale.
-4. Entretiens une marge d'écologie avant chaque nouvelle saison.
-5. Sous 50 en intégrité ou vestiaire, tu peux perdre toute une saison ; sous 50 en direction & staff, la saison peut s'enliser.
-6. À 90 de pression, chaque période supplémentaire engage aussi ta survie.
-7. Un échec intéressant peut ouvrir davantage de récits et de badges qu'une carrière parfaitement lisse.
+Une soixantaine de badges persistants : titres par époque et par pays, mercato (gros coup, arnaques, pépite devenue star), jauges à 100, pression, roulette, mode joueur·euse. Le Panthéon garde les carrières terminées avec leur score.
 
 ---
 
 <div align="center">
 
 ### « Un bon choix améliore tes chances. Il ne signe jamais le contrat avec le destin. »
-
-**Bon match. Et garde un œil sur le capital.**
 
 </div>

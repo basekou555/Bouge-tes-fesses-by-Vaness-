@@ -1,351 +1,256 @@
 /* ============================== ABSOLUT COACH — INTERFACE ============================== */
-const app=document.getElementById('app');
-const filmstripEl=document.getElementById('filmstrip');
-const homeCreditStripEl=document.getElementById('homeCreditStrip');
-const gameTopBannerEl=document.getElementById('gameTopBanner');
-const editionLabelEl=document.getElementById('editionLabel');
-let creation=null; // profil en cours de création (entraîneur·euse)
-
-function applyTheme(){
-  const player=state&&state.kind==='player';
-  document.documentElement.setAttribute('data-theme',player?'player':'coach');
-  const brand=gameTopBannerEl.querySelector('.brand');
-  if(brand) brand.innerHTML=(player?'ABSOLUT PLAYER':'ABSOLUT COACH')+'<span>.</span>';
-  document.title=player?'Absolut Player':'Absolut Coach';
-  editionLabelEl.textContent=player?'Une vie de joueur·euse, de 17 à 38 ans':'Une vie de football, de 30 à 75 ans';
-}
+const app=document.getElementById('app'), filmstripEl=document.getElementById('filmstrip'), homeCreditStripEl=document.getElementById('homeCreditStrip'), gameTopBannerEl=document.getElementById('gameTopBanner'), editionLabelEl=document.getElementById('editionLabel');
+let creation=null, marketFilter='all', tacticSel=null;
+function applyTheme(){ const player=state&&state.kind==='player'; document.documentElement.setAttribute('data-theme',player?'player':'coach'); const brand=gameTopBannerEl.querySelector('.brand'); if(brand) brand.innerHTML=(player?'ABSOLUT PLAYER':'ABSOLUT COACH')+'<span>.</span>'; document.title=player?'Absolut Player':'Absolut Coach'; editionLabelEl.textContent=state?`${eraForYear(state.year).icon} ${eraForYear(state.year).name} · ${state.year}`:'Une vie de football à travers les époques'; }
 function showHomeBanner(){ homeCreditStripEl.style.display=''; gameTopBannerEl.style.display='none'; filmstripEl.style.display='none'; applyTheme(); }
 function showGameBanner(){ homeCreditStripEl.style.display='none'; gameTopBannerEl.style.display=''; applyTheme(); }
-function goHomeFromGame(){ if(state&&!state.ended){ if(state.kind==='player') savePlayerGame(); else saveGame(); } state=null; creation=null; renderStart(); }
+function goHomeFromGame(){ if(state&&!state.ended) saveGame(); state=null; creation=null; renderStart(); }
 function scrollTop(){ window.scrollTo(0,0); }
+function $(v){ return money(v,state?state.year:2015); }
 
 /* ---------- Accueil ---------- */
 function renderStart(){
   showHomeBanner(); document.documentElement.setAttribute('data-theme','coach'); document.title='Absolut Coach';
-  const save=lsGet(SAVE_KEY,null), psave=lsGet(PLAYER_SAVE_KEY,null);
-  app.innerHTML=`<div class="fade-in">
-    <div class="home-hero">
-      <h1 class="display">ABSOLUT <span>COACH</span></h1>
-      <div class="tagline narr">Une vie de football, de 30 à 75 ans. Choisis tes clubs. Dirige tes vestiaires. Survis aux présidents. Construis une œuvre.</div>
-      <div class="home-pills"><span class="pill">100 % local</span><span class="pill">Aucune installation</span><span class="pill">Français</span><span class="pill">Badges persistants</span></div>
-      <p class="hint narr" style="max-width:640px;margin:0 auto;">Le jeu ne cherche pas « le bon bouton ». Chaque décision déplace des probabilités, puis le football fait ce qu'il sait faire de mieux : surprendre.</p>
-    </div>
+  const cs=lsGet(KEYS.coach,null), ps=lsGet(KEYS.player,null);
+  app.innerHTML=`<div class="fade-in"><div class="home-hero"><h1 class="display">ABSOLUT <span>COACH</span></h1>
+    <div class="tagline narr">Une vie de football, des années Kopa à l'ère Mbappé. Choisis ton époque, tes clubs, tes joueurs. Survis aux présidents.</div>
+    <div class="home-pills"><span class="pill">7 époques</span><span class="pill">Vrais clubs, vrais joueurs</span><span class="pill">100 % local</span><span class="pill">Français</span></div></div>
     <div class="home-grid">
-      <button class="home-card" onclick="startCoachCreation()"><div class="ico">🧢</div><b>Commencer une carrière d'entraîneur·euse</b><span>De la N3 aux super-clubs : offres, recrutement, vestiaire, tactique, staff, incidents et bilan de saison.</span></button>
-      <button class="home-card" onclick="startPlayerCreation()"><div class="ico">👟</div><b>Commencer une carrière de joueur·euse</b><span>De 17 à 38 ans : agents, temps de jeu, blessures, sélection et Ballon de platine.</span></button>
-      ${save&&!save.ended?`<button class="home-card" onclick="continueSavedGame()"><div class="ico">💾</div><b>Reprendre : ${escapeHtml(save.name)}</b><span>${escapeHtml(save.careerModeName)} · ${save.age} ans · ${save.seasons.length} saison${save.seasons.length>1?'s':''} · ${euros(save.stats.argent)}</span></button>`:''}
-      ${psave&&!psave.ended?`<button class="home-card" onclick="continuePlayerGame()"><div class="ico">💾</div><b>Reprendre : ${escapeHtml(psave.name)} (joueur·euse)</b><span>${psave.age} ans · ${psave.seasons.length} saison${psave.seasons.length>1?'s':''} · ${escapeHtml(psave.club||'sans club')}</span></button>`:''}
-      <button class="home-card" onclick="renderBadges()"><div class="ico">🏅</div><b>Salle des badges</b><span>${unlockedTrophies.size} / ${TROPHIES.length} badges débloqués, toutes carrières confondues.</span></button>
+      <button class="home-card" onclick="startCoachCreation()"><div class="ico">🧢</div><b>Carrière d'entraîneur·euse</b><span>Offres de clubs réels, mercato libre, phases de championnat, coupes, présidents et licenciements.</span></button>
+      <button class="home-card" onclick="startPlayerCreation()"><div class="ico">👟</div><b>Carrière de joueur·euse</b><span>De 17 à 38 ans : agents, temps de jeu, blessures, sélection nationale, Ballon d'or.</span></button>
+      ${cs&&!cs.ended?`<button class="home-card" onclick="continueGame('coach')"><div class="ico">💾</div><b>Reprendre : ${escapeHtml(cs.name)}</b><span>${escapeHtml(cs.modeName)} · ${cs.year} · ${cs.club?escapeHtml(cs.club.name):'sans club'} · ${cs.history.length} saison${cs.history.length>1?'s':''}</span></button>`:''}
+      ${ps&&!ps.ended?`<button class="home-card" onclick="continueGame('player')"><div class="ico">💾</div><b>Reprendre : ${escapeHtml(ps.name)} (joueur·euse)</b><span>${ps.year} · ${ps.club?escapeHtml(ps.club.name):'sans club'} · ${ps.history.length} saison${ps.history.length>1?'s':''}</span></button>`:''}
+      <button class="home-card" onclick="renderBadges()"><div class="ico">🏅</div><b>Salle des badges</b><span>${unlockedTrophies.size} / ${TROPHIES.length} débloqués.</span></button>
       <button class="home-card" onclick="renderHall()"><div class="ico">🏛️</div><b>Panthéon</b><span>Les carrières terminées sur ce navigateur.</span></button>
-      <button class="home-card" onclick="renderRules()"><div class="ico">📖</div><b>Comment ça marche</b><span>Statistiques, jauges du club, pression, roulette, enveloppe de secours et fins de carrière.</span></button>
-    </div>
-  </div>`;
-  scrollTop();
+      <button class="home-card" onclick="renderRules()"><div class="ico">📖</div><b>Comment ça marche</b><span>Époques, effectif, mercato, phases, confiance du président, pression.</span></button>
+    </div></div>`; scrollTop();
 }
-function continueSavedGame(){ if(loadGame()){ render(); } else renderStart(); }
+function continueGame(kind){ const s=lsGet(kind==='player'?KEYS.player:KEYS.coach,null); if(s&&!s.ended){ state=s; render(); } else renderStart(); }
 
-/* ---------- Création du profil entraîneur·euse ---------- */
-const CREATION_STEPS=['name','mode','origine','nationality','style','mentor','qualite','defaut','summary'];
-function startCoachCreation(){ creation={step:0,name:'',mode:null,origine:null,nationality:null,favoriteStyle:null,mentor:null,qualite:null,defaut:null}; renderCreation(); }
-function creationProgressHTML(){ const i=creation.step; return `<div class="creation-progress"><span>Étape ${i+1}/${CREATION_STEPS.length}</span><div class="track"><i style="width:${Math.round((i+1)/CREATION_STEPS.length*100)}%"></i></div></div>`; }
-function creationPick(key,value){ creation[key]=value; creation.step++; renderCreation(); }
-function creationBack(){ if(creation.step>0){ creation.step--; renderCreation(); } else renderStart(); }
-function bonusChips(bonus){ return `<div class="chip-row">${Object.entries(bonus||{}).filter(([k,v])=>v).map(([k,v])=>`<span class="chip ${v>0?'good':'bad'}">${STAT_LABELS[k]||k} ${v>0?'+':''}${v}</span>`).join('')}</div>`; }
+/* ---------- Création ---------- */
+function progressHTML(i,n){ return `<div class="creation-progress"><span>Étape ${i+1}/${n}</span><div class="track"><i style="width:${Math.round((i+1)/n*100)}%"></i></div></div>`; }
+function bonusChips(bonus,labels){ return `<div class="chip-row">${Object.entries(bonus||{}).filter(([k,v])=>v).map(([k,v])=>`<span class="chip ${v>0?'good':'bad'}">${labels[k]||k} ${v>0?'+':''}${v}</span>`).join('')}</div>`; }
+function eraPickHTML(cb){ return `<div class="era-grid">${ERAS.map((e,i)=>`<button class="era-card" onclick="${cb}(${i})"><div class="ico">${e.icon}</div><span class="years">${e.start} – ${e.end}</span><b>${e.name}</b><p>${e.tagline}</p><ul>${e.rules.map(r=>`<li>${r}</li>`).join('')}</ul></button>`).join('')}</div>`; }
+const C_STEPS=['name','era','mode','origin','nationality','style','mentor','quality','flaw','summary'];
+function startCoachCreation(){ creation={kind:'coach',step:0,name:''}; state=null; renderCreation(); }
+function cPick(k,v){ creation[k]=v; creation.step++; renderCreation(); }
+function cBack(){ if(creation.step>0){ creation.step--; renderCreation(); } else renderStart(); }
 function renderCreation(){
-  showGameBanner(); state=null; document.documentElement.setAttribute('data-theme','coach');
-  const step=CREATION_STEPS[creation.step];
-  let html='';
-  const back=`<div class="btn-row"><button class="btn secondary" onclick="creationBack()">← Retour</button></div>`;
-  if(step==='name'){
-    html=`<div class="card"><h2 class="display">Ton nom d'entraîneur·euse</h2><p class="hint">Il apparaîtra sur les bancs, dans la presse et au Panthéon.</p>
-      <input type="text" id="coachName" maxlength="28" placeholder="Ex. Vanessa Le Bris" value="${escapeHtml(creation.name)}">
-      <div class="btn-row"><button class="btn secondary" onclick="renderStart()">Accueil</button><button class="btn" onclick="creationPick('name',document.getElementById('coachName').value.trim()||'Anonyme')">Continuer →</button></div></div>`;
-  } else if(step==='mode'){
-    html=`<div class="card"><h2 class="display">Choisis ta campagne</h2><p class="hint">La campagne change l'économie, la variance, les incidents, l'usure des jauges et les conditions de défaite pendant toute la carrière.</p>
-      <div class="mode-grid">${CAREER_MODES.map((m,i)=>`<button class="mode-card" onclick="creationPick('mode',CAREER_MODES[${i}])"><div class="mode-icon">${m.icon}</div><div class="mode-copy"><small>${m.difficulty}</small><b>${m.name}</b><span>${m.desc}</span><span class="mode-rules">${m.details.map(d=>`<i>${d}</i>`).join('')}</span></div></button>`).join('')}</div>${back}</div>`;
-  } else if(step==='origine'){
-    html=`<div class="card"><h2 class="display">D'où viens-tu ?</h2><p class="hint">L'origine fixe ton capital de départ, ton profil initial et ta manière de démarrer.</p>
-      <div class="mode-grid">${ORIGINES.map((o,i)=>`<button class="mode-card" onclick="creationPick('origine',ORIGINES[${i}])"><div class="mode-copy"><b>${o.name}</b><span>${o.desc}</span>${bonusChips(o.bonus)}<span class="chip-row"><span class="chip">Capital ${o.capitalMod>0?'+':''}${Math.round(o.capitalMod*100)} %</span>${o.riskReduction?`<span class="chip good">Risque −${o.riskReduction}</span>`:''}${o.scandalStart?`<span class="chip bad">Scandale +${o.scandalStart}</span>`:''}</span></div></button>`).join('')}</div>${back}</div>`;
-  } else if(step==='nationality'){
-    html=`<div class="card"><h2 class="display">Ta nationalité</h2><p class="hint">Elle définit tes affinités culturelles avec certains styles de jeu.</p>
-      <div class="mode-grid">${NATIONALITIES.map((n,i)=>`<button class="mode-card" onclick="creationPick('nationality',NATIONALITIES[${i}])"><div class="mode-copy"><b>${n.name}</b><span>${n.desc}</span><span class="chip-row">${n.favoredStyleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>${bonusChips(n.bonus)}</div></button>`).join('')}</div>${back}</div>`;
-  } else if(step==='style'){
-    html=`<div class="card"><h2 class="display">Ton style de jeu favori</h2><p class="hint">Tu seras meilleur·e dans ce style, et les projets qui le demandent te parleront davantage.</p>
-      <div class="mode-grid">${STYLES.map((s,i)=>`<button class="mode-card" onclick="creationPick('favoriteStyle',STYLES[${i}])"><div class="mode-icon">${s.icon}</div><div class="mode-copy"><b>${s.name}</b><span>${s.desc}</span><span class="chip-row"><span class="chip">Prestige ${starRating(s.prestige*100)}</span><span class="chip">Spectacle ${starRating(s.appeal*100)}</span></span></div></button>`).join('')}</div>${back}</div>`;
-  } else if(step==='mentor'){
-    html=`<div class="card"><h2 class="display">Ton inspiration</h2><p class="hint">Un·e entraîneur·euse dont tu revendiques l'héritage. Une simple orientation de départ.</p>
-      <div class="mode-grid">${MENTORS.map((m,i)=>`<button class="mode-card" onclick="creationPick('mentor',MENTORS[${i}])"><div class="mode-copy"><b>${m.name}</b><span>${m.style}</span>${bonusChips(m.bonus)}</div></button>`).join('')}</div>${back}</div>`;
-  } else if(step==='qualite'){
-    html=`<div class="card"><h2 class="display">Ta grande qualité</h2><div class="mode-grid">${QUALITES.map((q,i)=>`<button class="mode-card" onclick="creationPick('qualite',QUALITES[${i}])"><div class="mode-copy"><b>${q.name}</b><span>${q.desc}</span>${bonusChips(q.bonus)}</div></button>`).join('')}</div>${back}</div>`;
-  } else if(step==='defaut'){
-    html=`<div class="card"><h2 class="display">Ton défaut</h2><p class="hint">Il augmente les risques d'incident et parfois le scandale. Personne n'est parfait.</p><div class="mode-grid">${DEFAUTS.map((d,i)=>`<button class="mode-card" onclick="creationPick('defaut',DEFAUTS[${i}])"><div class="mode-copy"><b>${d.name}</b><span>${d.desc}</span>${bonusChips(d.bonus)}<span class="chip-row"><span class="chip bad">Risque +${d.riskBoost}</span></span></div></button>`).join('')}</div>${back}</div>`;
-  } else {
-    const stats=computeCreationStats();
-    const startCapital=clamp((STARTING_CAPITAL+(creation.origine.capitalMod||0))*creation.mode.rules.capitalMult,.04,8);
-    html=`<div class="card"><h2 class="display">${escapeHtml(creation.name)}</h2>
-      <div class="identity">${creation.mode.icon} <b>${creation.mode.name}</b> · ${creation.origine.name} · ${creation.nationality.name} · style favori <b>${creation.favoriteStyle.icon} ${creation.favoriteStyle.name}</b> · inspiré·e par <b>${creation.mentor.name}</b> · ${creation.qualite.name} / ${creation.defaut.name}</div>
-      <div class="section-label">Statistiques de départ</div>
-      ${STAT_KEYS.map(k=>`<div class="stat-row"><div class="lbl"><span>${STAT_LABELS[k]}</span><b>${Math.round(stats[k])}</b></div><div class="bar"><i style="width:${clamp(stats[k])}%"></i></div></div>`).join('')}
-      <div class="stat-row"><div class="lbl"><span>Capital de départ</span><b>${euros(startCapital)}</b></div></div>
-      <div class="section-label">Indicateurs de destinée</div>
-      <div class="hint">${destinyHints(stats).map(h=>`• ${h}`).join('<br>')}</div>
-      <div class="btn-row"><button class="btn secondary" onclick="creationBack()">← Retour</button><button class="btn" onclick="launchCoachCareer()">Commencer la carrière ⚽</button></div></div>`;
+  showGameBanner(); document.documentElement.setAttribute('data-theme',creation.kind==='player'?'player':'coach'); editionLabelEl.textContent=creation.era?`${creation.era.icon} ${creation.era.name}`:'Nouvelle carrière';
+  const steps=creation.kind==='coach'?C_STEPS:P_STEPS, step=steps[creation.step]; const back=`<div class="btn-row"><button class="btn secondary" onclick="cBack()">← Retour</button></div>`; let html='';
+  const modeCard=(list,key,labels)=>`<div class="mode-grid">${list.map((m,i)=>`<button class="mode-card" onclick="cPick('${key}',${key==='mode'?'COACH_MODES':key==='origin'?(creation.kind==='coach'?'COACH_ORIGINS':'PLAYER_ORIGINS'):key==='quality'?'COACH_QUALITIES':key==='flaw'?'COACH_FLAWS':key==='trait'?'PLAYER_TRAITS':key==='nationality'?'NATIONALITIES':key==='style'?'STYLES':key==='pos'?'PLAYER_POS':'MENTORS_CUR'}[${i}])"><div class="mode-icon">${m.icon||''}</div><div class="mode-copy">${m.difficulty?`<small>${m.difficulty}</small>`:''}<b>${m.name}</b><span>${m.desc||m.style||''}</span>${m.details?`<span class="mode-rules">${m.details.map(d=>`<i>${d}</i>`).join('')}</span>`:''}${m.bonus?bonusChips(m.bonus,labels):''}${m.favoredStyleIds?`<span class="chip-row">${m.favoredStyleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>`:''}${m.styleIds?`<span class="chip-row">${m.styleIds.map(id=>`<span class="chip good">${styleById(id).icon} ${styleById(id).name}</span>`).join('')}</span>`:''}</div></button>`).join('')}</div>`;
+  if(step==='name') html=`<div class="card"><h2 class="display">${creation.kind==='coach'?"Ton nom d'entraîneur·euse":"Ton nom de joueur·euse"}</h2><input type="text" id="cName" maxlength="28" placeholder="Ex. Vanessa Le Bris" value="${escapeHtml(creation.name)}"><div class="btn-row"><button class="btn secondary" onclick="renderStart()">Accueil</button><button class="btn" onclick="cPick('name',document.getElementById('cName').value.trim()||'Anonyme')">Continuer →</button></div></div>`;
+  else if(step==='era') html=`<div class="card"><h2 class="display">Choisis ton époque</h2><p class="hint">Les joueurs disponibles, les règles du football et l'argent en jeu dépendent de l'époque. Une longue carrière traverse la suivante.</p>${eraPickHTML('cPickEra')}${back}</div>`;
+  else if(step==='mode') html=`<div class="card"><h2 class="display">Choisis ta campagne</h2><p class="hint">Elle règle les budgets, la patience des présidents, la variance et la fréquence des incidents.</p>${modeCard(COACH_MODES,'mode',CSTAT)}${back}</div>`;
+  else if(step==='origin') html=`<div class="card"><h2 class="display">D'où viens-tu ?</h2>${modeCard(creation.kind==='coach'?COACH_ORIGINS:PLAYER_ORIGINS,'origin',creation.kind==='coach'?CSTAT:PSTAT)}${back}</div>`;
+  else if(step==='nationality') html=`<div class="card"><h2 class="display">Ta nationalité</h2><p class="hint">Elle définit tes affinités avec certains styles de jeu.</p>${modeCard(NATIONALITIES.map(n=>({...n,bonus:null})),'nationality',CSTAT)}${back}</div>`;
+  else if(step==='style') html=`<div class="card"><h2 class="display">Ton style de jeu favori</h2><p class="hint">Un club qui demande ton style et un plan de jeu cohérent donnent un vrai bonus de force.</p>${modeCard(STYLES,'style',CSTAT)}${back}</div>`;
+  else if(step==='mentor'){ window.MENTORS_CUR=COACHES_BY_ERA[creation.era.id]; html=`<div class="card"><h2 class="display">Ton inspiration</h2><p class="hint">Un·e entraîneur·euse réel·le de l'époque ${creation.era.name}. Une orientation de départ, rien de plus.</p>${modeCard(MENTORS_CUR,'mentor',CSTAT)}${back}</div>`; }
+  else if(step==='quality') html=`<div class="card"><h2 class="display">Ta grande qualité</h2>${modeCard(COACH_QUALITIES,'quality',CSTAT)}${back}</div>`;
+  else if(step==='flaw') html=`<div class="card"><h2 class="display">Ton défaut</h2>${modeCard(COACH_FLAWS,'flaw',CSTAT)}${back}</div>`;
+  else if(step==='pos') html=`<div class="card"><h2 class="display">Ton poste</h2>${modeCard(PLAYER_POS,'pos',PSTAT)}${back}</div>`;
+  else if(step==='trait') html=`<div class="card"><h2 class="display">Ton trait de caractère</h2>${modeCard(PLAYER_TRAITS,'trait',PSTAT)}${back}</div>`;
+  else if(step==='summary'){
+    if(creation.kind==='coach'){ const tmp=coachFreshState({...creation,favoriteStyle:creation.style}); html=`<div class="card"><h2 class="display">${escapeHtml(creation.name)}</h2><div class="identity">${creation.era.icon} <b>${creation.era.name}</b> · ${creation.mode.icon} ${creation.mode.name} · ${creation.origin.name} · ${creation.nationality.name} · style <b>${creation.style.icon} ${creation.style.name}</b> · inspiré·e par <b>${creation.mentor.name}</b> · ${creation.quality.name} / ${creation.flaw.name}</div>
+      <div class="section-label">Statistiques de départ</div>${Object.keys(CSTAT).map(k=>`<div class="stat-row"><div class="lbl"><span>${CSTAT[k]}</span><b>${Math.round(tmp.stats[k])}</b></div><div class="bar"><i style="width:${tmp.stats[k]}%"></i></div></div>`).join('')}
+      <div class="section-label">Jauges de départ</div>${Object.keys(GAUGE_INFO).map(k=>`<div class="stat-row"><div class="lbl"><span>${GAUGE_INFO[k].icon} ${GAUGE_INFO[k].label}</span><b>${Math.round(tmp.gauges[k])}</b></div><div class="bar"><i style="width:${tmp.gauges[k]}%"></i></div></div>`).join('')}
+      <div class="btn-row"><button class="btn secondary" onclick="cBack()">← Retour</button><button class="btn" onclick="launchCoach()">Commencer en ${creation.era.start} ⚽</button></div></div>`; }
+    else { const tmp=playerFreshState(creation); html=`<div class="card"><h2 class="display">${escapeHtml(creation.name)}</h2><div class="identity">${creation.era.icon} <b>${creation.era.name}</b> · ${creation.pos.icon} ${creation.pos.name} · ${creation.origin.name} · ${creation.trait.name} · ${tmp.age} ans</div>
+      ${Object.keys(PSTAT).map(k=>`<div class="stat-row"><div class="lbl"><span>${PSTAT[k]}</span><b>${Math.round(tmp.stats[k])}</b></div><div class="bar"><i style="width:${tmp.stats[k]}%"></i></div></div>`).join('')}
+      <div class="section-label">Jauges de départ</div>${Object.keys(PGAUGE).map(k=>`<div class="stat-row"><div class="lbl"><span>${PGAUGE[k].icon} ${PGAUGE[k].label}</span><b>${Math.round(tmp.gauges[k])}</b></div><div class="bar"><i style="width:${tmp.gauges[k]}%"></i></div></div>`).join('')}
+      <div class="btn-row"><button class="btn secondary" onclick="cBack()">← Retour</button><button class="btn" onclick="launchPlayer()">Commencer en ${creation.era.start} 👟</button></div></div>`; }
   }
-  app.innerHTML=`<div class="fade-in">${creationProgressHTML()}${html}</div>`; scrollTop();
+  app.innerHTML=`<div class="fade-in">${progressHTML(creation.step,steps.length)}${html}</div>`; scrollTop();
 }
-function computeCreationStats(){
-  const st={...BASE_STATS};
-  [creation.origine,creation.nationality,creation.mentor,creation.qualite,creation.defaut].forEach(o=>{ Object.entries(o.bonus||{}).forEach(([k,v])=>{ st[k]=(st[k]||0)+v; }); });
-  Object.keys(st).forEach(k=>st[k]=clamp(st[k]));
-  return st;
-}
-function destinyHints(stats){
-  const h=[];
-  h.push(stats.talent>=40?"Un cerveau tactique au-dessus de la moyenne : les grands projets te tendront les bras plus tôt.":"Tactique perfectible : les premières saisons serviront d'apprentissage.");
-  h.push(stats.technique>=32?"Une gestion solide : les projets difficiles coûteront moins de qualité.":"Gestion fragile : attention aux clubs trop exigeants au début.");
-  h.push(stats.reseau>=22?"Un réseau déjà actif : les portes de l'étranger s'ouvriront vite.":"Réseau limité : il faudra convaincre par les résultats.");
-  const risk=(creation.defaut.riskBoost||0)-(creation.qualite.riskReduction||0)-(creation.origine.riskReduction||0);
-  h.push(risk>4?"Profil à risques : incidents et scandales seront plus fréquents.":risk<-2?"Profil prudent : les incidents seront plus rares.":"Un équilibre entre prudence et audace.");
-  h.push(`Campagne ${creation.mode.name} : ${creation.mode.desc}`);
-  return h;
-}
-function launchCoachCareer(){
-  const stats=computeCreationStats();
-  state=freshState({...creation,stats},creation.name);
-  log(`🧢 Début de carrière à ${state.age} ans : ${state.origineName}, inspiré·e par ${state.mentorName}. Campagne « ${state.careerModeName} ».`);
-  creation=null;
-  openProjects(); render();
-}
+function cPickEra(i){ cPick('era',ERAS[i]); }
+function launchCoach(){ state=coachFreshState({...creation,favoriteStyle:creation.style}); log(`🧢 ${state.year} : début de carrière à ${state.age} ans. ${state.originName}, inspiré·e par ${state.mentorName}. Campagne « ${state.modeName} ».`); creation=null; coachOpenOffers(); render(); }
+const P_STEPS=['name','era','pos','origin','trait','summary'];
+function startPlayerCreation(){ creation={kind:'player',step:0,name:''}; state=null; renderCreation(); }
+function launchPlayer(){ state=playerFreshState(creation); log(`👟 ${state.year} : début de carrière à ${state.age} ans, ${state.posName.toLowerCase()}. ${state.originName}.`); creation=null; playerOpenOffers(); render(); }
 
 /* ---------- Rendu principal ---------- */
 function render(){
   if(!state){ renderStart(); return; }
-  if(state.kind==='player'){ renderPlayerScreen(); return; }
   showGameBanner(); renderFilmstrip();
-  if(state.ended){ renderEnd(); return; }
-  const screens={ projects:renderProjects, strategy:renderStrategy, recruit:renderRecruit, vestiaire:renderVestiaire, tactic:renderTactic, staff:renderStaff, incident:renderIncident, promo:renderPromo, seasonResult:renderSeasonResult, aborted:renderAborted, choiceResult:renderChoiceResult, event:renderEvent, careerRoulette:renderRoulette, ecoFine:renderEcoFine, pressureCrisis:renderPressureCrisis, emergencyLoanOffer:renderLoanOffer, emergencyLoanPayment:renderLoanPayment };
-  const fn=screens[state.pendingChoice]||renderProjects;
-  app.innerHTML=`<div class="layout fade-in"><div class="main">${fn()}</div><div class="sidebar">${sidebarHTML()}</div></div>`;
-  scrollTop();
+  if(state.ended){ state.kind==='player'?renderPlayerEnd():renderCoachEnd(); return; }
+  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
+  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
+  const fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
+  app.innerHTML=`<div class="layout fade-in"><div class="main">${eraBannerHTML()}${fn()}</div><div class="sidebar">${state.kind==='player'?playerSidebar():coachSidebar()}</div></div>`; scrollTop();
 }
+function eraBannerHTML(){ const e=eraForYear(state.year); return `<div class="era-banner">${e.icon} <b>${e.name}</b> · <span class="year-badge">${state.year}</span>${state.club?` · ${escapeHtml(state.club.name)} · <b>${escapeHtml(state.club.leagueName||'')}</b>`:''} · ${e.rules.slice(0,2).join(' · ')}</div>`; }
 function renderFilmstrip(){
-  if(!state||!state.seasons){ filmstripEl.style.display='none'; return; }
   filmstripEl.style.display='';
-  const frames=state.seasons.map(f=>{ const cls=f.aborted?'aborted':f.isFlop?'flop':f.isHit?'success':'mid'; const label=f.aborted?'🪓':f.champion?'🏆':f.relegated?'⬇️':`${f.finalPos}e`; return `<div class="frame ${cls}" title="${escapeHtml(f.club)} — ${escapeHtml(f.title)}">${f.n}. ${label}</div>`; });
-  if(state.currentProduction) frames.push(`<div class="frame current">${state.seasons.length+1}. en cours</div>`);
-  filmstripEl.innerHTML=frames.length?frames.join(''):`<div class="frame">Aucune saison pour l'instant</div>`;
+  const h=state.history||[]; const frames=h.map(f=>{ const cls=f.sacked?'aborted':(f.champion?'success':f.relegated||f.bad?'flop':f.objectiveMet||f.note>=6.8?'success':'mid'); const label=f.sacked?'🪓':f.champion?'🏆':f.relegated?'⬇️':state.kind==='player'?(f.note?f.note.toFixed(1):'—'):(f.pos?ordinal(f.pos):'—'); return `<div class="frame ${cls}" title="${f.year} · ${escapeHtml(f.club)}">${f.year} ${label}</div>`; });
+  if(state.comp) frames.push(`<div class="frame current">${state.year} · phase ${Math.min(state.phase+1,4)}/4</div>`);
+  filmstripEl.innerHTML=frames.length?frames.join(''):'<div class="frame">Aucune saison pour l\'instant</div>';
 }
-function sidebarHTML(){
-  const s=state.stats, systems=ensureBaseCareerSystems(), risk=careerStructuralRisk();
-  const pressureCls=state.pressure>=85?'bad':state.pressure>=50?'mid':'good';
-  return `<div class="card">
-    <div class="identity"><b>${escapeHtml(state.name)}</b> · ${state.age} ans<br>${state.careerModeIcon} ${state.careerModeName}<br>${state.currentClub?`🏟️ ${escapeHtml(state.currentClub)} (saison ${state.seasonsAtClub})`:'Sans club'}</div>
-    <div class="money ${s.argent<0?'neg':''}">${euros(s.argent)}</div><div class="hint">Capital : ce que le football accepte de te confier.</div>
-    ${state.emergencyLoan?`<div class="warn small">🏦 Enveloppe : ${euros(state.emergencyLoan.balance)} dus · échéance ${state.emergencyLoan.installments}/2</div>`:''}
-    <div class="section-label">Statistiques</div>
-    ${STAT_KEYS.map(k=>`<div class="stat-row"><div class="lbl"><span>${STAT_LABELS[k]}</span><b>${Math.round(s[k])}</b></div><div class="bar"><i style="width:${clamp(s[k])}%"></i></div></div>`).join('')}
-    <div class="stat-row"><div class="lbl"><span>Pression</span><b class="pressure-state ${pressureCls}">${Math.round(state.pressure)}</b></div><div class="bar pressure"><i style="width:${clamp(state.pressure)}%"></i></div></div>
-    ${s.scandalRisk>0?`<div class="hint">Risque de scandale : ${Math.round(s.scandalRisk)}</div>`:''}
-    <div class="structure ${risk.tone}">${risk.label}${risk.domains.length?`<small>Foyers : ${risk.domains.join(', ')}</small>`:''}${state.criticalStructuralYears?`<small>Rupture : ${state.criticalStructuralYears}/3 périodes</small>`:''}</div>
-    ${state.activeStrategy?`<div class="active-strategy">${state.activeStrategy.icon} <b>${state.activeStrategy.name}</b> · encore ${state.activeStrategy.remaining} saison${state.activeStrategy.remaining>1?'s':''}</div>`:''}
-    <div class="section-label">Jauges du club</div>
-    ${BASE_SYSTEM_DEFINITIONS.map(d=>`<div class="gauge-row ${careerSystemMood(systems[d.key])}" title="${escapeHtml(d.impact)}"><span>${d.icon}</span><div><div class="bar"><i style="width:${clamp(systems[d.key])}%"></i></div><div class="hint" style="font-size:10px">${d.label} · ${careerSystemEffectLabel(d.key,systems[d.key])}</div></div><span>${Math.round(systems[d.key])}</span></div>`).join('')}
-    <div class="section-label">Staff</div>
-    ${state.careerCrew.map(m=>`<div class="hint">${escapeHtml(m.name)} · ${m.job} · ${m.age} ans · compétence ${Math.round(m.skill)} · loyauté ${Math.round(m.loyalty)}</div>`).join('')}
-    <div class="section-label">Palmarès</div>
-    <div class="hint">🏆 ${state.titles.champion} titre${state.titles.champion>1?'s':''} · ⬆️ ${state.titles.promo} montée${state.titles.promo>1?'s':''} · 🥇 ${state.titles.cup} coupe${state.titles.cup>1?'s':''} · ⭐ ${state.titles.euro1} · 🌍 ${state.titles.euro2} · 🎖️ ${state.awardsWon}</div>
-    <div class="section-label">Traits</div><div>${state.traits.map(t=>`<span class="trait-pill">${escapeHtml(t)}</span>`).join('')}</div>
-  </div>
-  <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,40).map(l=>`<div><span class="age">${l.age} ans</span>${l.msg}</div>`).join('')}</div></div>
-  <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Abandonner cette carrière ? La sauvegarde sera supprimée.')){ endCareer('Tu raccroches le survêtement de ton plein gré.',{cause:'retire',automatic:false}); render(); }">Prendre ma retraite</button></div></div>`;
+function bar(label,v,cls=''){ return `<div class="stat-row"><div class="lbl"><span>${label}</span><b>${Math.round(v)}</b></div><div class="bar ${cls}"><i style="width:${clamp(v)}%"></i></div></div>`; }
+function gaugeRow(info,v){ const mood=v>=65?'':v>=35?'mid':'low'; return `<div class="gauge-row ${mood}" title="${escapeHtml(info.help)}"><span>${info.icon}</span><div><div class="bar"><i style="width:${clamp(v)}%"></i></div><div class="hint" style="font-size:10px">${info.label}</div></div><span>${Math.round(v)}</span></div>`; }
+function coachSidebar(){
+  const s=state.stats, c=state.club, g=state.gauges; const pcls=state.pressure>=85?'bad':state.pressure>=50?'mid':'good';
+  const xi=c?bestXI(state.squad,FORMATIONS[state.formation],state.year):[]; const xiAvg=xi.length?xi.reduce((n,p)=>n+playerRating(p,state.year),0)/xi.length:0;
+  return `<div class="card"><div class="identity"><b>${escapeHtml(state.name)}</b> · ${state.age} ans · ${state.modeIcon} ${state.modeName}<br>${c?`🏟️ <b>${escapeHtml(c.name)}</b> · ${escapeHtml(c.leagueName||'')} · saison ${c.since}<br>Objectif : ${ordinal(c.objectivePos)} · ${capitalize(c.presidentName)}`:'Sans club'}</div>
+    ${c?`<div class="section-label">Confiance du président</div><div class="conf-big ${c.confidence<25?'pressure-state bad':c.confidence<50?'pressure-state mid':''}">${Math.round(c.confidence)} / 100</div><div class="bar"><i style="width:${c.confidence}%"></i></div><div class="hint">À zéro, tu es licencié·e. Sous 35 en fin de saison, tu n'es pas prolongé·e.</div>`:''}
+    <div class="section-label">Toi</div>${Object.keys(CSTAT).map(k=>bar(CSTAT[k],s[k])).join('')}${bar('Pression',state.pressure,'pressure')}
+    <div class="section-label">Le club</div>${Object.keys(GAUGE_INFO).map(k=>gaugeRow(GAUGE_INFO[k],g[k])).join('')}
+    ${c?`<div class="section-label">Effectif</div><div class="hint">${state.squad.length} joueurs · onze type ${xiAvg.toFixed(1)} · ${state.formation} · ${styleById(state.styleId).icon} ${styleById(state.styleId).name}<br>Blessés : ${state.squad.filter(p=>p.injury).length} · Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)}</div>`:''}
+    <div class="section-label">Palmarès</div><div class="hint">🏆 ${state.titles.league} · ⬆️ ${state.titles.promo} · 🥇 ${state.titles.cup} · ⭐ ${state.titles.euro} · 🌍 ${state.titles.euro2} · 🎖️ ${state.awards} · 🪓 ${state.sackings}</div></div>
+    <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,30).map(l=>`<div><span class="age">${l.year}</span>${l.msg}</div>`).join('')}</div></div>
+    <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Prendre ta retraite ? La sauvegarde sera supprimée.')){coachEnd('Tu raccroches le survêtement de ton plein gré.','retire');render();}">Retraite</button></div></div>`;
 }
-function deltaChipsHTML(before,after,hideArgent){
-  const keys=[...STAT_KEYS,'pressure','argent'].filter(k=>!(hideArgent&&k==='argent'));
-  const chips=keys.map(k=>{ const b=before[k]||0,a=after[k]||0,d=a-b; if(Math.abs(d)<.5) return ''; const label=k==='pressure'?'Pression':STAT_LABELS[k]; const good=k==='pressure'?d<0:d>0; return `<span class="delta-chip ${good?'up':'down'}">${label} ${k==='argent'?(d>0?'+':'')+euros(d):(d>0?'+':'')+Math.round(d)}</span>`; }).filter(Boolean);
-  return chips.length?`<div class="delta-chips">${chips.join('')}</div>`:`<div class="hint">Aucun changement notable de statistiques.</div>`;
+const CLABELS={talent:'Tactique',technique:'Management',reseau:'Réseau',reputation:'Réputation',pressure:'Pression',confidence:'Confiance du président',vestiaire:'✊ Vestiaire',supporters:'📣 Supporters',formation:'🎓 Formation',staff:'🧑‍🤝‍🧑 Staff',note:'Note globale',coachTrust:'Confiance du coach',forme:'Forme',corps:'🩻 Corps',entourage:'👪 Entourage',physique:'Physique',mental:'Mental'};
+function deltaChips(before,after,extra=[]){
+  const chips=Object.keys(after).map(k=>{ const d=(after[k]||0)-(before[k]||0); if(Math.abs(d)<.5) return ''; const good=k==='pressure'?d<0:d>0; return `<span class="delta-chip ${good?'up':'down'}">${CLABELS[k]||k} ${d>0?'+':''}${Math.round(d)}</span>`; }).filter(Boolean).concat(extra.map(e=>`<span class="delta-chip">${escapeHtml(e)}</span>`));
+  return chips.length?`<div class="delta-chips">${chips.join('')}</div>`:'<div class="hint">Aucun changement immédiat visible.</div>';
 }
-function systemDeltaHTML(before,after){
-  if(!before||!after) return '';
-  const chips=CAREER_SYSTEM_KEYS.map(k=>{ const d=(after[k]||0)-(before[k]||0); if(Math.abs(d)<.5) return ''; const def=BASE_SYSTEM_DEFINITIONS.find(x=>x.key===k); return `<span class="delta-chip ${d>0?'up':'down'}">${def.icon} ${def.label} ${d>0?'▲':'▼'} ${d>0?'+':''}${Math.round(d*10)/10}</span>`; }).filter(Boolean);
-  return chips.length?`<div class="delta-chips">${chips.join('')}</div>`:'';
+function renderChoiceResult(){ const r=state.pendingResult; const cont=state.kind==='player'?'playerContinueChoiceResult()':'coachContinueChoiceResult()'; return `<div class="card"><h2 class="display">${r.title}</h2><div class="subtitle">${escapeHtml(r.subtitle||'')}</div><p class="narr">${escapeHtml(r.narrative||'')}</p>${deltaChips(r.before,r.after,r.extra||[])}<div class="btn-row"><button class="btn" onclick="${cont}">Continuer →</button></div></div>`; }
+function renderEvent(){ const ce=state.currentEvent, ev=ce.event; const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Intersaison'}[ce.kind]; const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent'; return `<div class="card event-card"><div class="hint">${kind}${ev.gauge?` · jauge ${(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge]?(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge].label:''}`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map((c,i)=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b></div></button>`).join('')}</div></div>`; }
+function renderRoulette(){ const ev=state.currentRoulette.event; const fn=state.kind==='player'?'playerChooseRoulette':'coachChooseRoulette'; return `<div class="card event-card"><div class="hint">🎲 Roulette du destin · une seule des quatre issues met fin à la carrière</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="roulette-grid">${ev.choices.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><div class="body"><b>${escapeHtml(c)}</b></div></button>`).join('')}</div><div class="hint" style="margin-top:10px">Issues cachées : ☠️ fin · 🌠 jackpot · 🍀 petit bonus · 🌧️ malus.</div></div>`; }
+function renderPressure(){ const list=state.kind==='player'?PLAYER_PRESSURE_CHOICES:PRESSURE_CHOICES; const fn=state.kind==='player'?'playerChoosePressure':'coachChoosePressure'; return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">${state.kind==='player'?'Craquage':'Crise de pression'}</h2><p class="narr">La pression atteint ${Math.round(state.pressure)}/100. Insomnies, malaise, une famille inquiète. Il faut décider.</p><div class="choice-list">${list.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`; }
+function tableHTML(table,me,full){
+  const N=table.length, meIdx=table.findIndex(r=>r.name===me);
+  const keep=full?new Set(table.map((_,i)=>i)):new Set([0,1,2,3,N-1,N-2,N-3,meIdx-1,meIdx,meIdx+1].filter(i=>i>=0&&i<N));
+  let rows='',gap=false; table.forEach((r,i)=>{ if(keep.has(i)){ rows+=`<tr class="${r.name===me?'me':''}"><td>${i+1}</td><td>${escapeHtml(r.name)}</td><td class="r">${r.w}-${r.d}-${r.l}</td><td class="r">${r.gf-r.ga>0?'+':''}${r.gf-r.ga}</td><td class="r">${r.pts}</td></tr>`; gap=false; } else if(!gap){ rows+='<tr><td colspan="5" style="color:var(--muted)">…</td></tr>'; gap=true; } });
+  return `<table class="table"><thead><tr><th>#</th><th>Club</th><th class="r">V-N-D</th><th class="r">Diff</th><th class="r">Pts</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-function milestonesHTML(items){ return (items||[]).map(m=>`<div class="milestone">${m.icon} <b>Palier 100 — ${escapeHtml(m.name)}</b><br>${escapeHtml(m.desc)}</div>`).join(''); }
+function phaseTrack(){ return `<div class="phase-track">${['Automne','Hiver','Printemps','Sprint final'].map((l,i)=>`<span class="${i<state.phase?'done':i===state.phase?'now':''}">${l}</span>`).join('')}</div>`; }
+function matchesHTML(mine,me){ return `<div class="matches">${mine.map(m=>`<div class="match ${m.res}"><span>${m.home===me?'<b>'+escapeHtml(m.home)+'</b>':escapeHtml(m.home)}</span><span class="sc">${m.gh} – ${m.ga}</span><span>${m.away===me?'<b>'+escapeHtml(m.away)+'</b>':escapeHtml(m.away)}</span></div>`).join('')}</div>`; }
 
-/* ---------- Écrans de carrière ---------- */
-function renderStrategy(){
-  return `<div class="card"><h2 class="display">Stratégie de carrière</h2><p class="hint">Tous les cinq projets, tu choisis un cap pour trois saisons. Il oriente sans remplacer les décisions de terrain.</p>
-    <div class="strategy-grid">${state.strategyOptions.map((s,i)=>`<button class="strategy-card" onclick="chooseStrategy(${i})"><span>${s.icon}</span><b>${s.name}</b><small>${s.desc}</small></button>`).join('')}</div></div>`;
-}
-function renderProjects(){
+/* ---------- Écrans entraîneur·euse ---------- */
+function renderOffers(){
   const offers=state.currentOffers||[];
-  if(!offers.length) return `<div class="card"><h2 class="display">Aucune proposition</h2><p class="narr">Le téléphone reste silencieux cette année. Ta réputation ne suffit plus, ou le marché est saturé.</p><div class="btn-row"><button class="btn" onclick="skipYear()">Attendre une année</button></div></div>`;
-  return `<div class="card"><h2 class="display">Les projets sur la table</h2><p class="hint">${state.age} ans · Le budget affiché est le capital que tu engages (surcoûts structurels inclus à partir du 3e projet). Les recettes de fin de saison reviennent dans ton capital.</p>
-    <div class="offer-grid">${offers.map((o,i)=>{ const req=o.interimBacked?0:productionBudgetRequired(o), ok=canAffordCareerOffer(o); return `<div class="offer-card ${ok?'affordable':'locked'}" ${ok?`onclick="startProduction(${i});render()"`:''}>
-      <div class="club">${escapeHtml(o.club)}${o.league?` · ${o.league.name}`:''}</div><h3>${escapeHtml(o.title)}</h3><div class="syn narr">${escapeHtml(o.synopsis)}</div>
-      <div class="meta"><span class="tag gold">${TIER_SHORT[o.tierId]}</span><span class="tag">${o.style.icon} ${o.style.name}</span><span class="tag">${o.duration} saison${o.duration>1?'s':''}</span><span class="tag">Objectif : top ${o.objectivePos} / ${o.teams}</span>${o.international?'<span class="tag intl">🌍 International</span>':''}</div>
-      <div class="budget">${o.interimBacked?'Pris en charge par le club':`Capital à engager : ${euros(req)}`}</div>
-      <div class="offer-hint ${o.hint?o.hint.cls:''}">${o.hint?o.hint.label:''}${ok?'':' · <b>capital insuffisant</b>'}</div></div>`; }).join('')}</div>
-    <div class="btn-row"><button class="btn secondary" onclick="skipYear()">Refuser tout et prendre une année sabbatique</button></div></div>`;
+  if(!offers.length) return `<div class="card"><h2 class="display">Aucune proposition</h2><p class="narr">Le téléphone reste silencieux cette année. Ta réputation (${Math.round(state.stats.reputation)}) ne suffit plus, ou le marché est saturé.</p><div class="btn-row"><button class="btn" onclick="coachSkipYear()">Attendre une année</button></div></div>`;
+  return `<div class="card"><h2 class="display">Les bancs qui te tendent les bras</h2><p class="hint">${state.year} · ${state.age} ans · réputation ${Math.round(state.stats.reputation)}. Chaque offre fixe un championnat, un objectif de classement, un budget de transferts et un président. Paliers accessibles : ${accessibleTiers().map(t=>TIER_INFO[t].label).join(', ')}.</p>
+    <div class="offer-grid">${offers.map((o,i)=>`<div class="offer-card affordable" onclick="coachAcceptOffer(${i});render()"><div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label}${o.stay?' · rester':''}</div><h3>${escapeHtml(o.club)}</h3><div class="syn narr">${escapeHtml(o.title)}. ${capitalize(o.presidentName)} : ${escapeHtml(o.presidentDesc)}</div>
+      <div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">Objectif : ${ordinal(o.objectivePos)} / ${o.teams}</span><span class="tag">${styleById(o.styleWanted).icon} ${styleById(o.styleWanted).name} demandé</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))}</span></div>
+      <div class="budget">Budget transferts : ${$(o.budget)}</div><div class="offer-hint ${o.stay?'good':o.styleWanted===state.favoriteStyleId?'good':''}">${o.stay?'🏠 Le président te garde : continuité du projet':o.styleWanted===state.favoriteStyleId?'❤️ Le club veut ton style de jeu':o.tier==='amateur'||o.tier==='ligue2'?'🌱 Petit budget, présidents plus patients':'🎯 Objectif exigeant, moyens à la hauteur'}</div></div>`).join('')}</div>
+    <div class="btn-row"><button class="btn secondary" onclick="coachSkipYear()">Refuser tout et prendre une année sabbatique</button></div></div>`;
 }
-function productionHeader(step){
-  const o=state.currentProduction.offer;
-  return `<div class="hint" style="margin-bottom:8px">🏟️ <b>${escapeHtml(o.club)}</b> · ${escapeHtml(o.title)} · ${o.style.icon} ${o.style.name} · objectif top ${o.objectivePos} · ${step}</div>`;
-}
-function renderRecruit(){
-  const p=state.currentProduction;
-  return `<div class="card">${productionHeader('Étape 1/5 · Recrutement')}<h2 class="display">Ta recrue phare</h2><p class="hint">Les effets chiffrés restent cachés. Le cachet est prélevé sur ton capital. Le niveau d'accès aux stars dépend de ta cote et de ton réseau.</p>
-    <div class="choice-list">${p.recruitOptions.map((r,i)=>`<button class="choice-btn" onclick="chooseRecruit(${i});render()"><span class="ico">${r.icon}</span><div class="body"><b>${r.label}${r.player?` — ${escapeHtml(r.player.name)}, ${r.player.position}, ${r.player.age} ans`:''}</b><small>${r.sub}</small>${r.player?`<div class="traits"><i class="plus">${r.strength}</i><i class="minus">${r.weakness}</i></div>`:''}<span class="cost">${r.fee>0?`Cachet et indemnité : ${euros(r.fee)}`:'Gratuit'}</span></div></button>`).join('')}</div></div>`;
-}
-function renderVestiaire(){
-  const p=state.currentProduction;
-  return `<div class="card">${productionHeader('Étape 2/5 · Vestiaire')}<h2 class="display">Comment gères-tu le groupe ?</h2>
-    <div class="choice-list">${p.vestiaireOptions.map((o,i)=>`<button class="choice-btn" onclick="chooseVestiaire(${i});render()"><span class="ico">${o.icon}</span><div class="body"><b>${o.label}</b><small>${o.sub}</small></div></button>`).join('')}</div></div>`;
+function renderMercato(){
+  const m=state.market, c=state.club, y=state.year; const wages=state.squad.reduce((n,p)=>n+p.wage,0); const fmax=eraForeignersMax(y); const xi=bestXI(state.squad,FORMATIONS[state.formation],y);
+  const kinds={all:'Tous',real:'Stars',pro:'Pros',youth:'Pépites',free:'Libres',academy:'Centre'};
+  const list=m.targets.map((t,i)=>({t,i})).filter(x=>marketFilter==='all'||x.t.kind===marketFilter);
+  const rowHTML=(p,inXI)=>`<tr class="${inXI?'xi':''} ${p.injury?'inj':''}"><td><span class="pos-badge pos-${p.pos}">${p.pos}</span></td><td class="${p.real?'real':''}">${escapeHtml(p.name)}${p.fanFav?' ❤️':''}${p.promised?' ⭐':''}${p.injury?` 🩼${p.injury}s`:''}</td><td>${playerAge(p,y)}</td><td><b>${playerRating(p,y)}</b> ${stars(playerRating(p,y))}</td><td>${traitLabel(p.trait)}</td><td>${p.contractEnd}</td><td class="r">${$(p.wage)}</td><td class="r">${$(playerValue(p,y))}</td><td class="r"><button class="btn secondary" onclick="coachSell(${p.id})">Vendre</button></td></tr>`;
+  return `<div class="card"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2><p class="hint">Vends, recrute, promeus. Les prix dépendent de l'époque (${eraForYear(y).name}). Les pépites viennent parfois d'une vidéo, d'un cousin ou d'un agent inconnu : certaines sont des arnaques. Un joueur hors de portée ne répond pas ; un « gros coup » coûte cher et exige une place de titulaire (⭐).</p>
+    <div class="mercato-head"><div>Budget restant<b>${$(m.budgetLeft)}</b></div><div class="${wages>c.wageCap*1.1?'warn-box':''}">Masse salariale<b>${$(wages)}</b>plafond ${$(c.wageCap)}</div><div>Effectif<b>${state.squad.length} / 27</b></div>${c.nat==='FR'&&fmax<99?`<div class="${foreignCount()>=fmax?'warn-box':''}">Étrangers<b>${foreignCount()} / ${fmax}</b></div>`:''}<div>Onze type<b>${(xi.reduce((n,p)=>n+playerRating(p,y),0)/Math.max(1,xi.length)).toFixed(1)}</b>force club ${c.strength}</div><div>Crédibilité<b>${Math.round(coachCredibility())}</b>niveau max accessible</div></div>
+    ${m.message?`<div class="msg">${escapeHtml(m.message)}</div>`:''}
+    <div class="section-label">Ton effectif (onze type surligné)</div><div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niveau</th><th>Caractère</th><th>Fin</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(p=>p.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(p=>rowHTML(p,xi.includes(p))).join('')).join('')}</tbody></table></div>
+    <div class="section-label">Le marché</div><div class="market-tabs">${Object.entries(kinds).map(([k,l])=>`<button class="${marketFilter===k?'on':''}" onclick="marketFilter='${k}';render()">${l} (${k==='all'?m.targets.length:m.targets.filter(t=>t.kind===k).length})</button>`).join('')}</div>
+    <div class="market-list">${list.map(({t,i})=>`<div class="market-row ${t.access} ${t.kind}"><div><span class="lbl">${t.label}</span> · <span class="pos-badge pos-${t.p.pos}">${t.p.pos}</span> <b class="${t.p.real?'real':''}">${escapeHtml(t.p.name)}</b> · ${t.age} ans · niveau ${t.kind==='youth'?'≈ '+t.shownRating+' (potentiel inconnu)':t.shownRating+' '+stars(t.shownRating)} · ${traitLabel(t.p.trait)}<div class="meta">Via ${t.source} · prix ${t.price>0?$(t.price):'libre'} · salaire ${$(t.wage)} / an${t.access==='coup'?' · exige d\'être titulaire':''}${t.access==='no'?' · ne répond pas':''}</div></div><button class="btn ${t.access==='no'?'secondary':''}" ${t.access==='no'?'disabled':''} onclick="coachBuy(${i})">Recruter</button></div>`).join('')||'<div class="hint">Rien dans cette catégorie.</div>'}</div>
+    ${m.bought.length||m.sold.length?`<div class="section-label">Bilan du mercato</div><div class="hint">${m.bought.map(b=>`➕ ${escapeHtml(b.name)} (${$(b.price)})`).join(' · ')}${m.bought.length&&m.sold.length?' · ':''}${m.sold.map(s=>`➖ ${escapeHtml(s.name)} (${$(s.price)})`).join(' · ')}</div>`:''}
+    <div class="btn-row"><button class="btn" onclick="coachCloseMercato()">Clore le mercato →</button></div></div>`;
 }
 function renderTactic(){
-  const p=state.currentProduction;
-  return `<div class="card">${productionHeader('Étape 3/5 · Système de jeu')}<h2 class="display">Ton plan de jeu</h2><p class="hint">Un système cohérent avec le style demandé par le club (${p.offer.style.icon} ${p.offer.style.name}) donne un vrai bonus. Le reste dépend de toi.</p>
-    <div class="choice-list">${p.tacticOptions.map((o,i)=>`<button class="choice-btn" onclick="chooseTactic(${i});render()"><span class="ico">📋</span><div class="body"><b>${o.label}</b><small>${o.sub}</small></div></button>`).join('')}</div></div>`;
+  if(!tacticSel||tacticSel.year!==state.year||tacticSel.club!==state.club.name) tacticSel={formation:state.formation,style:state.styleId,year:state.year,club:state.club.name};
+  const c=state.club, notes=state.market&&state.market.closingNotes||[];
+  const y=state.year; const xi=bestXI(state.squad,FORMATIONS[tacticSel.formation],y);
+  return `<div class="card">${notes.length?`<div class="section-label">Révélations du mercato</div>${notes.map(n=>`<div class="warn">${n}</div>`).join('')}`:''}<h2 class="display">Plan de jeu</h2><p class="hint">Le club demande <b>${styleById(c.styleWanted).icon} ${styleById(c.styleWanted).name}</b> (+2 de force si tu le suis). Ton style favori (${styleById(state.favoriteStyleId).icon} ${styleById(state.favoriteStyleId).name}) donne +1,5. Un style prestigieux exige de la tactique (${Math.round(state.stats.talent)}).</p>
+    <div class="section-label">Formation</div><div class="formation-grid">${Object.keys(FORMATIONS).map(f=>`<button class="${tacticSel.formation===f?'on':''}" onclick="tacticSel.formation='${f}';render()"><b>${f}</b></button>`).join('')}</div>
+    <div class="section-label">Style</div><div class="style-grid">${STYLES.map(s=>`<button class="${tacticSel.style===s.id?'on':''}" onclick="tacticSel.style='${s.id}';render()"><b>${s.icon} ${s.name}</b><small>${s.desc}${s.id===c.styleWanted?' · <b>demandé par le club</b>':''}${s.id===state.favoriteStyleId?' · <b>ton style</b>':''}${s.prestige*60>state.stats.talent?` · exige tactique ${Math.round(s.prestige*60)}`:''}</small></button>`).join('')}</div>
+    <div class="section-label">Onze type en ${tacticSel.formation}</div><div class="squad">${xi.map(p=>`<div><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)} <span>${playerRating(p,y)}</span></div>`).join('')}</div>
+    <div class="btn-row"><button class="btn" onclick="coachSetTactic(tacticSel.formation,tacticSel.style);render()">${state.tacticAfterWinter?'Reprendre la saison →':'Lancer la saison →'}</button></div></div>`;
 }
-function renderStaff(){
-  const p=state.currentProduction;
-  return `<div class="card">${productionHeader('Étape 4/5 · Staff et infrastructures')}<h2 class="display">Où mets-tu les moyens ?</h2>
-    <div class="choice-list">${p.staffOptions.map((o,i)=>`<button class="choice-btn" onclick="chooseStaff(${i});render()"><span class="ico">${o.icon}</span><div class="body"><b>${o.label}</b><small>${o.sub}</small><span class="cost">${o.moneyMod>0?`Coût : ${euros(p.offer.budget*o.moneyMod)}`:o.moneyMod<0?`Économie : ${euros(-p.offer.budget*o.moneyMod)}`:'Sans coût'}</span></div></button>`).join('')}</div></div>`;
+function impactLines(){
+  const c=state.club, g=state.gauges, lines=[]; const xi=bestXI(state.squad,FORMATIONS[state.formation],state.year); const xiAvg=xi.reduce((n,p)=>n+playerRating(p,state.year),0)/Math.max(1,xi.length);
+  lines.push({t:`Onze type à ${xiAvg.toFixed(1)} contre une force de club attendue de ${c.strength}`,d:xiAvg-c.strength});
+  lines.push({t:`Vestiaire ${Math.round(g.vestiaire)} : ${g.vestiaire>=60?'un groupe soudé qui tire tout le monde vers le haut':g.vestiaire<40?'un groupe fracturé qui coûte des points':'un groupe correct, sans plus'}`,d:(g.vestiaire-50)*.05});
+  lines.push({t:`Style ${styleById(state.styleId).name} : ${state.styleId===c.styleWanted?'exactement ce que le club voulait':'pas celui que le club demandait'}${state.styleId===state.favoriteStyleId?', et ton style favori':''}`,d:(state.styleId===c.styleWanted?2:0)+(state.styleId===state.favoriteStyleId?1.5:0)-(state.styleId!==c.styleWanted?.5:0)});
+  lines.push({t:`Tactique ${Math.round(state.stats.talent)} : ${state.stats.talent>=55?'tes idées font gagner des matchs':'tes idées sont encore un peu courtes'}`,d:(state.stats.talent-50)*.08});
+  const inj=state.squad.filter(p=>p.injury).length; if(inj) lines.push({t:`${inj} blessé${inj>1?'s':''} (staff ${Math.round(g.staff)})`,d:-inj*.6});
+  if(state.seasonStats&&Math.abs(state.seasonStats.form)>=1) lines.push({t:`Dynamique ${state.seasonStats.form>0?'positive':'négative'} (${state.seasonStats.form>0?'+':''}${state.seasonStats.form.toFixed(1)})`,d:state.seasonStats.form});
+  return `<div class="impact">${lines.map(l=>`<div class="${l.d>=.5?'up':l.d<=-.5?'down':''}">${l.d>=.5?'▲':l.d<=-.5?'▼':'•'} ${escapeHtml(l.t)}</div>`).join('')}</div>`;
 }
-function renderIncident(){
-  const inc=state.currentProduction.incident;
-  return `<div class="card event-card">${productionHeader('Incident de saison')}<div class="ico">${inc.icon}</div><h2 class="display">${escapeHtml(inc.title)}</h2><p class="narr">${escapeHtml(inc.text)}</p>
-    <div class="choice-list">${inc.choices.map((c,i)=>`<button class="choice-btn" onclick="chooseIncident(${i});render()"><div class="body"><b>${escapeHtml(c.label)}</b></div></button>`).join('')}</div></div>`;
+function renderPhaseResult(){
+  const ph=state.lastPhase, c=state.club, N=state.comp.teams.length;
+  const conf=c.confidence; const gap=c.objectivePos-ph.pos;
+  return `<div class="card"><h2 class="display">Phase ${ph.n} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(ph.pos)}</div><div class="k">sur ${N} · objectif ${ordinal(c.objectivePos)}</div></div><div class="score-box ${ph.W>ph.L?'good':ph.L>ph.W?'bad':''}"><div class="v">${ph.W}-${ph.D}-${ph.L}</div><div class="k">V-N-D · ${ph.gf} buts pour, ${ph.ga} contre</div></div><div class="score-box ${ph.dConf>=0?'good':'bad'}"><div class="v">${ph.dConf>=0?'+':''}${ph.dConf}</div><div class="k">Confiance du président → ${Math.round(conf)}</div></div><div class="score-box"><div class="v">${ph.strength}</div><div class="k">Force de l'équipe</div></div></div>
+    <div class="section-label">Tes matchs</div>${matchesHTML(ph.matches,c.name)}
+    ${ph.injuries.length?`<div class="warn">🩼 Blessures : ${ph.injuries.map(escapeHtml).join(', ')}</div>`:''}
+    <div class="section-label">Pourquoi ce résultat</div>${impactLines()}
+    <div class="section-label">Le président</div><div class="hint">${gap>=2?`Tu es ${gap} place${gap>1?'s':''} au-dessus de l'objectif : ${c.presidentName} savoure.`:gap>=0?`Tu tiens l'objectif. ${capitalize(c.presidentName)} reste calme.`:gap>=-3?`Tu es ${-gap} place${gap<-1?'s':''} sous l'objectif. ${capitalize(c.presidentName)} s'impatiente.`:`Tu es loin de l'objectif (${-gap} places). ${capitalize(c.presidentName)} pense à ton successeur.`}${conf<=20?' <b>Le prochain faux pas sera le dernier.</b>':''}</div>
+    <div class="section-label">Classement</div>${tableHTML(ph.table,c.name,true)}
+    <div class="btn-row"><button class="btn" onclick="coachAfterPhase()">${state.phase>=4?'Bilan de la saison →':state.phase===2&&eraHasWinterMercato(state.year)?'Mercato d\'hiver →':'Phase suivante →'}</button></div></div>`;
 }
-function renderPromo(){
-  const p=state.currentProduction;
-  return `<div class="card">${productionHeader('Étape 5/5 · Communication')}<h2 class="display">Ta communication de saison</h2>
-    <div class="choice-list">${p.promoOptions.map((o,i)=>`<button class="choice-btn" onclick="choosePromo(${i});render()"><span class="ico">${o.icon}</span><div class="body"><b>${o.label}</b><small>${o.sub}</small><span class="cost">${o.moneyMod>0?`Coût : ${euros(p.offer.budget*o.moneyMod)}`:'Sans coût'}</span></div></button>`).join('')}</div></div>`;
-}
-function tableHTML(table){
-  if(!table) return '';
-  const N=table.length, meIdx=table.findIndex(r=>r.me);
-  const keep=new Set([0,1,2,N-1,N-2,N-3,meIdx-1,meIdx,meIdx+1].filter(i=>i>=0&&i<N));
-  let rows='', gap=false;
-  table.forEach((r,i)=>{ if(keep.has(i)){ rows+=`<tr class="${r.me?'me':''}"><td>${r.pos}</td><td>${escapeHtml(r.club)}</td><td class="r">${r.pts} pts</td></tr>`; gap=false; } else if(!gap){ rows+=`<tr><td colspan="3" style="color:var(--muted)">…</td></tr>`; gap=true; } });
-  return `<table class="table"><thead><tr><th>#</th><th>Club</th><th class="r">Points</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-function seasonPunchline(f){
-  if(f.champion&&f.cupWon) return "« Le doublé. Dans dix ans, on te demandera encore comment tu as fait. »";
-  if(f.champion) return "« Champion·ne. Les statues se sculptent avec ce genre de saison. »";
-  if(f.euroWon) return "« Une nuit européenne dont la ville parlera pendant des décennies. »";
-  if(f.unexpectedFlop) return "« Tout était en place. Puis le football a décidé autrement. »";
-  if(f.financialDisaster) return "« Belle saison, comptes catastrophiques : le directeur financier a démissionné. »";
-  if(f.relegated) return "« La descente. Le silence dans le vestiaire durera tout l'été. »";
-  if(f.isDoubleFlop) return "« La presse t'a démoli, les supporters ont sifflé. Il faudra digérer. »";
-  if(f.objectiveMet) return "« Objectif rempli. Le président sourit, ce qui n'arrive jamais. »";
-  return "« Une saison à ranger dans le tiroir du milieu : ni gloire, ni drame. »";
-}
-function renderSeasonResult(){
-  const r=state.lastSeasonResult, f=r.season;
-  const icon=f.champion?'🏆':f.euroWon?'⭐':f.relegated?'⬇️':f.isFlop?'🥶':f.isHit?'🔥':'📊';
+function cupPathHTML(path,label){ return `<div class="cup-path"><b>${label}</b><br>${path.map(r=>`Tour ${r.round} : ${r.gh}–${r.ga}${r.pen?' (t.a.b.)':''} contre ${escapeHtml(r.opp)} ${r.win?'✅':'❌'}`).join('<br>')}</div>`; }
+function renderSeasonEnd(){
+  const f=state.lastSeason, c=state.club;
+  const icon=f.champion?'🏆':f.euro&&f.euro.won?'⭐':f.relegated?'⬇️':f.objectiveMet?'✅':'❌';
   const verdict=f.champion?(f.promotion?'Montée !':'Champion·ne !'):f.relegated?'Relégation':f.objectiveMet?'Objectif atteint':'Objectif manqué';
-  const trophies=[]; if(f.champion) trophies.push(`${f.promotion?'⬆️ Montée':'🏆 Titre de champion'} avec ${escapeHtml(f.club)}`); if(f.cupWon) trophies.push(`🥇 Vainqueur de la coupe nationale`); if(f.euroWon) trophies.push(`${COMPETITIONS[f.euroWon].icon} Vainqueur de la ${COMPETITIONS[f.euroWon].label}`); (f.awards||[]).forEach(a=>trophies.push(`🎖️ ${a}`));
-  const notes=[]; if(f.unexpectedFlop) notes.push('🌩️ Coup de tabac imprévisible : la saison s\'est effondrée sans raison claire.'); if(f.jackpot) notes.push('🌠 Jackpot : le gros pari s\'est transformé en phénomène.'); if(f.financialDisaster) notes.push('📉 Catastrophe financière : les recettes ont fondu malgré l\'accueil.'); if(f.sagaFatigue) notes.push('😴 Usure du discours : après plusieurs saisons au même club, le message passe moins.'); if(state.currentProduction&&state.currentProduction.delayed) notes.push('🐌 Saison enlisée.');
-  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${icon}</span><h2 class="display">${escapeHtml(f.club)}</h2><div class="verdict">${verdict} · ${f.finalPos}${f.finalPos===1?'er':'e'} sur ${f.teams} · objectif top ${f.objectivePos}</div><div class="hint">${escapeHtml(f.title)} · ${f.duration} saison${f.duration>1?'s':''} · ${f.ageStart} → ${f.ageEnd} ans</div></div>
-    <div class="score-grid"><div class="score-box gold"><div class="v">${f.finalPos}${f.finalPos===1?'er':'e'}</div><div class="k">Classement</div></div><div class="score-box ${f.critique>=60?'good':f.critique<40?'bad':''}"><div class="v">${Math.round(f.critique)}</div><div class="k">Presse ${starRating(f.critique)}</div></div><div class="score-box ${f.publicScore>=60?'good':f.publicScore<40?'bad':''}"><div class="v">${Math.round(f.publicScore)}</div><div class="k">Supporters ${starRating(f.publicScore)}</div></div><div class="score-box ${f.profit>=0?'good':'bad'}"><div class="v">${f.profit>=0?'+':''}${euros(f.profit)}</div><div class="k">Bilan (recettes ${euros(f.recette)})</div></div></div>
-    ${trophies.map(t=>`<div class="trophy-line">${t}</div>`).join('')}
-    ${notes.map(n=>`<div class="warn">${n}</div>`).join('')}
-    <div class="two-cols"><div><div class="section-label">Classement final</div>${tableHTML(f.table)}</div><div><div class="section-label">Tes choix</div><div class="hint">Recrue : ${escapeHtml(f.recruit)}<br>Vestiaire : ${escapeHtml(f.vestiaire)}<br>Système : ${escapeHtml(f.tactic)}<br>Staff : ${escapeHtml(f.staff)}<br>Communication : ${escapeHtml(f.promoLabel)}${f.incident?`<br>Incident : ${escapeHtml(f.incident)} → ${escapeHtml(f.incidentChoice||'')}`:''}</div></div></div>
-    <div class="section-label">Évolution</div>${deltaChipsHTML(r.before,r.after)}
-    <div class="section-label">Usure du club après la saison</div>${systemDeltaHTML(Object.fromEntries(CAREER_SYSTEM_KEYS.map(k=>[k,0])),r.wear)||'<div class="hint">Aucune usure (jauges déjà à zéro).</div>'}
-    ${milestonesHTML(r.milestones)}
-    <div class="punchline narr">${seasonPunchline(f)}</div>
-    <div class="btn-row"><button class="btn" onclick="continueAfterSeasonResult()">Continuer la carrière →</button></div></div>`;
+  const kept=c.confidence>=35;
+  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${icon}</span><h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2><div class="verdict">${verdict} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)} · objectif ${ordinal(f.objective)}</div></div>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(f.pos)}</div><div class="k">Classement</div></div><div class="score-box"><div class="v">${f.goals} / ${f.conceded}</div><div class="k">Buts pour / contre</div></div><div class="score-box ${f.cupWon?'good':''}"><div class="v">${f.cupWon?'🥇':f.cupRounds}</div><div class="k">${f.cupWon?'Coupe gagnée':'Tour atteint en coupe'}</div></div><div class="score-box ${f.dConf>=0?'good':'bad'}"><div class="v">${f.dConf>=0?'+':''}${f.dConf}</div><div class="k">Confiance → ${f.confidence}</div></div></div>
+    ${f.award?`<div class="trophy-line">🎖️ ${f.award}</div>`:''}${f.euro?`<div class="trophy-line">${f.euro.won?'⭐ Vainqueur de la '+escapeHtml(f.euro.name):'🌍 '+escapeHtml(f.euro.name)+' : éliminé au tour '+f.euro.rounds}</div>`:''}${f.topScorer?`<div class="hint">Meilleur buteur : ${escapeHtml(f.topScorer)} · ${f.formation} · ${escapeHtml(f.style)}</div>`:''}
+    <div class="two-cols"><div><div class="section-label">Classement final</div>${tableHTML(f.table,f.club,false)}</div><div><div class="section-label">Parcours en coupe</div>${cupPathHTML(f.cupPath,'Coupe nationale')}${f.euro?cupPathHTML(f.euro.path,f.euro.name):''}</div></div>
+    ${f.devNotes.length?`<div class="section-label">Progressions</div><div class="hint">${f.devNotes.map(escapeHtml).join('<br>')}</div>`:''}
+    ${f.contracts.length?`<div class="section-label">Contrats</div><div class="hint">${f.contracts.map(escapeHtml).join(' · ')}</div>`:''}
+    <div class="punchline narr">${pick(f.champion?PUNCHLINES.champion:f.relegated?PUNCHLINES.relegated:f.objectiveMet?PUNCHLINES.hit:f.pos>f.teams*.7?PUNCHLINES.flop:PUNCHLINES.mid)}</div>
+    <div class="section-label">Le verdict du président</div><div class="${kept?'milestone':'warn'}">${kept?`${capitalize(c.presidentName)} te renouvelle sa confiance (${Math.round(c.confidence)}/100). Une offre de prolongation t'attendra, avec d'autres bancs.`:`${capitalize(c.presidentName)} ne te renouvelle pas sa confiance (${Math.round(c.confidence)}/100). Il faudra trouver un autre banc.`}</div>
+    <div class="btn-row"><button class="btn" onclick="coachAfterSeasonEnd()">Intersaison →</button></div></div>`;
 }
-function renderAborted(){
-  const f=state.lastSeasonResult.season;
-  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">🪓</span><h2 class="display">Licencié·e en cours de saison</h2><div class="verdict">${escapeHtml(f.club)}</div></div><p class="narr">Une rupture avec le vestiaire et la direction rend la saison impossible. Le club te remercie à la trêve : ${euros(f.spent)} engagés sont perdus, et cette saison compte comme un échec.</p><div class="hint">Les jauges Intégrité et Vestiaire déterminent ce risque (5 % minimum, jusqu'à 25 %).</div><div class="btn-row"><button class="btn" onclick="continueAfterSeasonResult()">Continuer →</button></div></div>`;
-}
-function renderChoiceResult(){
-  const r=state.pendingResult;
-  return `<div class="card"><h2 class="display">${r.title}</h2><div class="subtitle">${escapeHtml(r.subtitle||'')}</div><p class="narr">${escapeHtml(r.narrative||'')}</p>${deltaChipsHTML(r.before,r.after)}${systemDeltaHTML(r.systemBefore,r.systemAfter)}${milestonesHTML(r.milestones)}<div class="btn-row"><button class="btn" onclick="continueAfterChoiceResult()">Continuer →</button></div></div>`;
-}
-function renderEvent(){
-  const ce=state.currentEvent, ev=ce.event;
-  const kindLabel={happening:'Coup du sort',issue:'Dilemme structurel',recovery:'Plan de redressement'}[ce.kind];
-  const sys=ev.system?BASE_SYSTEM_DEFINITIONS.find(d=>d.key===ev.system):null;
-  return `<div class="card event-card"><div class="hint">${kindLabel}${sys?` · jauge ${sys.icon} ${sys.label}`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p>
-    <div class="choice-list">${ev.choices.map((c,i)=>`<button class="choice-btn" onclick="chooseEvent(${i})"><div class="body"><b>${escapeHtml(c.label)}</b>${ce.kind==='recovery'&&c.failChance?`<small>Peut échouer (${Math.round(c.failChance*100)} %).</small>`:''}</div></button>`).join('')}</div></div>`;
-}
-function renderRoulette(){
-  const ev=state.currentRoulette.event;
-  return `<div class="card event-card"><div class="hint">🎲 Roulette du destin · une seule des quatre issues met fin à la carrière</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p>
-    <div class="roulette-grid">${ev.choices.map((c,i)=>`<button class="choice-btn" onclick="chooseCareerRoulette(${i})"><div class="body"><b>${escapeHtml(c)}</b></div></button>`).join('')}</div><div class="hint" style="margin-top:10px">Issues cachées : ☠️ fin · 🌠 jackpot · 🍀 petit bonus · 🌧️ malus moyen. Les positions sont remélangées à chaque roulette.</div></div>`;
-}
-function renderEcoFine(){
-  const f=state.currentEcoFine, canPay=f.amount<=state.stats.argent;
-  return `<div class="card event-card"><div class="ico">🌍</div><h2 class="display">Ligue des défenseurs de la planète</h2><p class="narr">${escapeHtml(f.text)}${f.record?' L\'enquête est qualifiée de record : le montant réclamé dépasse tout ce que le club a jamais payé.':''}</p>
-    <div class="loan-box"><span>Amende réclamée</span><span class="big">${euros(f.amount)}</span><span class="hint">Payer ramène l'écologie à 20. Refuser augmente durablement le risque d'arrestation (actuellement ${state.ecoArrestRisk||0} %).</span></div>
-    <div class="btn-row"><button class="btn" ${canPay?'':'disabled'} onclick="chooseEcoFine(true)">Payer ${canPay?'':'(capital insuffisant)'}</button><button class="btn danger" onclick="chooseEcoFine(false)">Refuser de payer</button></div></div>`;
-}
-function renderPressureCrisis(){
-  return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">Crise de pression</h2><p class="narr">La pression atteint ${Math.round(state.pressure)}/100. Insomnies, malaise au bord du terrain, une famille inquiète. Il faut décider.</p>
-    <div class="choice-list">${PRESSURE_CRISIS_CHOICES.map((c,i)=>`<button class="choice-btn" onclick="choosePressureCrisis(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`;
-}
-function renderLoanOffer(){
-  const d=state.emergencyLoanDraft;
-  return `<div class="card event-card"><div class="ico">🏦</div><h2 class="display">L'enveloppe de la dernière chance</h2><p class="narr">Ton capital est tombé à ${euros(d.cashBefore)}. Un mécène mystérieux te propose une enveloppe unique pour relancer ta carrière.</p>
-    <div class="loan-box"><span>Montant proposé</span><span class="big">${euros(d.principal)}</span><span class="hint">Deux échéances, une par période. Avant chacune, le solde prend 10 % d'intérêts. Tu choisis librement combien rembourser ; tout doit être soldé à la seconde échéance, sinon radiation.</span></div>
-    <div class="btn-row"><button class="btn" onclick="acceptEmergencyLoan()">Accepter l'enveloppe</button><button class="btn danger" onclick="refuseEmergencyLoan()">Refuser et arrêter la carrière</button></div></div>`;
-}
-function renderLoanPayment(){
-  const l=state.emergencyLoan, max=emergencyLoanMaxPayment();
-  return `<div class="card event-card"><div class="ico">📅</div><h2 class="display">Échéance ${l.installments}/2 de l'enveloppe</h2><p class="narr">${euros(l.lastInterest)} d'intérêts viennent d'être ajoutés. Solde dû : <b>${euros(l.balance)}</b>. Capital disponible : ${euros(state.stats.argent)}.</p>
-    <div class="loan-box"><label>Montant remboursé : <b id="loanShown">${euros(max)}</b></label><input type="range" id="loanRange" min="0" max="${max.toFixed(3)}" step="0.001" value="${max.toFixed(3)}" oninput="document.getElementById('loanShown').textContent=euros(Number(this.value))"><span class="hint">${l.installments>=2?'Dernière échéance : tout solde restant entraîne la radiation.':'Ce qui reste dû prendra 10 % d\'intérêts avant la dernière échéance.'}</span></div>
-    <div class="btn-row"><button class="btn" onclick="confirmEmergencyLoanPayment(document.getElementById('loanRange').value)">Valider le remboursement</button></div></div>`;
+function renderSacked(){ const h=state.history[state.history.length-1]; return `<div class="card"><div class="result-hero"><span class="result-hero-icon">🪓</span><h2 class="display">Licencié·e</h2><div class="verdict">${escapeHtml(h.club)} · après la phase ${h.phase} · ${ordinal(h.pos)} pour un objectif de ${ordinal(h.objective)}</div></div><p class="narr">La confiance du président est tombée à zéro. Le communiqué tient en trois lignes, ton bureau est vidé avant midi. Ta réputation en prend un coup, ton téléphone continuera de sonner… un peu moins fort.</p><div class="btn-row"><button class="btn" onclick="coachIntersaison();render()">Continuer →</button></div></div>`; }
+function seasonLine(f,i){ const badge=f.sacked?'🪓':f.champion?'🏆':f.relegated?'⬇️':f.objectiveMet?'✅':'❌'; return `<div class="season-line"><span><span class="pos">${badge} ${f.pos?ordinal(f.pos):'—'}</span> ${f.year} · ${escapeHtml(f.club)} · ${escapeHtml(f.league)}</span><span>${f.sacked?'licencié·e phase '+f.phase:(f.cupWon?'🥇 ':'')+(f.euro&&f.euro.won?'⭐ ':'')+(f.award?'🎖️ ':'')+(f.topScorer?escapeHtml(f.topScorer):'')}</span></div>`; }
+function renderCoachEnd(){
+  const t=state.titles, newB=[...new Set(state.newBadges||[])].map(id=>TROPHY_MAP[id]).filter(Boolean);
+  app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">${state.endingCause==='death'||state.endingCause==='roulette'?'⚰️':'🏁'}</span><h2 class="display">${escapeHtml(state.name)} — ${coachEpithet()}</h2><div class="verdict">${state.modeIcon} ${state.modeName} · ${ERAS.find(e=>e.id===state.startEra).name} → ${eraForYear(state.year).name} · fin à ${state.age} ans · score ${coachScore()}</div></div><p class="narr">${escapeHtml(state.endingText)}</p>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${state.history.filter(h=>!h.sacked).length}</div><div class="k">Saisons complètes</div></div><div class="score-box good"><div class="v">${t.league+t.promo}</div><div class="k">Titres et montées</div></div><div class="score-box good"><div class="v">${t.cup+t.euro+t.euro2}</div><div class="k">Coupes</div></div><div class="score-box gold"><div class="v">${state.awards}</div><div class="k">Récompenses</div></div><div class="score-box"><div class="v">${state.clubsCoached.length}</div><div class="k">Clubs</div></div><div class="score-box bad"><div class="v">${state.sackings}</div><div class="k">Licenciements</div></div></div>
+    ${newB.length?`<div class="section-label">Badges débloqués</div><div class="badge-grid">${newB.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
+    <div class="section-label">Toutes les saisons</div>${state.history.map(seasonLine).join('')||'<div class="hint">Aucune saison.</div>'}
+    <div class="btn-row"><button class="btn" onclick="state=null;startCoachCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button></div></div></div>`; scrollTop();
 }
 
-/* ---------- Fin de carrière ---------- */
-function toggleSeasonDetail(i){ const el=document.getElementById('sd-'+i); if(el) el.style.display=el.style.display==='none'?'':'none'; }
-function seasonLineHTML(f,i){
-  const badge=f.aborted?'🪓':f.champion?'🏆':f.relegated?'⬇️':f.isFlop?'🥶':f.isHit?'🔥':'📊';
-  return `<div class="season-line" onclick="toggleSeasonDetail(${i})"><span><span class="pos">${badge} ${f.aborted?'—':f.finalPos+'e'}</span> ${escapeHtml(f.club)} · ${escapeHtml(f.title)}</span><span>${f.ageStart} ans · ${TIER_SHORT[f.tierId]}</span></div>
-  <div class="season-detail" id="sd-${i}" style="display:none">${f.aborted?'Licenciement en cours de saison.':`Presse ${Math.round(f.critique)} · Supporters ${Math.round(f.publicScore)} · Bilan ${f.profit>=0?'+':''}${euros(f.profit)} · ${f.styleName}<br>Recrue : ${escapeHtml(f.recruit)} · ${escapeHtml(f.vestiaire)} · ${escapeHtml(f.tactic)} · ${escapeHtml(f.staff)} · ${escapeHtml(f.promoLabel)}${f.cupWon?'<br>🥇 Coupe nationale':''}${f.euroWon?`<br>${COMPETITIONS[f.euroWon].icon} ${COMPETITIONS[f.euroWon].label}`:''}${f.awards&&f.awards.length?`<br>🎖️ ${f.awards.join(', ')}`:''}`}</div>`;
+/* ---------- Écrans joueur·euse ---------- */
+function playerSidebar(){
+  const s=state.stats,g=state.gauges,c=state.club;
+  return `<div class="card"><div class="identity"><b>${escapeHtml(state.name)}</b> · ${pAge()} ans · ${state.posIcon} ${state.posName}<br>${c?`🏟️ <b>${escapeHtml(c.name)}</b> · ${escapeHtml(c.leagueName||'')} · ${ROLES[c.role].name} · coach ${escapeHtml(c.coach)}`:'Sans club'}</div>
+    ${c?`<div class="section-label">Confiance du coach</div><div class="conf-big ${state.coachTrust<25?'pressure-state bad':state.coachTrust<50?'pressure-state mid':''}">${Math.round(state.coachTrust)} / 100</div><div class="bar"><i style="width:${state.coachTrust}%"></i></div><div class="hint">Décide ton temps de jeu. Concurrents au poste : ${state.squad.filter(p=>p.pos===state.pos).map(p=>`${escapeHtml(p.name)} (${playerRating(p,state.year)})`).join(', ')||'aucun'}</div>`:''}
+    <div class="section-label">Toi · note ${pRating().toFixed(1)}</div>${Object.keys(PSTAT).map(k=>bar(PSTAT[k],s[k])).join('')}${bar('Forme',state.forme)}${bar('Pression',state.pressure,'pressure')}
+    <div class="section-label">Ta vie</div>${Object.keys(PGAUGE).map(k=>gaugeRow(PGAUGE[k],g[k])).join('')}
+    <div class="section-label">Totaux</div><div class="hint">${state.totals.apps} matchs · ${state.totals.goals} buts · ${state.totals.assists} passes · 🏆 ${state.totals.titles} · 🥇 ${state.totals.cups} · ⭐ ${state.totals.euros} · 🇫🇷 ${state.totals.caps} sél. (${state.totals.capGoals} buts) · 🏅 ${state.totals.ballons} · 👞 ${state.totals.boots}<br>Gains cumulés : ${$(state.totals.earned)}</div></div>
+    <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,30).map(l=>`<div><span class="age">${l.year}</span>${l.msg}</div>`).join('')}</div></div>
+    <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Raccrocher les crampons ?')){playerEnd('Tu décides de raccrocher les crampons.','retire');render();}">Retraite</button></div></div>`;
 }
-function renderEnd(){
-  const t=state.titles, hits=state.seasons.filter(f=>f.isHit).length, flops=state.seasons.filter(f=>f.isFlop).length;
-  const newBadges=[...new Set(state.newlyUnlockedTrophies||[])].map(id=>TROPHY_MAP[id]).filter(Boolean);
-  app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">${state.endingCause==='pressureDeath'||state.endingCause==='roulette'?'⚰️':state.endingCause==='age'?'🎗️':'🏁'}</span><h2 class="display">${escapeHtml(state.name)} — ${computeEpithet()}</h2><div class="verdict">${state.careerModeIcon} ${state.careerModeName} · carrière terminée à ${state.age} ans · score ${careerScore()}</div></div>
-    <p class="narr">${escapeHtml(state.endingText)}</p>
-    <div class="score-grid"><div class="score-box gold"><div class="v">${state.seasons.length}</div><div class="k">Saisons</div></div><div class="score-box good"><div class="v">${t.champion+t.promo}</div><div class="k">Titres et montées</div></div><div class="score-box good"><div class="v">${t.cup+t.euro1+t.euro2}</div><div class="k">Coupes</div></div><div class="score-box gold"><div class="v">${state.awardsWon}</div><div class="k">Récompenses</div></div><div class="score-box"><div class="v">${state.clubsCoached.length}</div><div class="k">Clubs</div></div><div class="score-box ${hits>=flops?'good':'bad'}"><div class="v">${hits} / ${flops}</div><div class="k">Réussites / échecs</div></div><div class="score-box ${state.stats.argent>=0?'good':'bad'}"><div class="v">${euros(state.stats.argent)}</div><div class="k">Capital final</div></div></div>
-    ${newBadges.length?`<div class="section-label">Badges débloqués pendant cette carrière</div><div class="badge-grid">${newBadges.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
-    <div class="section-label">Toutes les saisons</div>${state.seasons.map((f,i)=>seasonLineHTML(f,i)).join('')||'<div class="hint">Aucune saison.</div>'}
-    <div class="section-label">Journal complet</div><div class="log" style="max-height:260px">${state.log.map(l=>`<div><span class="age">${l.age} ans</span>${l.msg}</div>`).join('')}</div>
-    <div class="btn-row"><button class="btn" onclick="state=null;startCoachCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button><button class="btn secondary" onclick="renderBadges()">Salle des badges</button></div></div></div>`;
-  scrollTop();
+function renderPOffers(){
+  const offers=state.currentOffers||[];
+  if(!offers.length) return `<div class="card"><h2 class="display">Aucune proposition</h2><p class="narr">Ton agent ne répond plus. Le marché t'a oublié·e cette année.</p><div class="btn-row"><button class="btn" onclick="playerSkipYear()">Attendre une année</button></div></div>`;
+  return `<div class="card"><h2 class="display">Ton agent a des propositions</h2><p class="hint">${state.year} · ${pAge()} ans · note ${pRating().toFixed(1)}. Le rôle promis pèse sur ton temps de jeu, ta progression et ta pression.</p>
+    <div class="offer-grid">${offers.map((o,i)=>`<div class="offer-card affordable" onclick="playerAcceptOffer(${i});render()"><div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label}${o.stay?' · prolonger':''}</div><h3>${escapeHtml(o.club)}</h3><div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">${ROLES[o.role].name}</span><span class="tag">${o.duration} an${o.duration>1?'s':''}</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))}</span></div><div class="budget">${$(o.salary)} / saison</div><div class="offer-hint">Coach : ${escapeHtml(o.coach)} · ${o.role==='titulaire'?'⭐ Temps de jeu garanti, pression maximale':o.role==='rotation'?'🔄 Du temps de jeu à gagner':'🪑 Peu de matchs, progression lente'}</div></div>`).join('')}</div>
+    <div class="btn-row"><button class="btn secondary" onclick="playerSkipYear()">Refuser tout et attendre une année</button></div></div>`;
+}
+function renderPPhaseResult(){
+  const ph=state.lastPhase, c=state.club, N=state.comp.teams.length;
+  return `<div class="card"><h2 class="display">Phase ${ph.n} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ph.apps}</div><div class="k">matchs joués (${Math.round(ph.share*100)} % du temps)</div></div><div class="score-box good"><div class="v">${ph.goals} / ${ph.assists}</div><div class="k">buts / passes</div></div><div class="score-box ${ph.note>=6.8?'good':ph.note<5.8?'bad':''}"><div class="v">${ph.note.toFixed(1)}</div><div class="k">note moyenne</div></div><div class="score-box ${ph.dTrust>=0?'good':'bad'}"><div class="v">${ph.dTrust>=0?'+':''}${ph.dTrust}</div><div class="k">confiance du coach → ${Math.round(state.coachTrust)}</div></div><div class="score-box"><div class="v">${ordinal(ph.pos)}</div><div class="k">${escapeHtml(c.name)} sur ${N}</div></div></div>
+    ${ph.injury?`<div class="warn">🩼 Blessure : ${ph.injury}</div>`:''}
+    <div class="section-label">Les matchs de ${escapeHtml(c.name)}</div>${matchesHTML(ph.matches,c.name)}
+    <div class="section-label">Classement</div>${tableHTML(ph.table,c.name,false)}
+    <div class="btn-row"><button class="btn" onclick="playerAfterPhase()">${state.phase>=4?'Bilan de la saison →':'Phase suivante →'}</button></div></div>`;
+}
+function renderPSeasonEnd(){
+  const f=state.lastSeason;
+  const lines=[]; if(f.champion) lines.push(`🏆 Champion·ne avec ${escapeHtml(f.club)}`); if(f.cupWon) lines.push('🥇 Vainqueur de la coupe'); if(f.euro) lines.push(f.euro.won?`⭐ Vainqueur de la ${escapeHtml(f.euro.name)}`:`🌍 ${escapeHtml(f.euro.name)} : tour ${f.euro.rounds}`); if(f.selected) lines.push(`🇫🇷 Sélection nationale : ${f.caps} capes, ${f.capGoals} but${f.capGoals>1?'s':''}`); if(f.ballon) lines.push("🏅 Ballon d'or"); if(f.boot) lines.push('👞 Soulier d\'or'); if(f.relegated) lines.push('⬇️ Le club est relégué');
+  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${f.ballon?'🏅':f.champion?'🏆':f.bad?'🥶':f.note>=6.8?'🔥':'📊'}</span><h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2><div class="verdict">${ROLES[f.role].name} · note ${f.note.toFixed(2)} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)}</div></div>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${f.apps}</div><div class="k">Matchs</div></div><div class="score-box good"><div class="v">${f.goals}</div><div class="k">Buts</div></div><div class="score-box good"><div class="v">${f.assists}</div><div class="k">Passes</div></div><div class="score-box"><div class="v">${Math.round(f.share*100)} %</div><div class="k">Temps de jeu</div></div><div class="score-box gold"><div class="v">${$(f.salary)}</div><div class="k">Salaire</div></div></div>
+    ${lines.map(l=>`<div class="trophy-line">${l}</div>`).join('')}
+    <div class="section-label">Classement final</div>${tableHTML(f.table,f.club,false)}
+    <div class="btn-row"><button class="btn" onclick="playerAfterSeasonEnd()">Intersaison →</button></div></div>`;
+}
+function renderPlayerEnd(){
+  const t=state.totals, newB=[...new Set(state.newBadges||[])].map(id=>TROPHY_MAP[id]).filter(Boolean);
+  app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">🎗️</span><h2 class="display">${escapeHtml(state.name)}</h2><div class="verdict">${state.posIcon} ${state.posName} · ${ERAS.find(e=>e.id===state.startEra).name} → ${eraForYear(state.year).name} · fin à ${pAge()} ans · score ${playerScore()}</div></div><p class="narr">${escapeHtml(state.endingText)}</p>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${state.history.length}</div><div class="k">Saisons</div></div><div class="score-box"><div class="v">${t.apps}</div><div class="k">Matchs</div></div><div class="score-box good"><div class="v">${t.goals}</div><div class="k">Buts</div></div><div class="score-box good"><div class="v">${t.assists}</div><div class="k">Passes</div></div><div class="score-box gold"><div class="v">${t.titles+t.cups+t.euros}</div><div class="k">Trophées</div></div><div class="score-box"><div class="v">${t.caps}</div><div class="k">Sélections</div></div><div class="score-box gold"><div class="v">${t.ballons}</div><div class="k">Ballons d'or</div></div><div class="score-box good"><div class="v">${$(t.earned)}</div><div class="k">Gains</div></div></div>
+    ${newB.length?`<div class="section-label">Badges débloqués</div><div class="badge-grid">${newB.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
+    <div class="section-label">Saisons</div>${state.history.map(f=>`<div class="season-line"><span><span class="pos">${f.ballon?'🏅':f.champion?'🏆':f.note.toFixed(1)}</span> ${f.year} · ${escapeHtml(f.club)} · ${escapeHtml(f.league)}</span><span>${f.apps} m · ${f.goals} b · ${f.assists} p${f.selected?' · 🇫🇷':''}</span></div>`).join('')}
+    <div class="btn-row"><button class="btn" onclick="state=null;startPlayerCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button></div></div></div>`; scrollTop();
 }
 
 /* ---------- Badges, panthéon, règles ---------- */
-function renderBadges(){
-  showGameBanner(); filmstripEl.style.display='none';
-  const cats=[...new Set(TROPHIES.map(t=>t.cat))];
-  app.innerHTML=`<div class="fade-in"><div class="card"><h2 class="display">Salle des badges</h2><p class="hint">${unlockedTrophies.size} / ${TROPHIES.length} débloqués. Les badges sont conservés dans ce navigateur, toutes carrières confondues.</p>
-    ${cats.map(c=>`<div class="badge-cat">${c}</div><div class="badge-grid">${TROPHIES.filter(t=>t.cat===c).map(t=>`<div class="badge ${unlockedTrophies.has(t.id)?'':'locked'}"><span class="ico">${t.icon}</span><div><b>${t.label}</b><small>${unlockedTrophies.has(t.id)?'Débloqué':'Verrouillé'}</small></div></div>`).join('')}</div>`).join('')}
-    <div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop();
-}
-function renderHall(){
-  showGameBanner(); filmstripEl.style.display='none';
-  const h=hallOfFame();
-  app.innerHTML=`<div class="fade-in"><div class="card"><h2 class="display">Panthéon</h2><div class="hall">${h.length?h.map(e=>`<div><span>${e.kind==='player'?'👟':'🧢'} <b>${escapeHtml(e.name)}</b> · ${escapeHtml(e.mode||'')} · ${e.seasons} saisons · ${e.titles} titre${e.titles>1?'s':''} · fin à ${e.age} ans</span><span>score ${e.score}${e.date?` · ${e.date}`:''}</span></div>`).join(''):'<div class="hint">Aucune carrière terminée pour l\'instant.</div>'}</div>
-    <div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop();
-}
-function renderRules(){
-  showGameBanner(); filmstripEl.style.display='none';
-  app.innerHTML=`<div class="fade-in"><div class="card rules"><h2 class="display">Comment ça marche</h2>
-    <h3>Le capital</h3><ul><li>Le capital (en M€) représente l'argent que le football accepte de te confier. Chaque projet engage une part de ce capital ; les recettes de saison (primes, billetterie, plus-values) reviennent dedans.</li><li>À partir du 3e projet, chaque offre reçoit un surcoût caché de 5 à 70 %, tiré vers le haut quand les jauges du club sont mauvaises.</li><li>À zéro, un mécène propose une enveloppe unique avec deux échéances à 10 % d'intérêts. Sans elle, ou sans remboursement complet, la carrière s'arrête.</li></ul>
-    <h3>Les six jauges du club</h3><ul>${BASE_SYSTEM_DEFINITIONS.map(d=>`<li><b>${d.icon} ${d.label}</b> : ${d.impact}.</li>`).join('')}<li>Chaque saison use toutes les jauges (−1 à −3). Une jauge à 100 débloque un statut permanent.</li><li>Intégrité et Vestiaire sous 50 : jusqu'à 25 % de risque de licenciement en cours de saison (capital engagé perdu). Direction & staff sous 50 : jusqu'à 25 % de risque que la saison s'enlise (durée et budget doublés).</li><li>Écologie sous 10 : la Ligue des défenseurs de la planète peut infliger une amende ; refuser augmente un risque persistant d'arrestation.</li></ul>
-    <h3>Une saison</h3><ul><li>Choix du projet (club, style demandé, objectif, budget), recrue phare, gestion du vestiaire, système de jeu, staff et infrastructures, incident éventuel, communication.</li><li>Le moteur combine tactique, gestion, difficulté du projet, cohérence système/style, expérience dans le style, tendance cachée, pression, moral, staff, jauges et hasard. Un système cohérent avec le style demandé donne un vrai bonus.</li><li>Une saison est ratée quand presse et supporters sont sous 40 (ou en cas de relégation mal vécue). Quatre échecs d'affilée (trois dans « Dernier contrat ») mettent fin à la carrière.</li><li>Rester dans le même club fidélise le public, mais à partir de la 4e saison, le discours s'use.</li></ul>
-    <h3>Pression et mortalité</h3><ul><li>Dès 25, la pression réduit la qualité. À 60, elle dégrade le moral. Entre 90 et 99, 1 % de risque de mort par période critique. À 100, une crise impose un choix ; « continuer coûte que coûte » déclenche 50 % de risque de mort.</li></ul>
-    <h3>Roulette du destin</h3><ul><li>Éligible après trois saisons, 20 % de chance d'apparaître quand la chaîne d'événements l'atteint, quatre saisons de délai ensuite. Quatre issues cachées : fin, jackpot, petit bonus, malus.</li></ul>
-    <h3>Fins de carrière</h3><ul><li>75 ans · capital épuisé · radiation pour dettes · série d'échecs · trois périodes en rupture structurelle · plus aucune offre après 55 ans avec une réputation faible · arrestation écologique · roulette · pression · retraite volontaire.</li></ul>
-    <h3>Mode joueur·euse</h3><ul><li>De 17 à 38 ans : ton agent te propose des clubs et des rôles, tu choisis ta préparation et ton attitude, la saison décide de tes buts, de ta note, de ta sélection et de ta valeur. La forme physique remplace le capital : à zéro, le corps lâche.</li></ul>
-    <div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop();
-}
-
-/* ---------- Démarrage ---------- */
+function renderBadges(){ showGameBanner(); filmstripEl.style.display='none'; const cats=[...new Set(TROPHIES.map(t=>t.cat))]; app.innerHTML=`<div class="fade-in"><div class="card"><h2 class="display">Salle des badges</h2><p class="hint">${unlockedTrophies.size} / ${TROPHIES.length} débloqués, toutes carrières confondues.</p>${cats.map(c=>`<div class="badge-cat">${c}</div><div class="badge-grid">${TROPHIES.filter(t=>t.cat===c).map(t=>`<div class="badge ${unlockedTrophies.has(t.id)?'':'locked'}"><span class="ico">${t.icon}</span><div><b>${t.label}</b><small>${unlockedTrophies.has(t.id)?'Débloqué':'Verrouillé'}</small></div></div>`).join('')}</div>`).join('')}<div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop(); }
+function renderHall(){ showGameBanner(); filmstripEl.style.display='none'; const h=hallOfFame(); app.innerHTML=`<div class="fade-in"><div class="card"><h2 class="display">Panthéon</h2><div class="hall">${h.length?h.map(e=>`<div><span>${e.kind==='player'?'👟':'🧢'} <b>${escapeHtml(e.name)}</b> · ${escapeHtml(e.mode||'')} · ${escapeHtml(e.era||'')} · ${e.seasons} saisons · ${e.titles} titre${e.titles>1?'s':''} · fin à ${e.age} ans</span><span>score ${e.score}${e.date?` · ${e.date}`:''}</span></div>`).join(''):'<div class="hint">Aucune carrière terminée pour l\'instant.</div>'}</div><div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop(); }
+function renderRules(){ showGameBanner(); filmstripEl.style.display='none'; app.innerHTML=`<div class="fade-in"><div class="card rules"><h2 class="display">Comment ça marche</h2>
+  <h3>Les époques</h3><ul>${ERAS.map(e=>`<li><b>${e.icon} ${e.name}</b> (${e.start}-${e.end}) : ${e.rules.join(', ')}.</li>`).join('')}<li>Les joueurs réels apparaissent selon leur âge dans l'année en cours. Une carrière longue traverse l'époque suivante.</li></ul>
+  <h3>Carrière d'entraîneur·euse</h3><ul><li>Chaque offre fixe un championnat réel, un objectif de classement, un budget de transferts et un président avec son caractère.</li><li>Le mercato est libre : vends, recrute des stars (si ta crédibilité le permet), des pros, des pépites (parfois des arnaques), des joueurs libres ou des jeunes du centre. Un « gros coup » coûte cher et exige une place de titulaire.</li><li>La force de l'équipe vient de ton onze type, du vestiaire, de la cohérence entre ton style et celui que le club demande, de ta tactique et de la dynamique.</li><li>La saison se joue en quatre phases avec un vrai calendrier. À chaque phase, un incident peut survenir, puis tu vois tes matchs, le classement et l'évolution de la confiance du président.</li><li><b>Confiance du président</b> : elle monte quand tu dépasses l'objectif, chute quand tu es en dessous ou que la masse salariale explose. À zéro, licenciement immédiat. Sous 35 en fin de saison, pas de prolongation.</li><li>Quatre jauges du club : Vestiaire (force de l'équipe), Supporters (pression et patience), Formation (jeunes, arnaques), Staff (blessures, progression). Une jauge basse déclenche des dilemmes.</li><li>Pression : à 100, une crise impose un choix, dont un à 50 % de risque de mort. Entre 90 et 99, 1 % de risque par intersaison.</li><li>Roulette du destin : après trois saisons, 20 % de chance par intersaison, quatre issues cachées dont une fatale.</li><li>Fin : 75 ans, quatre licenciements d'affilée, deux années sans offre, roulette, pression, retraite.</li></ul>
+  <h3>Carrière de joueur·euse</h3><ul><li>Tu rejoins des clubs réels avec un rôle promis. Ton temps de jeu dépend de ta note face aux concurrents à ton poste et de la confiance du coach.</li><li>Chaque phase : un incident possible, puis tes matchs, buts, passes, note et l'évolution de la confiance du coach.</li><li>Quatre jauges : Corps (à zéro, fin de carrière), Vestiaire, Supporters, Entourage.</li><li>Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.</li></ul>
+  <div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop(); }
 window.addEventListener('DOMContentLoaded',()=>{ renderStart(); });
