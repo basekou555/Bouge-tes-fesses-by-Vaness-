@@ -41,23 +41,12 @@ function playerApplyEffects(e,ctx={}){
 /* ---------- Offres ---------- */
 function playerTierFor(rating,rep){ const t=['amateur']; if(rating>=44) t.push('ligue2'); if(rating>=55) t.push('ligue1'); if(rating>=52&&state.gauges.entourage>=45) t.push('etranger'); if(rating>=66) t.push('europe'); if(rating>=78&&(state.selected||rep>=60)) t.push('superclub'); return t; }
 function playerBuildOffer(tier,forced){
-  const o=buildCoachOfferLike(tier,forced); const r=pRating();
+  const o=buildCoachOffer(tier,forced); const r=pRating();
   const gap=r-o.strength; const role=gap>=4?'titulaire':gap>=-4?pick(['titulaire','rotation']):gap>=-10?pick(['rotation','remplacant']):'remplacant';
-  const salary=Math.max(.01,playerValueForRating(r,pAge())*.14*(role==='titulaire'?1:role==='rotation'?.75:.55)*rand(.85,1.2));
+  const salary=Math.max(.01,valueForRating(r,pAge(),state.year)*.14*(role==='titulaire'?1:role==='rotation'?.75:.55)*rand(.85,1.2));
   o.role=role; o.salary=salary; o.duration=randInt(1,3); const dk=decadeKey(state.year);
   const coaches=COACHES_BY_ERA[eraForYear(state.year).id]; o.coach=Math.random()<.35?pick(coaches).name:fakeName(o.nat==='FR'?'FR':(FAKE_FIRST[o.nat]?o.nat:'FR'));
   return o;
-}
-function playerValueForRating(r,age){ const base=Math.pow(Math.max(0,r-40)/60,3)*120; const ageF=age<=23?1.35:age<=28?1:age<=31?.7:age<=33?.45:.25; return Math.max(.01,base*ageF*eraForYear(state.year).marketSize); }
-function buildCoachOfferLike(tier,forced){
-  const dk=decadeKey(state.year); let club,nat='FR',league=null,s=0;
-  if(forced){ club=forced.name; nat=forced.nat; league=forced.league; s=forced.s; }
-  else if(tier==='ligue1'){ const c=pick(FR_CLUBS.filter(x=>x.s[dk]>0)); club=c.n; s=c.s[dk]; }
-  else if(tier==='ligue2'){ club=pick(FR_CLUBS.filter(x=>!x.s[dk]).map(x=>x.n).concat(FR_LOWER.slice(0,10))); }
-  else if(tier==='amateur'){ club=pick(FR_LOWER); }
-  else if(tier==='etranger'){ const c=pick(WORLD_CLUBS.filter(x=>x.s[dk]>0)); club=c.n; nat=c.nat; league=c.league; s=c.s[dk]; }
-  else { const pool=EU_CLUBS.filter(x=>x.s[dk]>0&&(tier==='superclub'?x.s[dk]===5:x.s[dk]<=4)); const c=pick(pool.length?pool:EU_CLUBS.filter(x=>x.s[dk]>0)); club=c.n; nat=c.nat; s=c.s[dk]; }
-  const o={club,tier,nat,league,s,strength:tierBaseStrength(tier,s),year:state.year}; const lg=buildLeagueTeams(o,state.year); o.leagueName=lg.name; o.teams=lg.teams.length+1; return o;
 }
 function playerGenerateOffers(){
   const r=pRating(), offers=[]; const tiers=playerTierFor(r,state.gauges.supporters);
@@ -146,8 +135,8 @@ function playerSimulatePhase(){
 }
 function playerAfterPhase(){
   if(state.gauges.corps<=0){ unlockTrophy('p-injury'); playerEnd(`Ton corps ne suit plus : une blessure de trop met fin à ta carrière à ${pAge()} ans.`,'injury'); render(); return; }
-  if(state.pressure>=100){ state.pendingChoice='pressureCrisis'; render(); return; }
   if(state.phase>=4){ playerEndSeason(); render(); return; }
+  if(state.pressure>=100){ state.pendingChoice='pressureCrisis'; render(); return; }
   playerPlayPhase(); render();
 }
 function playerEndSeason(){
@@ -155,8 +144,8 @@ function playerEndSeason(){
   const table=sortTable(comp.table), pos=tablePos(comp.table,c.name), N=comp.teams.length;
   const champion=pos===1, relegated=pos>N-3;
   const cup=simCup(5,playerClubStrength,shuffledCopy(comp.teams.filter(n=>n!==c.name)).slice(0,5).map(n=>({name:n,strength:comp.strength[n]})));
-  let euro=null; if(state.euroQualified){ const dk=decadeKey(year); euro=simCup(5,playerClubStrength,shuffledCopy(EU_CLUBS.filter(x=>x.s[dk]>=3&&x.n!==c.name)).slice(0,5).map(x=>({name:x.n,strength:tierBaseStrength('europe',x.s[dk])}))); euro.name=eraForYear(year).euroCup; }
-  state.euroQualified=(c.tier==='ligue1'||c.tier==='europe'||c.tier==='superclub')&&pos<=3;
+  let euro=null; if(c.euroQualified){ const dk=decadeKey(year); euro=simCup(5,playerClubStrength,shuffledCopy(EU_CLUBS.filter(x=>x.s[dk]>=3&&x.n!==c.name)).slice(0,5).map(x=>({name:x.n,strength:tierBaseStrength('europe',x.s[dk])}))); euro.name=eraForYear(year).euroCup; }
+  c.euroQualified=(c.tier==='ligue1'||c.tier==='europe'||c.tier==='superclub')&&pos<=3;
   const avgNote=ss.notes.reduce((n,x)=>n+x,0)/Math.max(1,ss.notes.length), avgShare=ss.shares.reduce((n,x)=>n+x,0)/Math.max(1,ss.shares.length);
   const r=pRating();
   // sélection nationale
@@ -176,7 +165,6 @@ function playerEndSeason(){
   state.gauges.supporters=clamp(state.gauges.supporters+(champion?8:0)+(bad?-5:2)); state.gauges.entourage=clamp(state.gauges.entourage+(selected?3:0)+(bad?-2:1));
   const season={year,club:c.name,league:c.leagueName,tier:c.tier,role:c.role,pos,teams:N,champion,relegated,cupWon:cup.won,cupRounds:cup.roundsReached,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached}:null,apps:ss.apps,goals:ss.goals,assists:ss.assists,note:avgNote,share:avgShare,selected,caps,capGoals,ballon,boot,bad,salary:c.salary,table:table.map(t=>({...t})),age};
   state.history.push(season); state.lastSeason=season;
-  state.usedNames=state.usedNames.filter(n=>true);
   // développement des coéquipiers et contrats
   developSquad(state.squad,year,{minutes:null,formation:50,staff:50,vestiaire:state.gauges.vestiaire});
   state.squad=state.squad.filter(p=>playerAge(p,year+1)<36||Math.random()<.5);

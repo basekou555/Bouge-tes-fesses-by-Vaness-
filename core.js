@@ -22,6 +22,8 @@ function lsGet(k,f){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v
 function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 function saveGame(){ if(!state) return; lsSet(state.kind==='player'?KEYS.player:KEYS.coach,state); }
 function clearSave(kind){ try{ localStorage.removeItem(kind==='player'?KEYS.player:KEYS.coach); }catch(e){} }
+// Migration depuis la première version : le Panthéon est conservé, les anciens badges (identifiants incompatibles) non.
+(function migrate(){ try{ if(!localStorage.getItem(KEYS.hall)&&localStorage.getItem('ac-hall')) localStorage.setItem(KEYS.hall,localStorage.getItem('ac-hall')); }catch(e){} })();
 let unlockedTrophies=new Set(lsGet(KEYS.trophies,[]));
 function unlockTrophy(id){ if(!TROPHY_MAP[id]||unlockedTrophies.has(id)) return false; unlockedTrophies.add(id); lsSet(KEYS.trophies,[...unlockedTrophies]); if(state&&state.newBadges) state.newBadges.push(id); return true; }
 function hallOfFame(){ return lsGet(KEYS.hall,[]); }
@@ -78,7 +80,8 @@ function tierBaseStrength(tier,s){
 /* Construit la liste des équipes du championnat de notre club (notre club exclu, ajouté ensuite) */
 function buildLeagueTeams(offer,year){
   const dk=decadeKey(year), teams=[];
-  const push=(name,strength)=>{ if(name!==offer.club&&!teams.some(t=>t.name===name)) teams.push({name,strength:Math.round(strength+rand(-2,2))}); };
+  const self=offer.club||offer.name;
+  const push=(name,strength)=>{ if(name!==self&&!teams.some(t=>t.name===name)) teams.push({name,strength:Math.round(strength+rand(-2,2))}); };
   if(offer.tier==='ligue1'){ FR_CLUBS.filter(c=>c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('ligue1',c.s[dk]))); while(teams.length<17){ const c=pick(FR_CLUBS); push(c.n,62); } return {name:leagueName(1,'FR',year),nat:'FR',level:1,teams:teams.slice(0,17)}; }
   if(offer.tier==='ligue2'){ FR_CLUBS.filter(c=>!c.s[dk]).forEach(c=>push(c.n,rand(56,62))); shuffledCopy(FR_LOWER).slice(0,8).forEach(n=>push(n,rand(53,59))); return {name:leagueName(2,'FR',year),nat:'FR',level:2,teams:shuffledCopy(teams).slice(0,17)}; }
   if(offer.tier==='amateur'){ shuffledCopy(FR_LOWER).slice(0,15).forEach(n=>push(n,rand(44,52))); return {name:leagueName(3,'FR',year),nat:'FR',level:3,teams:teams.slice(0,15)}; }
@@ -94,18 +97,20 @@ const AGE_CURVE={16:.68,17:.72,18:.76,19:.8,20:.84,21:.88,22:.92,23:.95,24:.97,2
 function ageCurve(age){ return AGE_CURVE[clamp(age,16,40)]; }
 const TRAITS=[{id:'leader',label:"Leader",v:3},{id:'pro',label:"Professionnel",v:2},{id:'ego',label:"Ego",v:-3},{id:'fetard',label:"Fêtard",v:-2,scandal:true},{id:'fragile',label:"Fragile",injury:.08},{id:'loyal',label:"Loyal",v:2},{id:'mercenaire',label:"Mercenaire",v:-1},{id:'showman',label:"Showman",fans:3},{id:'travailleur',label:"Bosseur",dev:.02},{id:'discret',label:"Discret",v:1}];
 let _pid=1;
+// Les identifiants sont mémorisés dans la sauvegarde pour ne jamais entrer en collision après un rechargement.
+function nextPid(){ if(state){ state.pidCounter=Math.max(state.pidCounter||1000,_pid)+1; _pid=state.pidCounter; return state.pidCounter; } return _pid++; }
 function makePlayer(o){
-  const p={ id:_pid++, name:o.name, pos:o.pos, born:o.born, peak:o.peak, nat:o.nat||'FR', real:!!o.real, dev:o.dev!=null?Math.min(o.dev,1.14):clamp(1+rand(-.06,.06)+(Math.random()<.08?rand(.04,.1):0),.8,1.14), trait:o.trait||pick(TRAITS).id, morale:o.morale!=null?o.morale:65, form:0, injury:0, contractEnd:o.contractEnd||0, wage:o.wage||0, apps:0, goals:0, assists:0, seasonsAtClub:0, fanFav:false, scam:o.scam||null, promised:o.promised||false, joinedYear:o.joinedYear||0 };
+  const p={ id:nextPid(), name:o.name, pos:o.pos, born:o.born, peak:o.peak, nat:o.nat||'FR', real:!!o.real, dev:o.dev!=null?Math.min(o.dev,1.14):clamp(1+rand(-.06,.06)+(Math.random()<.08?rand(.04,.1):0),.8,1.14), trait:o.trait||pick(TRAITS).id, morale:o.morale!=null?o.morale:65, form:0, injury:0, contractEnd:o.contractEnd||0, wage:o.wage||0, apps:0, goals:0, assists:0, seasonsAtClub:0, fanFav:false, scam:o.scam||null, promised:o.promised||false, joinedYear:o.joinedYear||0 };
   return p;
 }
 function playerAge(p,year){ return year-p.born; }
 function playerRating(p,year){ const age=playerAge(p,year); return clamp(Math.round(p.peak*ageCurve(age)*p.dev+(p.form||0)*.3),25,99); }
-function playerValue(p,year){
-  const r=playerRating(p,year), age=playerAge(p,year);
+function valueForRating(r,age,year){
   const base=Math.pow(Math.max(0,r-40)/60,3)*120;
   const ageF=age<=23?1.35:age<=28?1:age<=31?.7:age<=33?.45:.25;
   return Math.max(.01,base*ageF*eraForYear(year).marketSize);
 }
+function playerValue(p,year){ return valueForRating(playerRating(p,year),playerAge(p,year),year); }
 function playerWage(p,year){ return Math.max(.005,playerValue(p,year)*.14+.01); }
 function traitLabel(id){ const t=TRAITS.find(x=>x.id===id); return t?t.label:id; }
 function fakeName(nat){ const k=FAKE_FIRST[nat]?nat:(['SN','ML','CI','CM','DZ','MA','GH','NG']).includes(nat)?'AF':'FR'; return `${pick(FAKE_FIRST[k])} ${pick(FAKE_LAST[k])}`; }

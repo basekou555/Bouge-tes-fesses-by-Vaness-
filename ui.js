@@ -185,6 +185,7 @@ function renderSeasonEnd(){
     <div class="two-cols"><div><div class="section-label">Classement final</div>${tableHTML(f.table,f.club,false)}</div><div><div class="section-label">Parcours en coupe</div>${cupPathHTML(f.cupPath,'Coupe nationale')}${f.euro?cupPathHTML(f.euro.path,f.euro.name):''}</div></div>
     ${f.devNotes.length?`<div class="section-label">Progressions</div><div class="hint">${f.devNotes.map(escapeHtml).join('<br>')}</div>`:''}
     ${f.contracts.length?`<div class="section-label">Contrats</div><div class="hint">${f.contracts.map(escapeHtml).join(' · ')}</div>`:''}
+    <div class="punchline narr">${pick(f.champion?PUNCHLINES.champion:f.relegated?PUNCHLINES.relegated:f.objectiveMet?PUNCHLINES.hit:f.pos>f.teams*.7?PUNCHLINES.flop:PUNCHLINES.mid)}</div>
     <div class="section-label">Le verdict du président</div><div class="${kept?'milestone':'warn'}">${kept?`${capitalize(c.presidentName)} te renouvelle sa confiance (${Math.round(c.confidence)}/100). Une offre de prolongation t'attendra, avec d'autres bancs.`:`${capitalize(c.presidentName)} ne te renouvelle pas sa confiance (${Math.round(c.confidence)}/100). Il faudra trouver un autre banc.`}</div>
     <div class="btn-row"><button class="btn" onclick="coachAfterSeasonEnd()">Intersaison →</button></div></div>`;
 }

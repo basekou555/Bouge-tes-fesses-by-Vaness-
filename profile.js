@@ -17,15 +17,15 @@ const STYLES = [
 ];
 function styleById(id){ return STYLES.find(s=>s.id===id)||STYLES[0]; }
 const NATIONALITIES=[
-  { id:'fr', name:"Française", desc:"École de la formation et du jeu structuré.", favoredStyleIds:['formation','positionnel'], bonus:{talent:4, repCritique:2} },
-  { id:'es', name:"Espagnole", desc:"Culture de la possession et du jeu de position.", favoredStyleIds:['possession','positionnel'], bonus:{talent:5, repCritique:1} },
+  { id:'fr', name:"Française", desc:"École de la formation et du jeu structuré.", favoredStyleIds:['formation','positionnel'], bonus:{talent:4, reputation:2} },
+  { id:'es', name:"Espagnole", desc:"Culture de la possession et du jeu de position.", favoredStyleIds:['possession','positionnel'], bonus:{talent:5, reputation:1} },
   { id:'de', name:"Allemande", desc:"Gegenpressing, intensité et rigueur analytique.", favoredStyleIds:['pressing','verticalite'], bonus:{technique:4, talent:1} },
-  { id:'it', name:"Italienne", desc:"Science défensive et art du résultat.", favoredStyleIds:['catenaccio','blocbas'], bonus:{technique:3, repCritique:2} },
-  { id:'nl', name:"Néerlandaise", desc:"Héritière du football total et des académies.", favoredStyleIds:['total','formation'], bonus:{talent:4, repPublic:1} },
-  { id:'en', name:"Anglaise", desc:"Intensité, duels et ferveur des tribunes.", favoredStyleIds:['direct','physique'], bonus:{repPublic:3, reseau:2} },
+  { id:'it', name:"Italienne", desc:"Science défensive et art du résultat.", favoredStyleIds:['catenaccio','blocbas'], bonus:{technique:3, reputation:2} },
+  { id:'nl', name:"Néerlandaise", desc:"Héritière du football total et des académies.", favoredStyleIds:['total','formation'], bonus:{talent:4, reputation:1} },
+  { id:'en', name:"Anglaise", desc:"Intensité, duels et ferveur des tribunes.", favoredStyleIds:['direct','physique'], bonus:{reputation:3, reseau:2} },
   { id:'pt', name:"Portugaise", desc:"Génération de tacticien·nes formé·es sur les bancs d'école.", favoredStyleIds:['contre','possession'], bonus:{technique:3, talent:2} },
-  { id:'ar', name:"Argentine", desc:"Grinta, folie et amour du dribble.", favoredStyleIds:['rock','fantaisie'], bonus:{talent:3, repPublic:2} },
-  { id:'br', name:"Brésilienne", desc:"Le joga bonito comme religion.", favoredStyleIds:['fantaisie','ailes'], bonus:{repPublic:4, talent:1} },
+  { id:'ar', name:"Argentine", desc:"Grinta, folie et amour du dribble.", favoredStyleIds:['rock','fantaisie'], bonus:{talent:3, reputation:2} },
+  { id:'br', name:"Brésilienne", desc:"Le joga bonito comme religion.", favoredStyleIds:['fantaisie','ailes'], bonus:{reputation:4, talent:1} },
   { id:'be', name:"Belge", desc:"Une génération dorée et un goût pour les projets modestes.", favoredStyleIds:['formation','contre'], bonus:{talent:3, reseau:1} },
   { id:'sn', name:"Sénégalaise", desc:"Puissance, discipline et lien fort avec les joueurs.", favoredStyleIds:['physique','pressing'], bonus:{talent:3, moral:3} },
   { id:'ma', name:"Marocaine", desc:"Organisation collective et fierté d'un football en pleine ascension.", favoredStyleIds:['blocbas','contre'], bonus:{technique:3, moral:2} },
