@@ -29,6 +29,7 @@ absolut-coach/
 ├── eras.js       les sept époques et leurs règles, les clubs réels, les entraîneurs réels
 ├── content.js    incidents, coups du sort, dilemmes, roulettes, arnaques du mercato
 ├── core.js       moteur partagé : joueurs, effectifs, marché, championnats, coupes
+├── match.js      le match : compo, fraîcheur, styles adverses, minute par minute, notes
 ├── coach.js      carrière d'entraîneur·euse
 ├── player.js     carrière de joueur·euse
 └── ui.js         écrans
@@ -56,9 +57,10 @@ Les joueurs réels (Kopa, Platini, Zidane, Mbappé, Yamal…) apparaissent selon
 
 1. **Les offres** : des clubs réels (Reims 1958, Bordeaux 1985, Lyon 2005, Inter Miami 2024…) avec leur championnat, un objectif de classement, un budget de transferts et un président qui a son caractère (patient, impulsif, ambitieux, comptable, romantique, étranger).
 2. **Le mercato** : libre, mais cohérent. Vends, recrute des stars si ta crédibilité le permet, des pros, des pépites venues d'une vidéo ou d'un cousin (certaines sont des arnaques : faux âge, blessure cachée, joueur fantôme, commission occulte…), des joueurs libres ou des jeunes du centre. Un « gros coup » coûte cher et exige une place de titulaire. Plafond salarial et quota d'étrangers de l'époque s'appliquent.
-3. **Le plan de jeu** : une formation et un style. Suivre le style demandé par le club et jouer ton style favori renforcent l'équipe.
-4. **La saison en quatre phases** : un vrai calendrier, tes scores, le classement, une explication du résultat (onze type, vestiaire, style, tactique, blessés, dynamique) et l'évolution de la **confiance du président**. Mercato d'hiver à la trêve quand l'époque le permet.
-5. **Le bilan** : classement final, coupe nationale, coupe d'Europe, récompenses, progressions des jeunes, contrats, verdict du président, montée ou descente.
+3. **Le plan de jeu** : une formation et un style. Suivre le style demandé par le club et jouer ton style favori renforcent l'équipe. Chaque style appartient à une famille : 🧠 contrôle bat 🔥 pression, pression bat 🧱 contre, contre bat contrôle, et le 🚀 jeu direct ouvre le match.
+4. **Le match, journée par journée** : avant chaque match, l'adversaire (classement, force, style, forme), ta formation, ton onze et ton banc (fraîcheur, suspensions, blessures, hors poste), ton capitaine, ton approche (tout devant, équilibré, fermer le jeu) et l'entraînement de la semaine (tactique, physique, jeunes, récupération). Le match se déroule minute par minute : buts et passeurs, penaltys, cartons, blessures, remplacements, avec une décision à la mi-temps (garder le plan, tout devant, fermer, recadrer le vestiaire). À la fin : le film du match, une note par joueur, l'homme du match, et les raisons du résultat. Un bouton simule le reste de la phase avec le onze automatique.
+5. **La saison en quatre phases** : un vrai calendrier, tes scores, le classement, une explication du résultat (onze type, vestiaire, style, tactique, blessés, dynamique) et l'évolution de la **confiance du président**. Mercato d'hiver à la trêve quand l'époque le permet.
+6. **Le bilan** : classement final, coupe nationale, coupe d'Europe, récompenses, progressions des jeunes, contrats, verdict du président, montée ou descente.
 
 **La confiance du président** remplace le capital : elle monte quand tu dépasses l'objectif, chute quand tu es en dessous ou que la masse salariale explose. À zéro, licenciement immédiat. Sous 35 en fin de saison, pas de prolongation. L'objectif se recalcule chaque saison sur la vraie force de ton effectif : bâtir une armada relève l'attente.
 
@@ -80,7 +82,7 @@ Les joueurs réels (Kopa, Platini, Zidane, Mbappé, Yamal…) apparaissent selon
 
 ## 👟 Carrière de joueur·euse (17 → 38 ans)
 
-Tu rejoins des clubs réels avec un rôle promis (titulaire, rotation, remplaçant·e) et un coach, parfois réel. Ton temps de jeu dépend de ta note face aux concurrents à ton poste et de la **confiance du coach**. Chaque phase : un incident possible, tes matchs, buts, passes, note. Quatre jauges : 🩻 Corps (à zéro, fin de carrière), ✊ Vestiaire, 📣 Supporters, 👪 Entourage. Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.
+Tu rejoins des clubs réels avec un rôle promis (titulaire, rotation, remplaçant·e) et un coach, parfois réel. Chaque journée, le coach compose : ta note face aux concurrents à ton poste, sa **confiance**, le rôle promis et ta fraîcheur décident si tu es titulaire, sur le banc ou en tribune. Tu vis le match minute par minute (buts, passes, cartons, blessures, entrée en jeu) avec une note à la fin, et un penalty à tirer ou à laisser quand il se présente. À chaque phase : un incident possible, puis le bilan de tes matchs, ta note moyenne et la confiance du coach. Quatre jauges : 🩻 Corps (à zéro, fin de carrière), ✊ Vestiaire, 📣 Supporters, 👪 Entourage. Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.
 
 ---
 

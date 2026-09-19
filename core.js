@@ -100,7 +100,7 @@ let _pid=1;
 // Les identifiants sont mémorisés dans la sauvegarde pour ne jamais entrer en collision après un rechargement.
 function nextPid(){ if(state){ state.pidCounter=Math.max(state.pidCounter||1000,_pid)+1; _pid=state.pidCounter; return state.pidCounter; } return _pid++; }
 function makePlayer(o){
-  const p={ id:nextPid(), name:o.name, pos:o.pos, born:o.born, peak:o.peak, nat:o.nat||'FR', real:!!o.real, dev:o.dev!=null?Math.min(o.dev,1.14):clamp(1+rand(-.06,.06)+(Math.random()<.08?rand(.04,.1):0),.8,1.14), trait:o.trait||pick(TRAITS).id, morale:o.morale!=null?o.morale:65, form:0, injury:0, contractEnd:o.contractEnd||0, wage:o.wage||0, apps:0, goals:0, assists:0, seasonsAtClub:0, fanFav:false, scam:o.scam||null, promised:o.promised||false, joinedYear:o.joinedYear||0 };
+  const p={ id:nextPid(), name:o.name, pos:o.pos, born:o.born, peak:o.peak, nat:o.nat||'FR', real:!!o.real, dev:o.dev!=null?Math.min(o.dev,1.14):clamp(1+rand(-.06,.06)+(Math.random()<.08?rand(.04,.1):0),.8,1.14), trait:o.trait||pick(TRAITS).id, morale:o.morale!=null?o.morale:65, form:0, injury:0, contractEnd:o.contractEnd||0, wage:o.wage||0, apps:0, goals:0, assists:0, seasonsAtClub:0, fanFav:false, scam:o.scam||null, promised:o.promised||false, joinedYear:o.joinedYear||0, fitness:100, yellows:0, suspended:0, sumRating:0, rated:0 };
   return p;
 }
 function playerAge(p,year){ return year-p.born; }
@@ -220,26 +220,24 @@ function roundRobin(teamIds){
 function simMatch(sH,sA){ const xh=1.35*Math.exp((sH+2-sA)/19), xa=1.05*Math.exp((sA-sH-2)/19); return [poisson(xh),poisson(xa)]; }
 function newSeasonTable(teams){ return teams.map(t=>({name:t.name,pts:0,w:0,d:0,l:0,gf:0,ga:0,me:!!t.me})); }
 function applyResult(table,h,a,gh,ga){ const H=table.find(t=>t.name===h),A=table.find(t=>t.name===a); H.gf+=gh;H.ga+=ga;A.gf+=ga;A.ga+=gh; if(gh>ga){H.pts+=3;H.w++;A.l++;} else if(gh<ga){A.pts+=3;A.w++;H.l++;} else {H.pts++;A.pts++;H.d++;A.d++;} }
+/* Enregistre un résultat dans le classement et la forme récente (cinq derniers matchs) */
+function recordResult(comp,h,a,gh,ga){ applyResult(comp.table,h,a,gh,ga); comp.form=comp.form||{}; const push=(n,r)=>{ comp.form[n]=(comp.form[n]||[]).concat(r).slice(-5); }; push(h,gh>ga?'W':gh<ga?'L':'D'); push(a,ga>gh?'W':ga<gh?'L':'D'); }
 function sortTable(table){ return [...table].sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf); }
 function tablePos(table,name){ return sortTable(table).findIndex(t=>t.name===name)+1; }
-/* Joue les journées [from,to) pour toute la ligue ; retourne nos résultats */
-function playMatchdays(comp,from,to,ourName,ourStrengthFn){
-  const mine=[];
-  for(let d=from;d<to&&d<comp.schedule.length;d++){
-    comp.schedule[d].forEach(([h,a])=>{
-      const sH=h===ourName?ourStrengthFn():comp.strength[h], sA=a===ourName?ourStrengthFn():comp.strength[a];
-      const [gh,ga]=simMatch(sH,sA); applyResult(comp.table,h,a,gh,ga);
-      if(h===ourName||a===ourName) mine.push({home:h,away:a,gh,ga,us:h===ourName?'home':'away',res:h===ourName?(gh>ga?'W':gh<ga?'L':'D'):(ga>gh?'W':ga<gh?'L':'D')});
-    });
-  }
-  return mine;
+/* Joue les autres matchs d'une journée (les nôtres passent par le moteur de match) */
+function playOthers(comp,d,ourName){
+  (comp.schedule[d]||[]).forEach(([h,a])=>{ if(h===ourName||a===ourName) return; const [gh,ga]=simMatch(comp.strength[h],comp.strength[a]); recordResult(comp,h,a,gh,ga); });
 }
-function createCompetition(league,ourName){
+/* Notre affiche d'une journée : {home,away,opp,isHome} ou null (journée de repos) */
+function ourFixture(comp,d,ourName){ const f=(comp.schedule[d]||[]).find(([h,a])=>h===ourName||a===ourName); if(!f) return null; return {home:f[0],away:f[1],opp:f[0]===ourName?f[1]:f[0],isHome:f[0]===ourName}; }
+function createCompetition(league,ourName,year){
   const names=[ourName,...league.teams.map(t=>t.name)];
-  const strength={}; league.teams.forEach(t=>strength[t.name]=t.strength);
+  // Chaque club adverse a aussi un staff : un bonus de saison de 0 à 4 s'ajoute à sa force nominale
+  const strength={}, styles={}; const pool=eraStylePool(year||2015); league.teams.forEach(t=>{ strength[t.name]=Math.round((t.strength+rand(0,4))*10)/10; styles[t.name]=pick(pool).id; });
   const schedule=roundRobin(names);
-  return {name:league.name,nat:league.nat,level:league.level,teams:names,strength,schedule,table:newSeasonTable(names.map(n=>({name:n,me:n===ourName}))),phaseEnds:[Math.round(schedule.length*.25),Math.round(schedule.length*.5),Math.round(schedule.length*.75),schedule.length]};
+  return {name:league.name,nat:league.nat,level:league.level,teams:names,strength,styles,form:{},schedule,table:newSeasonTable(names.map(n=>({name:n,me:n===ourName}))),phaseEnds:[Math.round(schedule.length*.25),Math.round(schedule.length*.5),Math.round(schedule.length*.75),schedule.length]};
 }
+function oppStyle(comp,name,year){ if(!comp.styles) comp.styles={}; if(!comp.styles[name]) comp.styles[name]=pick(eraStylePool(year)).id; return comp.styles[name]; }
 /* Coupe à élimination directe : rounds contre des adversaires de force donnée */
 function simCup(rounds,ourStrengthFn,opponents){
   const path=[]; let alive=true;
@@ -255,11 +253,11 @@ function developSquad(squad,year,ctx){
   squad.forEach(p=>{
     const age=playerAge(p,year); const share=ctx.minutes?clamp((ctx.minutes[p.id]||0)/4,0,1):.5;
     let dev=0;
-    if(age<=23) dev=(share-.35)*.03+(ctx.formation-50)*.0004+(p.trait==='travailleur'?.006:0);
+    if(age<=23) dev=(share-.35)*.03+(ctx.formation-50)*.0004+(p.trait==='travailleur'?.006:0)+(ctx.youthWeeks||0)*.0006;
     else if(age>=31) dev=-(.006+(age-30)*.004)+(ctx.staff-50)*.0002;
     p.dev=clamp(p.dev+dev,.8,1.14);
     if(age<=21&&share>=.5&&dev>.02) notes.push(`${p.name} a franchi un palier grâce au temps de jeu.`);
-    p.seasonsAtClub++; p.form=0; p.morale=clamp(p.morale+(share>=.5?4:-6)+(ctx.vestiaire-50)*.1,20,100);
+    p.seasonsAtClub++; p.form=0; p.morale=clamp(p.morale+(share>=.5?4:-6)+(ctx.vestiaire-50)*.1,20,100); p.yellows=0; p.suspended=0; p.fitness=100;
     if(p.seasonsAtClub>=3&&p.apps>=40&&Math.random()<.35) p.fanFav=true;
     p.injury=Math.max(0,p.injury-30);
   });

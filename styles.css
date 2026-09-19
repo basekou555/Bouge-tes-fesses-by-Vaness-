@@ -284,3 +284,46 @@ input[type=number]{ padding:8px 10px; border-radius:6px; border:1px solid var(--
 .cup-path b{ color:var(--cream); }
 .era-banner{ padding:10px 12px; margin-bottom:10px; border:1px solid var(--gold-dim); border-radius:6px; background:rgba(201,162,75,.07); font-size:12px; color:var(--muted); }
 .era-banner b{ color:var(--gold); }
+
+/* ---------- Le match ---------- */
+.form-chips{ display:inline-flex; gap:2px; vertical-align:middle; }
+.form-chips i{ display:inline-block; width:16px; height:16px; line-height:16px; text-align:center; font-size:9px; font-style:normal; font-weight:700; border-radius:3px; background:var(--panel); border:1px solid var(--line); color:var(--muted); }
+.form-chips i.W{ background:#1d4a2d; color:#cfe9d5; border-color:var(--sage); } .form-chips i.L{ background:#4a1d24; color:#f0cfd3; border-color:var(--red); } .form-chips i.D{ background:#3a3320; color:#e7dcb8; }
+.opp-card{ padding:12px 14px; margin:8px 0; border:1px solid var(--gold-dim); border-radius:8px; background:rgba(201,162,75,.06); }
+.opp-top{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.opp-name{ font-size:20px; font-family:'Bebas Neue',sans-serif; letter-spacing:.03em; }
+.opp-meta{ color:var(--muted); font-size:12px; margin-top:6px; line-height:1.6; }
+.opp-meta b{ color:var(--cream); }
+.opt-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:6px; }
+.opt-grid button{ padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel-2); color:var(--cream); cursor:pointer; text-align:left; font-size:12px; }
+.opt-grid button.on{ border-color:var(--gold); background:rgba(201,162,75,.12); }
+.opt-grid button small{ display:block; color:var(--muted); font-size:10.5px; margin-top:3px; line-height:1.4; }
+.lineup tr.xi td{ background:rgba(201,162,75,.08); } .lineup tr.bench td{ background:rgba(79,154,106,.06); } .lineup tr.out td{ opacity:.75; }
+.status-btn{ appearance:none; min-width:74px; padding:4px 8px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--muted); font-size:10.5px; font-weight:700; cursor:pointer; }
+.status-btn.xi{ border-color:var(--gold); color:var(--gold); } .status-btn.bench{ border-color:var(--sage); color:#8fd0a3; } .status-btn.off{ opacity:.5; cursor:default; }
+.flag{ font-size:10px; padding:1px 5px; border-radius:4px; border:1px solid var(--line); color:var(--muted); }
+.flag.bad{ color:#e08a95; border-color:var(--red); }
+.fit{ display:inline-block; width:64px; height:7px; border-radius:999px; background:#0b1512; border:1px solid var(--line); overflow:hidden; vertical-align:middle; }
+.fit i{ display:block; height:100%; background:var(--sage); } .fit.mid i{ background:var(--gold); } .fit.low i{ background:var(--red); }
+.note{ display:inline-block; min-width:30px; padding:1px 6px; border-radius:4px; text-align:center; font-weight:700; font-size:11px; background:var(--panel-2); border:1px solid var(--line); color:var(--cream); }
+.note.top{ color:var(--gold); border-color:var(--gold); } .note.good{ color:#8fd0a3; border-color:var(--sage); } .note.bad{ color:#e08a95; border-color:var(--red); }
+.select{ background:var(--panel-2); color:var(--cream); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12px; margin-left:6px; }
+.timeline{ display:flex; flex-direction:column; gap:3px; font-size:12px; }
+.timeline .ev{ display:flex; gap:8px; padding:5px 8px; border-radius:5px; background:var(--panel-2); border-left:3px solid var(--line); }
+.timeline .ev.goal.us{ border-left-color:var(--gold); } .timeline .ev.goal.them{ border-left-color:var(--red); } .timeline .ev.red{ border-left-color:var(--red); } .timeline .ev.injury{ border-left-color:#e08a95; } .timeline .ev.ht,.timeline .ev.choice{ border-left-color:var(--gold-dim); color:var(--muted); }
+.timeline .ico{ width:18px; text-align:center; }
+.score-hero{ text-align:center; padding:8px 0 12px; }
+.score-hero .teams{ display:flex; justify-content:center; align-items:center; gap:14px; font-size:20px; font-family:'Bebas Neue',sans-serif; letter-spacing:.03em; }
+.score-hero .teams .us{ color:var(--gold); } .score-hero .big{ font-size:44px; line-height:1; }
+.score-hero.W .big{ color:#8fd0a3; } .score-hero.L .big{ color:#e08a95; } .score-hero.D .big{ color:var(--cream); }
+.score-hero .verdict{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+.story{ text-align:center; color:var(--gold); }
+.ratings .marks{ font-size:12px; letter-spacing:1px; }
+.ratings tr.me td{ background:rgba(201,162,75,.12); }
+.match .line{ display:flex; justify-content:space-between; gap:6px; } .match .sub{ color:var(--muted); font-size:10.5px; margin-top:3px; }
+.my-status{ padding:10px 12px; margin:10px 0; border-radius:6px; border:1px solid var(--line); background:var(--panel-2); }
+.my-status.xi{ border-color:var(--sage); } .my-status.bench{ border-color:var(--gold-dim); } .my-status.injured,.my-status.suspended{ border-color:var(--red); }
+.my-status b{ font-size:15px; }
+.my-line{ padding:10px 12px; margin:8px 0; border-radius:6px; border-left:3px solid var(--gold); background:var(--panel-2); font-size:13px; }
+.my-line.good{ border-left-color:var(--sage); } .my-line.bad{ border-left-color:var(--red); }
+.squad div.me{ border-color:var(--gold); color:var(--gold); }
