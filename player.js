@@ -19,7 +19,7 @@ function playerFreshState(c){
   const g={corps:75,vestiaire:50,supporters:45,entourage:50}; [c.origin,c.trait].forEach(o=>Object.entries(o.gauges||{}).forEach(([k,v])=>g[k]=clamp(g[k]+v)));
   const nat=c.origin.nat==='AF'?pick(['SN','CI','ML','CM','DZ','MA']):'FR';
   return { kind:'player', name:c.name, year:c.era.start, startEra:c.era.id, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
-    stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, ended:false, endingText:'', endingCause:null };
+    stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, ended:false, endingText:'', endingCause:null };
 }
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
 function pAge(){ return state.year-state.born; }
@@ -38,36 +38,61 @@ function playerApplyEffects(e,ctx={}){
   });
   return out;
 }
-/* ---------- Offres ---------- */
-function playerTierFor(rating,rep){ const t=['amateur']; if(rating>=44) t.push('ligue2'); if(rating>=55) t.push('ligue1'); if(rating>=52&&state.gauges.entourage>=45) t.push('etranger'); if(rating>=66) t.push('europe'); if(rating>=78&&(state.selected||rep>=60)) t.push('superclub'); return t; }
+/* ---------- Offres : autour du niveau que ton agent peut vendre ---------- */
+/* Niveau de club visé : ta note, ta dernière saison, la sélection, l'âge */
+function playerTargetStrength(){
+  const r=pRating(); const last=state.history[state.history.length-1]; let t=r+2;
+  if(last){ if(last.note>=7) t+=3; else if(last.note<5.8) t-=3; if(last.share<.3) t-=2; if(last.champion) t+=1; if(last.ballon) t+=4; }
+  if(state.selected) t+=2; if(pAge()>=32) t-=3; if(pAge()<=19) t-=2;
+  return t;
+}
+function playerTiers(){ const t=['amateur','ligue2','ligue1']; if(state.gauges.entourage>=45) t.push('etranger'); t.push('europe'); if(state.selected||state.gauges.supporters>=60||pRating()>=76) t.push('superclub'); return t; }
 function playerBuildOffer(tier,forced){
   const o=buildCoachOffer(tier,forced); const r=pRating();
   const gap=r-o.strength; const role=gap>=4?'titulaire':gap>=-4?pick(['titulaire','rotation']):gap>=-10?pick(['rotation','remplacant']):'remplacant';
-  const salary=Math.max(.01,valueForRating(r,pAge(),state.year)*.14*(role==='titulaire'?1:role==='rotation'?.75:.55)*rand(.85,1.2));
-  o.role=role; o.salary=salary; o.duration=randInt(1,3); const dk=decadeKey(state.year);
+  const salary=Math.max(.005,playerWage(playerMe(),state.year,o.tier)*(role==='titulaire'?1:role==='rotation'?.8:.6)*rand(.9,1.15));
+  o.role=role; o.salary=salary; o.duration=randInt(1,3);
   const coaches=COACHES_BY_ERA[eraForYear(state.year).id]; o.coach=Math.random()<.35?pick(coaches).name:fakeName(o.nat==='FR'?'FR':(FAKE_FIRST[o.nat]?o.nat:'FR'));
   return o;
 }
-function playerGenerateOffers(){
-  const r=pRating(), offers=[]; const tiers=playerTierFor(r,state.gauges.supporters);
-  if(state.club&&state.coachTrust>=30&&state.consecutiveBad<2){ const o=playerBuildOffer(state.club.tier,{name:state.club.name,nat:state.club.nat,league:state.club.league,s:state.club.s}); o.stay=true; o.coach=state.club.coach; o.salary=Math.max(o.salary,state.club.salary*rand(1,1.3)); offers.push(o); }
-  let count=2+(state.history.length>=2?1:0)+(state.gauges.entourage>=60?1:0)+(state.bigOfferNext?1:0); count=Math.min(4,count);
-  if(pAge()>=33&&r<60) count--; if(pAge()>=35&&r<66) count--;
-  const used=new Set(offers.map(o=>o.club)); let tries=0;
-  while(offers.length<count&&tries<20){ tries++; let tier=pick(tiers); if(state.bigOfferNext&&tries===1&&tiers.length>1) tier=tiers[tiers.length-1]; const o=playerBuildOffer(tier); if(used.has(o.club)) continue; used.add(o.club); offers.push(o); }
+function playerGenerateOffers(opts={}){
+  const offers=[]; const c=state.club; const target=playerTargetStrength(); const last=state.history[state.history.length-1];
+  const clubKeeps=!!(c&&state.coachTrust>=30&&state.consecutiveBad<2); const underContract=!!(c&&c.contractEnd>state.year&&!opts.broke);
+  if(c&&clubKeeps&&!opts.noStay){ const o=playerBuildOffer(c.tier,{name:c.name,nat:c.nat,league:c.league,s:c.s}); o.stay=true; o.coach=c.coach; o.underContract=underContract; if(underContract){ o.role=c.role; o.salary=c.salary; o.duration=c.contractEnd-state.year; } else { o.salary=Math.max(o.salary,c.salary*rand(1,1.3)); } o.gap=o.strength-target; offers.push(o); }
+  const tiers=playerTiers(); const pool=[]; let tries=0;
+  while(pool.length<18&&tries<50){ tries++; const o=playerBuildOffer(pick(tiers)); if((c&&o.club===c.name)||pool.some(x=>x.club===o.club)) continue; o.gap=o.strength-target; pool.push(o); }
+  if(underContract&&clubKeeps){
+    // Sous contrat : un club plus ambitieux peut venir te chercher, surtout après une grosse saison
+    const pr=clamp(.1+(last&&last.note>=7?.35:0)+(last&&last.goals>=15?.15:0)+(state.bigOfferNext?.4:0),.05,.75); let count=Math.random()<pr?1:0; if(count&&Math.random()<.35) count++;
+    pool.filter(o=>o.gap>=-1&&o.gap<=7&&o.role!=='remplacant').sort((a,b)=>b.strength-a.strength).slice(0,count).forEach(o=>{ o.poach=true; offers.push(o); });
+  } else {
+    let count=2+(state.history.length>=2?1:0)+(state.gauges.entourage>=60?1:0)+(state.bigOfferNext?1:0); count=Math.min(4,count);
+    if(pAge()>=33&&pRating()<60) count--; if(pAge()>=35&&pRating()<66) count--;
+    let fit=pool.filter(o=>o.gap>=-8&&o.gap<=5); if(fit.length<2) fit=pool.filter(o=>o.gap>=-12&&o.gap<=8); if(fit.length<2) fit=[...pool].sort((a,b)=>Math.abs(a.gap)-Math.abs(b.gap)).slice(0,count+1);
+    const picked=[]; if(state.bigOfferNext){ const big=fit.filter(o=>o.gap>=2).sort((a,b)=>b.strength-a.strength)[0]; if(big) picked.push(big); }
+    shuffledCopy(fit.filter(o=>!picked.includes(o))).forEach(o=>{ if(picked.length<count) picked.push(o); });
+    picked.forEach(o=>offers.push(o));
+  }
   state.bigOfferNext=false; return offers;
+}
+/* Demander son transfert en cours de contrat : le public et l'entourage n'aiment pas ça */
+function playerBreakContract(){
+  const c=state.club; if(!c) return;
+  state.gauges.supporters=clamp(state.gauges.supporters-6); state.gauges.entourage=clamp(state.gauges.entourage-3);
+  log(`✂️ Tu demandes ton transfert de ${c.name}. Les supporters s'en souviendront.`);
+  state.currentOffers=playerGenerateOffers({broke:true,noStay:true}); if(!state.currentOffers.length) state.noOfferYears++; saveGame(); render();
 }
 function playerOpenOffers(){ state.currentOffers=playerGenerateOffers(); state.noOfferYears=state.currentOffers.length?0:state.noOfferYears+1; state.pendingChoice='offers'; playerCheckEnd(); saveGame(); }
 function playerAcceptOffer(i){
   const o=state.currentOffers[i]; if(!o) return;
-  if(o.stay){ state.club.salary=o.salary; state.club.role=o.role; state.club.since++; state.club.contractEnd=state.year+o.duration; }
+  if(o.stay){ state.club.salary=o.salary; state.club.role=o.role; state.club.since++; if(!o.underContract) state.club.contractEnd=state.year+o.duration; }
   else {
     const used=new Set(state.usedNames); const squad=generateSquad(o,state.year,used); squad.forEach(p=>{ if(p.real&&!state.usedNames.includes(p.name)) state.usedNames.push(p.name); });
     state.squad=squad; state.club={name:o.club,tier:o.tier,nat:o.nat,league:o.league,s:o.s,strength:o.strength,leagueName:o.leagueName,coach:o.coach,role:o.role,salary:o.salary,since:1,contractEnd:state.year+o.duration};
     state.coachTrust=o.role==='titulaire'?62:o.role==='rotation'?50:40; state.gauges.vestiaire=clamp(state.gauges.vestiaire*.6+25); state.gauges.supporters=clamp(state.gauges.supporters*.5+22);
     if(!state.clubs.includes(o.club)) state.clubs.push(o.club); if(o.tier==='superclub') unlockTrophy('p-superclub');
   }
-  state.currentOffers=[]; log(`🖊️ ${o.stay?'Tu prolonges à':'Tu signes à'} <b>${o.club}</b> (${o.leagueName}) : ${ROLES[o.role].name.toLowerCase()} promis·e, ${money(o.salary,state.year)} par saison, coach ${o.coach}.`);
+  state.currentOffers=[]; log(`🖊️ ${o.stay?(o.underContract?'Tu poursuis à':'Tu prolonges à'):o.poach?'Transfert ! Tu signes à':'Tu signes à'} <b>${o.club}</b> (${o.leagueName}) : ${ROLES[o.role].name.toLowerCase()} promis·e, ${money(o.salary,state.year)} par saison, coach ${o.coach}${o.stay&&o.underContract?'':`, jusqu'en ${state.club.contractEnd}`}.`);
   playerStartSeason();
 }
 /* ---------- Saison ---------- */
@@ -119,14 +144,10 @@ function playerBeginPhase(){
   playerNextMatch();
 }
 /* Le coach compose : ta place dépend de ta note, de sa confiance, du rôle promis et de ta fraîcheur */
-function playerNextMatch(){
-  const comp=state.comp, c=state.club;
-  if(state.matchday>=comp.phaseEnds[state.phase]){ playerFinishPhase(); return; }
-  const fx=ourFixture(comp,state.matchday,c.name);
-  if(!fx){ playOthers(comp,state.matchday,c.name); state.matchday++; playerNextMatch(); return; }
-  const year=state.year, full=playerFullSquad(), f=FORMATIONS[c.formation]||FORMATIONS['4-4-2'];
+function playerBuildMatch(fx){
+  const comp=state.comp, c=state.club, year=state.year, full=playerFullSquad(), f=FORMATIONS[c.formation]||FORMATIONS['4-4-2'];
   const a=autoLineup(full,f,year,{scoreBonus:p=>p.isMe?p.selBonus:0});
-  const me=full.find(p=>p.isMe); const seasonStart=state.phase===0?0:comp.phaseEnds[state.phase-1];
+  const me=full.find(p=>p.isMe);
   // Le rôle promis à la signature est tenu au moins un temps : un·e titulaire promis·e démarre les huit premières journées, un·e joueur·euse de rotation est au moins dans le groupe
   if(availableForMatch(me)&&!a.xi.includes(me)){
     if(c.role==='titulaire'&&state.matchday<8&&state.coachTrust>=35){ const same=a.xi.filter(p=>p.pos===me.pos).sort((x,y)=>effRating(x,year)-effRating(y,year)); const out=same[0]||a.xi[a.xi.length-1]; a.xi=a.xi.map(p=>p===out?me:p); a.bench=a.bench.filter(p=>p!==me); if(!a.bench.includes(out)&&a.bench.length<benchSize(year)) a.bench.push(out); }
@@ -135,8 +156,48 @@ function playerNextMatch(){
   const captain=defaultCaptain(a.xi);
   state.match=newMatch({year,home:fx.isHome,usName:c.name,themName:fx.opp,themStrength:comp.strength[fx.opp]+rand(-1.5,1.5),themStyle:oppStyle(comp,fx.opp,year),themNat:comp.nat,ourStyle:c.styleId,xi:a.xi,bench:a.bench,captain,approach:'equilibre',formation:c.formation,matchday:state.matchday,label:`Journée ${state.matchday+1}`,bonus:(state.gauges.vestiaire-50)*.03+rand(-1,1),decider:'me'});
   state.match.myStatus=a.xi.includes(me)?'xi':a.bench.includes(me)?'bench':me.injury>0?'injured':me.suspended>0?'suspended':'out';
-  state.pendingChoice='prematch'; saveGame();
 }
+/* Pourquoi ce match mérite un arrêt (selon le rythme choisi) ; null = joué en coulisses */
+function playerStopReasons(m){
+  const comp=state.comp, c=state.club, tempo=TEMPOS[state.tempo]?state.tempo:'temps_forts'; const start=state.phase===0?0:comp.phaseEnds[state.phase-1]; const why=[];
+  if(state.matchday===start) why.push(state.phase===0?"Première journée de la saison":"Reprise après la trêve");
+  if(tempo==='rapide') return why.length?why:null;
+  if(tempo==='complet') return why.length?why:["Rythme complet"];
+  const inGroup=m.myStatus==='xi'||m.myStatus==='bench';
+  if(inGroup&&state.matchday-start>=2){ const N=comp.teams.length, my=tablePos(comp.table,c.name), op=tablePos(comp.table,m.themName);
+    if(op<=3&&my<=3) why.push("Sommet du championnat"); else if(op<=3) why.push(`Choc contre le ${ordinal(op)}`); else if(Math.abs(op-my)<=2) why.push("Concurrent direct au classement");
+    if(my>=N-4&&op>=N-4) why.push("Match de la peur"); }
+  if(state.matchday===comp.phaseEnds[state.phase]-1&&state.phase===3&&inGroup) why.push("Dernière journée de la saison");
+  (state.alerts||[]).forEach(a=>why.push(a));
+  return why.length?why:null;
+}
+/* Ce qui a changé pour toi après un match joué en coulisses */
+function playerAlertsAfter(rec){
+  const a=[]; const prev=state.lastStatus; const st=rec.status;
+  if(rec.inj) a.push(`🩼 Blessé·e : ${state.injury} semaine${state.injury>1?'s':''}`);
+  if(rec.red) a.push("🟥 Expulsé·e : suspension");
+  if(prev==='xi'&&(st==='bench'||st==='out')) a.push("🪑 Tu as perdu ta place de titulaire");
+  if((prev==='bench'||prev==='out')&&st==='xi') a.push("✅ Tu retrouves une place de titulaire");
+  if(rec.played&&rec.note>=8) a.push("🔥 Un match énorme : la presse en parle");
+  state.lastStatus=st; return a;
+}
+/* Avance dans le calendrier : s'arrête sur un temps fort ou un penalty, sinon joue en coulisses */
+function playerAdvance(){
+  const comp=state.comp, c=state.club; let guard=0;
+  while(guard++<80){
+    if(state.matchday>=comp.phaseEnds[state.phase]){ playerFinishPhase(); return; }
+    const fx=ourFixture(comp,state.matchday,c.name);
+    if(!fx){ playOthers(comp,state.matchday,c.name); state.matchday++; continue; }
+    playerBuildMatch(fx); const why=playerStopReasons(state.match);
+    if(why){ state.match.why=why; state.sinceLast=state.skipped||[]; state.skipped=[]; state.alerts=[]; state.pendingChoice='prematch'; saveGame(); return; }
+    playerKickoff(false);
+    if(state.pendingChoice==='penalty'){ state.match.why=["🎯 Penalty : à toi de décider"]; state.sinceLast=state.skipped||[]; state.skipped=[]; state.alerts=[]; saveGame(); return; }
+    const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,matchday:rec.matchday,mine:rec.played?`${rec.min}' · note ${rec.note.toFixed(1)}${rec.goals?' · ⚽'+rec.goals:''}${rec.assists?' · 🅰️'+rec.assists:''}`:rec.status==='bench'?'banc':'absent·e'});
+    state.alerts=playerAlertsAfter(rec);
+    playerWeekPasses();
+  }
+}
+function playerNextMatch(){ playerAdvance(); }
 function playerKickoff(auto=false){
   const m=state.match; if(!m||m.done) return; const P=playerSquadMap(); const ctx={injuryMult:1};
   let guard=0;
@@ -179,14 +240,14 @@ function playerAfterMatchSim(P){
   state.pendingChoice='matchResult'; saveGame();
 }
 function playerWeekPasses(){ const me=playerMe(); recoverSquad([...state.squad,me],state.year,{training:'tactique',staff:50}); playerSyncMe(me); }
-function playerAfterMatch(){ playerWeekPasses(); playerNextMatch(); render(); }
+function playerAfterMatch(){ if(state.lastMatch) state.alerts=playerAlertsAfter(state.lastMatch); playerWeekPasses(); playerAdvance(); render(); }
 function playerSimPhase(){
-  let guard=0;
+  let guard=0; const keep=state.tempo; state.tempo='rapide'; state.alerts=[];
   while((state.pendingChoice==='prematch'||state.pendingChoice==='matchResult')&&guard++<60){
     if(state.pendingChoice==='prematch'){ if(!state.match||state.match.done) break; playerKickoff(true); }
-    else { playerWeekPasses(); playerNextMatch(); }
+    else { const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,matchday:rec.matchday,mine:rec.played?`${rec.min}' · note ${rec.note.toFixed(1)}`:rec.status==='bench'?'banc':'absent·e'}); state.lastStatus=rec.status; playerWeekPasses(); playerAdvance(); }
   }
-  render();
+  state.tempo=keep; render();
 }
 function playerFinishPhase(){
   const c=state.club, comp=state.comp, ss=state.seasonStats; const mine=state.phaseMatches||[];
@@ -200,7 +261,7 @@ function playerFinishPhase(){
   const pos=tablePos(comp.table,c.name);
   const injury=mine.find(m=>m.inj)?`${state.injury} semaine${state.injury>1?'s':''} d'absence`:null;
   const rec={n:state.phase+1,matches:mine.map(m=>({home:m.home,away:m.away,gh:m.gh,ga:m.ga,us:m.us,res:m.res,mine:m.played?`${m.min}' · note ${m.note.toFixed(1)}${m.goals?' · ⚽'+m.goals:''}${m.assists?' · 🅰️'+m.assists:''}`:m.status==='bench'?'banc':'absent·e'})),apps,goals,assists,note:note==null?0:note,share,pos,dTrust:Math.round(dTrust),injury,table:sortTable(comp.table).map(t=>({...t})),motm:played.filter(m=>m.motm==='me').length};
-  ss.phases.push(rec); state.lastPhase=rec; state.match=null;
+  ss.phases.push(rec); state.lastPhase=rec; state.match=null; state.skipped=[]; state.sinceLast=[]; state.alerts=[];
   log(`📊 Phase ${state.phase+1} : ${apps} matchs, ${goals} but${goals>1?'s':''}, ${assists} passe${assists>1?'s':''}${note!=null?', note '+note.toFixed(1):''}. ${c.name} ${ordinal(pos)}.`);
   state.phase++; state.pendingChoice='phaseResult'; saveGame();
 }

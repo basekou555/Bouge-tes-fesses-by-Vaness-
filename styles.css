@@ -327,3 +327,7 @@ input[type=number]{ padding:8px 10px; border-radius:6px; border:1px solid var(--
 .my-line{ padding:10px 12px; margin:8px 0; border-radius:6px; border-left:3px solid var(--gold); background:var(--panel-2); font-size:13px; }
 .my-line.good{ border-left-color:var(--sage); } .my-line.bad{ border-left-color:var(--red); }
 .squad div.me{ border-color:var(--gold); color:var(--gold); }
+.why-row{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+.why{ padding:4px 10px; border-radius:999px; background:rgba(201,162,75,.14); border:1px solid var(--gold); color:var(--gold); font-size:11px; font-weight:700; }
+.select.tempo{ width:100%; margin:0 0 4px; }
+.offer-card.poach{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-dim); }

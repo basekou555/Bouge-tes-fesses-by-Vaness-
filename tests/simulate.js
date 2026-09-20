@@ -15,11 +15,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
         localStorage.clear();
         const era=ERAS[run%ERAS.length], mode=COACH_MODES[run%COACH_MODES.length];
         creation={kind:'coach',step:0,name:'C'+run,era,mode,origin:pick(COACH_ORIGINS),nationality:pick(NATIONALITIES),style:pick(STYLES),mentor:pick(COACHES_BY_ERA[era.id]),quality:pick(COACH_QUALITIES),flaw:pick(COACH_FLAWS)};
-        launchCoach();
+        launchCoach(); state.tempo=pick(Object.keys(TEMPOS));
         let steps=0, screens={}, gaps=[], wagesR=[], mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0};
         while(!state.ended&&steps<6000){
           steps++; const pc=state.pendingChoice; screens[pc]=(screens[pc]||0)+1; if(steps%100===0) await new Promise(r=>setTimeout(r,0)); // laisse respirer le moteur de rendu
-          if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
+          if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ coachBreakContract(); if(!state.currentOffers.length){ coachSkipYear(); render(); continue; } } coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
           else if(pc==='mercato'){ const m=state.market; let tries=0; while(tries<4){ tries++; const cand=m.targets.map((t,i)=>({t,i})).filter(x=>x.t.access!=='no'&&x.t.price<=m.budgetLeft*.6); if(!cand.length) break; const x=cand[rnd(cand.length)]; coachBuy(x.i); if(state.pendingChoice!=='mercato') break; } if(state.squad.length>25) coachSell(state.squad[state.squad.length-1].id); coachCloseMercato(); }
           else if(pc==='tactic'){ coachSetTactic(pick(Object.keys(FORMATIONS)),Math.random()<.6?state.club.styleWanted:state.favoriteStyleId); }
           else if(pc==='event'){ coachChooseEvent(rnd(state.currentEvent.event.choices.length)); }
@@ -42,11 +42,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
     for(let run=0;run<8;run++){
       try{
         localStorage.clear(); const era=ERAS[run%ERAS.length];
-        creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer();
+        creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer(); state.tempo=pick(Object.keys(TEMPOS));
         let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0};
         while(!state.ended&&steps<5000){
           steps++; const pc=state.pendingChoice; if(steps%100===0) await new Promise(r=>setTimeout(r,0));
-          if(pc==='offers'){ if(state.currentOffers.length) playerAcceptOffer(rnd(state.currentOffers.length)); else playerSkipYear(); }
+          if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ playerBreakContract(); if(!state.currentOffers.length){ playerSkipYear(); render(); continue; } } playerAcceptOffer(rnd(state.currentOffers.length)); } else playerSkipYear(); }
           else if(pc==='event'){ playerChooseEvent(rnd(state.currentEvent.event.choices.length)); }
           else if(pc==='choiceResult'){ playerContinueChoiceResult(); }
           else if(pc==='prematch'){ if(Math.random()<.6) playerSimPhase(); else playerKickoff(); }

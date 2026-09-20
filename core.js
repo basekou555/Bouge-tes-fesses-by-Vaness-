@@ -111,7 +111,15 @@ function valueForRating(r,age,year){
   return Math.max(.01,base*ageF*eraForYear(year).marketSize);
 }
 function playerValue(p,year){ return valueForRating(playerRating(p,year),playerAge(p,year),year); }
-function playerWage(p,year){ return Math.max(.005,playerValue(p,year)*.14+.01); }
+/* Salaire annuel (millions de 2015) : niveau, âge (les jeunes gagnent peu), palier du club, époque.
+   Niveau 50 → ≈ 0,05 M, 60 → ≈ 0,4 M, 70 → ≈ 1,3 M, 80 → ≈ 3 M, 90 → ≈ 6 M, avant multiplicateurs (âge, palier, époque). */
+const WAGE_TIER_MULT={superclub:1.5,europe:1.2,ligue1:1,etranger:.9,ligue2:.55,amateur:.3};
+function playerWage(p,year,tier){
+  const r=playerRating(p,year), age=playerAge(p,year);
+  const base=Math.pow(Math.max(0,r-40)/60,3)*10;
+  const ageF=age<=19?.25:age<=21?.45:age<=23?.7:age<=31?1:age<=33?.85:.7;
+  return Math.max(.005,base*ageF*eraForYear(year).marketSize*(WAGE_TIER_MULT[tier]||1));
+}
 function traitLabel(id){ const t=TRAITS.find(x=>x.id===id); return t?t.label:id; }
 function fakeName(nat){ const k=FAKE_FIRST[nat]?nat:(['SN','ML','CI','CM','DZ','MA','GH','NG']).includes(nat)?'AF':'FR'; return `${pick(FAKE_FIRST[k])} ${pick(FAKE_LAST[k])}`; }
 function natForClub(nat){ const mix={FR:['FR','FR','FR','FR','FR','AF','AF','BR','ES','PT','BE'],ES:['ES','ES','ES','AR','BR','PT'],IT:['IT','IT','IT','AR','BR','FR'],DE:['DE','DE','DE','NL','FR','AF'],EN:['EN','EN','EN','SC','FR','BR','AF'],NL:['NL','NL','NL','BE','AF'],PT:['PT','PT','BR','BR','AF'],SC:['SC','SC','EN'],BE:['BE','BE','FR','AF','NL'],US:['EN','EN','AR','BR','FR'],SA:['AF','AF','BR','PT','FR'],JP:['DE','BR','ES','NL'],MX:['AR','ES','BR'],AR:['AR','AR','AR'],BR:['BR','BR','BR'],CN:['BR','BR','AR'],QA:['AF','BR','FR'],CA:['EN','FR','AF'],AU:['EN','EN','SC']}; return pick(mix[nat]||['FR','AF','ES','BR']); }
@@ -139,7 +147,7 @@ function generateSquad(offer,year,usedNames){
         if(idx>=0){ const r=pool.splice(idx,1)[0]; p=realToPlayer(r,year); usedNames.add(r[0]); if(r[4]!==offer.nat) foreigners++; }
       }
       if(!p){ let nat=natForClub(offer.nat); if(nat!==offer.nat&&foreigners>=foreignersMax) nat=offer.nat; else if(nat!==offer.nat) foreigners++; p=generatedPlayer(pos,year,want,nat); }
-      p.contractEnd=year+randInt(1,3); p.wage=playerWage(p,year); p.seasonsAtClub=randInt(0,5); p.joinedYear=year-p.seasonsAtClub; p.fanFav=p.seasonsAtClub>=3&&Math.random()<.4;
+      p.contractEnd=year+randInt(1,3); p.wage=playerWage(p,year,offer.tier)*rand(.9,1.15); p.seasonsAtClub=randInt(0,5); p.joinedYear=year-p.seasonsAtClub; p.fanFav=p.seasonsAtClub>=3&&Math.random()<.4;
       squad.push(p);
     }
   });
@@ -198,7 +206,7 @@ function marketTargets(offer,year,squad,usedNames,ctx){
 }
 function marketEntry(p,year,offer,cred,kind){
   const r=playerRating(p,year), age=playerAge(p,year);
-  let price=playerValue(p,year)*(kind==='free'||kind==='academy'?0:rand(.9,1.4)); let wage=playerWage(p,year)*(kind==='free'?1.3:1);
+  let price=playerValue(p,year)*(kind==='free'||kind==='academy'?0:rand(.9,1.4)); let wage=playerWage(p,year,offer.tier)*(kind==='free'?1.3:kind==='academy'?.8:1)*rand(.95,1.1);
   const sellers=kind==='real'?pick(["son club","son agent","un intermédiaire","sa direction"]):kind==='youth'?pick(["un agent inconnu","une vidéo virale","un recruteur de passage","un cousin qui connaît quelqu'un","une académie privée","un ancien coéquipier"]):kind==='free'?"sans club":kind==='academy'?"le centre de formation":"un agent classique";
   const gap=r-cred; // > 0 : au-dessus de ta crédibilité
   let access='ok', label='Accessible';
