@@ -69,7 +69,7 @@ Les joueurs réels (Kopa, Platini, Zidane, Mbappé, Yamal…) apparaissent selon
 
 **Quatre jauges du club** : ✊ Vestiaire (force de l'équipe), 📣 Supporters (pression et patience), 🎓 Formation (jeunes, arnaques), 🧑‍🤝‍🧑 Staff (blessures, progression). Une jauge basse déclenche des dilemmes.
 
-**Pression, roulette, fins** : à 100 de pression, une crise impose un choix (dont un à 50 % de risque de mort). La roulette du destin peut apparaître deux fois par carrière, avec une issue parfois fatale. La carrière s'arrête à 75 ans, après quatre licenciements d'affilée, deux années sans offre, ou par retraite.
+**Pression, roulette, fins** : à 100 de pression, une crise impose un choix (dont un à 50 % de risque de mort). La roulette du destin peut apparaître deux fois par carrière, et elle a toujours une suite : un gain ou un revers laisse un écho qui pèse une ou deux saisons (sur la force de l'équipe en mode entraîneur·euse, sur ce que le coach voit de toi en mode joueur·euse), et la mauvaise porte scelle un destin. Deux des quatre roulettes poursuivent alors la carrière sous contrainte — la clause d'exclusivité à vie t'installe dans le club de l'émir et t'y enferme (plus aucune offre, mais plus aucun licenciement possible non plus ; le propriétaire exige la première place chaque saison et la pression monte) ; l'affaire des archives te bannit de l'élite jusqu'à ce qu'un titre gagné loin des projecteurs lave ton nom. Les deux autres (accident, radiation) restent des fins sèches. La carrière s'arrête aussi à 75 ans, après quatre licenciements d'affilée, deux années sans offre, ou par retraite.
 
 ### Les cinq campagnes
 

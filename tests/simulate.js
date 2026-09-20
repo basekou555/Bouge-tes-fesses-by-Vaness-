@@ -28,7 +28,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='halftime'){ mstat.ht++; coachHalftime(pick(HALFTIME_CHOICES).id); }
           else if(pc==='matchResult'){ const m=state.lastMatch; mstat.n++; mstat.g+=m.gh+m.ga; mstat.y+=m.events.filter(e=>e.kind==='yellow').length; mstat.r+=m.events.filter(e=>e.kind==='red'&&e.side==='us').length; mstat.inj+=m.events.filter(e=>e.kind==='injury').length; mstat.pen+=m.events.filter(e=>e.kind==='goal'&&/penalty/.test(e.text)||e.kind==='penmiss').length; mstat.sub+=m.events.filter(e=>e.kind==='sub').length; if(!m.ratings||!Object.keys(m.ratings).length) throw new Error('no ratings'); coachAfterMatch(); }
           else if(pc==='phaseResult'){ coachAfterPhase(); }
-          else if(pc==='seasonEnd'){ gaps.push(Math.round((state.lastPhase.strength-state.club.strength)*10)/10); wagesR.push(Math.round(state.squad.reduce((n,p)=>n+p.wage,0)/state.club.wageCap*100)/100); coachAfterSeasonEnd(); }
+          else if(pc==='seasonEnd'){ gaps.push(Math.round((state.lastPhase.strength-state.club.strength)*10)/10); wagesR.push(Math.round(state.squad.reduce((n,p)=>n+p.wage,0)/state.club.wageCap*100)/100); coachAfterSeasonEnd();
+            // une carrière sur trois force un destin de roulette, pour couvrir les suites (exclusivité, bannissement)
+            if(run%3===0&&!state.ended&&!state.rouletteFate&&state.history.length===3){ state.currentRoulette={event:pick(COACH_ROULETTES.filter(r=>r.fate&&r.fate.kind!=='death'&&r.fate.kind!=='banned')),outcomes:['end','jackpot','small','malus']}; state.pendingChoice='roulette'; } }
           else if(pc==='sacked'){ coachIntersaison(); }
           else if(pc==='roulette'){ coachChooseRoulette(rnd(4)); }
           else if(pc==='pressureCrisis'){ coachChoosePressure(rnd(3)); }
@@ -36,7 +38,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           render();
         }
         render();
-        res.coach.push({run,era:era.id,mode:mode.id,cause:state.endingCause,age:state.age,year:state.year,seasons:state.history.length,sackings:state.sackings,titles:state.titles,awards:state.awards,steps,screens,clubs:state.clubsCoached.length,rep:Math.round(state.stats.reputation),scams:state.scamsSuffered,gap:(gaps.reduce((a,b)=>a+b,0)/Math.max(1,gaps.length)).toFixed(1),gapMax:Math.max(...gaps,0),wr:(wagesR.reduce((a,b)=>a+b,0)/Math.max(1,wagesR.length)).toFixed(2),m:mstat});
+        res.coach.push({run,era:era.id,mode:mode.id,fate:(state.rouletteFate&&state.rouletteFate.kind)||'-',cause:state.endingCause,age:state.age,year:state.year,seasons:state.history.length,sackings:state.sackings,titles:state.titles,awards:state.awards,steps,screens,clubs:state.clubsCoached.length,rep:Math.round(state.stats.reputation),scams:state.scamsSuffered,gap:(gaps.reduce((a,b)=>a+b,0)/Math.max(1,gaps.length)).toFixed(1),gapMax:Math.max(...gaps,0),wr:(wagesR.reduce((a,b)=>a+b,0)/Math.max(1,wagesR.length)).toFixed(2),m:mstat});
       }catch(e){ res.coach.push({run,error:e.message+' @ '+(e.stack||'').split('\n')[1],pc:state&&state.pendingChoice}); }
     }
     for(let run=0;run<8;run++){

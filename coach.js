@@ -44,11 +44,11 @@ function coachFreshState(c){
   Object.keys(st).forEach(k=>st[k]=clamp(st[k]));
   const gauges={vestiaire:50,supporters:50,formation:40+(mode.youthBonus||0)+(c.origin.youthBonus||0),staff:45};
   [c.quality,c.flaw].forEach(o=>Object.entries((o&&o.gauge)||{}).forEach(([k,v])=>gauges[k]=clamp(gauges[k]+v)));
-  return { kind:'coach', name:c.name, year:era.start, startEra:era.id, age:30, modeId:mode.id, modeName:mode.name, modeIcon:mode.icon, mode:{budgetMult:mode.budgetMult,toleranceMult:mode.toleranceMult,variance:mode.variance,incidentMult:mode.incidentMult*(c.flaw.incidentMult||1),objMult:mode.objMult||1,pressureMult:mode.pressureMult||1},
+  return { kind:'coach', name:c.name, year:era.start, startYear:era.start, startEra:era.id, age:30, modeId:mode.id, modeName:mode.name, modeIcon:mode.icon, mode:{budgetMult:mode.budgetMult,toleranceMult:mode.toleranceMult,variance:mode.variance,incidentMult:mode.incidentMult*(c.flaw.incidentMult||1),objMult:mode.objMult||1,pressureMult:mode.pressureMult||1},
     originName:c.origin.name, nationality:c.nationality, nationalityStyles:(c.nationality&&c.nationality.favoredStyleIds)||[], favoriteStyleId:c.favoriteStyle.id, mentorName:c.mentor.name, mentorStyles:c.mentor.styleIds||[], qualityName:c.quality.name, flawName:c.flaw.name,
     perks:{pressureRes:(c.origin.pressureRes||0)+(c.quality.pressureRes||0)+(c.flaw.pressureRes||0),confidenceRes:(c.quality.confidenceRes||0)+(c.flaw.confidenceRes||0),scamRes:(c.quality.scamRes||0)+(c.flaw.scamRes||0),budgetLeak:c.flaw.budgetLeak||0},
     stats:st, pressure:8, gauges, cote:clamp(18+(st.reputation-40)*.6+(st.reseau-18)*.2,10,60), coteDelta:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], club:null, squad:[], usedNames:[], formation:'4-4-2', styleId:c.favoriteStyle.id, approach:'equilibre', training:'tactique', captainId:null, comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, cup:null, euro:null,
-    history:[], sackings:0, consecutiveSackings:0, clubsCoached:[], titles:{league:0,cup:0,euro:0,euro2:0,promo:0}, awards:0, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, market:null, newBadges:[], lastRouletteSeason:-99, rouletteCount:0, pressureCrisisCooldown:0, noOfferYears:0, scamsSuffered:0, stayLocal:false, ended:false, endingText:'', endingCause:null };
+    history:[], sackings:0, consecutiveSackings:0, clubsCoached:[], titles:{league:0,cup:0,euro:0,euro2:0,promo:0}, awards:0, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, market:null, newBadges:[], lastRouletteSeason:-99, rouletteCount:0, rouletteFate:null, rouletteEcho:null, pressureCrisisCooldown:0, noOfferYears:0, scamsSuffered:0, stayLocal:false, ended:false, endingText:'', endingCause:null };
 }
 function coachEra(){ return eraForYear(state.year); }
 function usedSet(){ return new Set(state.usedNames); }
@@ -57,7 +57,9 @@ function addUsed(name){ if(!state.usedNames.includes(name)) state.usedNames.push
 /* ---------- Offres ---------- */
 function tierBudget(tier,s){ return {superclub:{5:250,4:160},europe:{5:180,4:100,3:50,2:30,1:20},ligue1:{5:120,4:60,3:30,2:18,1:10},etranger:{2:12,3:25,4:45,5:60},ligue2:{0:4},amateur:{0:.4}}[tier][s]||(tier==='ligue2'?4:tier==='amateur'?.4:20); }
 function accessibleTiers(){
-  const n=state.history.length, tiers=['amateur','ligue2','ligue1'];
+  const n=state.history.length;
+  if(state.rouletteFate&&state.rouletteFate.kind==='exile') return ['amateur','ligue2'];
+  const tiers=['amateur','ligue2','ligue1'];
   if(state.stats.reseau>=25&&n>=1&&!state.stayLocal) tiers.push('etranger'); if(n>=2&&!state.stayLocal) tiers.push('europe'); if(n>=3&&!state.stayLocal) tiers.push('superclub');
   return tiers;
 }
@@ -96,6 +98,15 @@ function generateCoachOffers(opts={}){
   const underContract=!!(c&&!c.sacked&&c.contractEnd>state.year&&!opts.broke);
   // rester : le club te garde tant que la confiance tient ; sous contrat, c'est la voie normale
   if(c&&!c.sacked&&c.confidence>=35&&!opts.noStay){ const o=buildCoachOffer(c.tier,{name:c.name,nat:c.nat,league:c.league,s:c.s}); o.stay=true; o.underContract=underContract; o.title=underContract?`Contrat en cours jusqu'en ${c.contractEnd}`:"Poursuivre le projet : le président propose de prolonger"; if(underContract) o.duration=c.contractEnd-state.year; o.budget*=c.confidence>=70?1.15:.9; o.presidentName=c.presidentName; o.presidentDesc=c.presidentDesc; o.president=c.president; o.tolerance=c.tolerance; o.gap=o.strength-target; offers.push(o); }
+  // Destin scellé : l'exclusivité à vie interdit tout autre banc, il ne reste que le club
+  const fate=state.rouletteFate;
+  if(fate&&fate.kind==='exclusive'){
+    if(fate.installed){ if(!offers.length) return []; const o=offers[0]; o.underContract=true; o.duration=null; o.title=`${fate.icon} ${fate.label} : tu ne peux signer nulle part ailleurs`; return [o]; }
+    const tier=state.stats.reseau>=20?'superclub':'europe';
+    const o=buildCoachOffer(tier); o.gap=o.strength-target; o.budget*=1.6; o.duration=null;
+    o.title=`${fate.icon} Le projet de l'émir : des moyens sans fin, et plus jamais d'ailleurs`;
+    return [o];
+  }
   const tiers=accessibleTiers(); const pool=[]; let tries=0;
   while(pool.length<18&&tries<50){ tries++; const o=buildCoachOffer(pick(tiers)); if((c&&o.club===c.name)||pool.some(x=>x.club===o.club)) continue; o.gap=o.strength-target; pool.push(o); }
   if(underContract&&offers.length){
@@ -131,6 +142,7 @@ function coachAcceptOffer(i){
     state.squad=squad; state.club={name:o.club,tier:o.tier,nat:o.nat,league:o.league,s:o.s,strength:o.strength,leagueName:o.leagueName,president:o.president,presidentName:o.presidentName,presidentDesc:o.presidentDesc,tolerance:o.tolerance,objectivePos:o.objectivePos,budget:o.budget,styleWanted:o.styleWanted,confidence:55,since:1,sacked:false,contractEnd:state.year+(o.duration||2)};
     state.gauges.vestiaire=clamp(state.gauges.vestiaire*.6+30); state.gauges.supporters=clamp(state.gauges.supporters*.5+28);
     if(!state.clubsCoached.includes(o.club)) state.clubsCoached.push(o.club);
+    if(state.rouletteFate&&state.rouletteFate.kind==='exclusive'){ state.rouletteFate.installed=true; state.rouletteFate.club=o.club; state.club.contractEnd=9999; state.club.objectivePos=1; state.club.tolerance=Math.min(state.club.tolerance,.7); log(`${state.rouletteFate.icon} Le propriétaire n'accepte qu'une chose : la première place, chaque saison, pour toujours.`); }
     if(o.tier==='etranger'||o.tier==='europe'||o.tier==='superclub') unlockTrophy('c-abroad'); if(o.tier==='superclub') unlockTrophy('c-superclub');
   }
   state.club.wageCap=clubWageCap(state.club);
@@ -222,6 +234,7 @@ function coachBonus(withNoise=true){
   if(state.styleId===c.styleWanted) bonus+=1.2; if(state.styleId===state.favoriteStyleId) bonus+=1; if(state.mentorStyles.includes(state.styleId)) bonus+=.3; if((state.nationalityStyles||[]).includes(state.styleId)) bonus+=.3;
   if(state.stats.talent<style.prestige*60) bonus-=(style.prestige*60-state.stats.talent)*.06;
   bonus+=(TRAINING[state.training]||TRAINING.tactique).strength;
+  if(state.rouletteEcho&&state.rouletteEcho.seasons>0) bonus+=state.rouletteEcho.delta;
   if(withNoise) bonus+=rand(-1.5,1.5)*state.mode.variance;
   return bonus;
 }
@@ -235,6 +248,7 @@ function coachBonusLines(){
   lines.push({t:`Style ${style.name} : ${state.styleId===c.styleWanted?'celui que le club demande':'pas celui que le club demandait'}${state.styleId===state.favoriteStyleId?', et ton style favori':''}${state.stats.talent<style.prestige*60?', trop ambitieux pour ta tactique actuelle':''}`,d:st});
   const tr=TRAINING[state.training]||TRAINING.tactique; lines.push({t:`Entraînement ${tr.label.toLowerCase()} : ${tr.desc}`,d:tr.strength});
   if(state.seasonStats&&Math.abs(state.seasonStats.form)>=.5) lines.push({t:`Dynamique ${state.seasonStats.form>0?'positive':'négative'}`,d:state.seasonStats.form});
+  const e=state.rouletteEcho; if(e&&e.seasons>0) lines.push({t:`${e.icon} ${e.label} : ${e.short} (encore ${e.seasons} saison${e.seasons>1?'s':''})`,d:e.delta});
   return lines;
 }
 function coachPlayPhase(){
@@ -432,12 +446,16 @@ function coachFinishPhase(){
 }
 function coachAfterPhase(){
   const c=state.club;
-  if(c.confidence<=0){ coachSacked(); render(); return; }
+  if(c.confidence<=0){
+    if(coachFateProtects()){ c.confidence=25; log(`${state.rouletteFate.icon} ${capitalize(c.presidentName)} voudrait te virer, mais la clause d'exclusivité te protège autant qu'elle t'enferme : tu restes.`); }
+    else { coachSacked(); render(); return; } }
   if(state.phase>=4){ coachEndSeason(); render(); return; }
   if(state.pressure>=100){ state.pendingChoice='pressureCrisis'; unlockTrophy('x-pressure'); render(); return; }
   if(state.phase===2&&eraHasWinterMercato(state.year)){ coachOpenMercato(true); render(); return; }
   coachPlayPhase(); render();
 }
+/* La clause d'exclusivité lie les deux parties : le club ne peut pas te lâcher */
+function coachFateProtects(){ const f=state.rouletteFate; return !!(f&&f.kind==='exclusive'&&f.installed&&state.club&&!state.club.sacked); }
 function coachSacked(){
   const c=state.club; state.sackings++; state.consecutiveSackings++; unlockTrophy('c-sacked'); if(state.sackings>=3) unlockTrophy('c-sacked-3');
   const pos=state.comp?tablePos(state.comp.table,c.name):null;
@@ -473,6 +491,10 @@ function coachEndSeason(){
   let dConf=objectiveMet?12:-(pos-c.objectivePos)*3; if(champion) dConf+=15; if(cupWon) dConf+=8; if(euroWon) dConf+=20; if(relegated) dConf-=25;
   if(dConf<0) dConf/=c.tolerance;
   c.confidence=clamp(c.confidence+dConf);
+  const fx=state.rouletteFate;
+  if(fx&&fx.kind==='exclusive'&&fx.installed){ state.pressure=clamp(state.pressure+(champion?4:10)); }
+  if(fx&&fx.kind==='exile'&&(champion||cupWon)&&year-fx.year>=2){ log(`🕊️ ${champion?'Un titre':'Une coupe'} loin des projecteurs : l'affaire des archives est oubliée, les grands clubs recommencent à appeler.`); state.cote=clamp(state.cote+10); state.rouletteFate=null; unlockTrophy('r-redemption'); }
+  if(state.rouletteEcho&&state.rouletteEcho.seasons>0){ state.rouletteEcho.seasons--; if(!state.rouletteEcho.seasons){ log(`${state.rouletteEcho.icon} ${state.rouletteEcho.label} : c'est fini, la saison prochaine repart sur tes seules forces.`); state.rouletteEcho=null; } }
   const s=state.stats; s.reputation=clamp(s.reputation+clamp(overperf*1,-5,5)+(champion?4:0)+(cupWon?2:0)+(euroWon?6:0)+(relegated?-6:0)+(c.tier==='superclub'?1:0)+(c.tier==='amateur'?-1:0)+(55-s.reputation)*.06);
   // cote : ce que cette saison vaut sur le marché des bancs
   const coteBefore=state.cote==null?30:state.cote; const coteWhy=[]; let dCote=0;
@@ -514,7 +536,8 @@ function coachEndSeason(){
 }
 function coachAfterSeasonEnd(){
   const c=state.club;
-  if(c.confidence<35){ log(`🪓 ${capitalize(c.presidentName)} ne te renouvelle pas sa confiance : tu quittes ${c.name}.`); state.sackings++; unlockTrophy('c-sacked'); c.sacked=true; state.stats.reputation=clamp(state.stats.reputation-3); state.cote=clamp(state.cote-4); state.coteDelta-=4; }
+  if(c.confidence<35&&coachFateProtects()){ c.confidence=Math.max(c.confidence,38); log(`${state.rouletteFate.icon} ${capitalize(c.presidentName)} ne veut plus de toi, mais la clause l'oblige : tu rempiles ici, qu'il le veuille ou non.`); }
+  else if(c.confidence<35){ log(`🪓 ${capitalize(c.presidentName)} ne te renouvelle pas sa confiance : tu quittes ${c.name}.`); state.sackings++; unlockTrophy('c-sacked'); c.sacked=true; state.stats.reputation=clamp(state.stats.reputation-3); state.cote=clamp(state.cote-4); state.coteDelta-=4; }
   coachIntersaison(); render();
 }
 /* ---------- Intersaison ---------- */
@@ -534,12 +557,30 @@ function coachIntersaison(){
 }
 function coachChooseRoulette(i){
   const r=state.currentRoulette, ev=r.event, out=r.outcomes[i];
-  if(out==='end'){ unlockTrophy('r-death'); log(`${ev.icon} ${ev.title} → ${ev.choices[i]}. ☠️ ${ev.endText}`); state.currentRoulette=null; coachEnd(`${ev.icon} ${ev.endText}`,'roulette'); render(); return; }
-  const before=coachSnapshot(); let effects, narrative;
-  if(out==='jackpot'){ effects={talent:10,technique:10,reseau:12,reputation:12,pressure:-25,vestiaire:15,supporters:15,formation:10,staff:10,confidence:25,budget:.8}; narrative=ev.jackpotText; unlockTrophy('r-jackpot'); }
-  else if(out==='malus'){ effects={talent:-4,reseau:-5,reputation:-6,pressure:12,vestiaire:-8,supporters:-6,confidence:-15,budget:-.2}; narrative="Un revers sérieux sans détruire ta carrière : ta réputation, ton vestiaire et la patience du président encaissent le choc."; unlockTrophy('r-malus'); }
-  else { effects={talent:3,technique:3,reputation:3,pressure:-5,vestiaire:4,confidence:5}; narrative="Une seule porte s'entrouvre modestement : un peu d'élan pour la suite."; unlockTrophy('r-small'); }
+  const before=coachSnapshot(); let effects, narrative, echo=null;
+  if(out==='end'){
+    const fate=ev.fate||{kind:'death'};
+    log(`${ev.icon} ${ev.title} → ${ev.choices[i]}. ☠️ ${ev.endText}`);
+    state.currentRoulette=null;
+    // Deux destins ferment la carrière, deux la poursuivent sous contrainte : la roulette a une suite.
+    if(fate.kind==='death'||fate.kind==='banned'){ unlockTrophy('r-death'); coachEnd(`${ev.icon} ${ev.endText}`,'roulette'); render(); return; }
+    unlockTrophy('r-fate');
+    state.rouletteFate={kind:fate.kind,icon:fate.icon,label:fate.label,text:fate.text,club:state.club?state.club.name:null,year:state.year};
+    // L'émir rachète ton contrat et t'installe dans son projet : le club arrive à l'écran des offres
+    if(fate.kind==='exclusive'){ effects={reputation:6,reseau:-12,pressure:10}; if(state.club) state.club.sacked=true; }
+    else { effects={reputation:-16,reseau:-10,pressure:8,supporters:-10,confidence:-10}; state.cote=clamp(state.cote-18); state.coteDelta=-18;
+      // Banni de l'élite : un club de haut de tableau ne peut pas te garder
+      if(state.club&&!state.club.sacked&&!['amateur','ligue2'].includes(state.club.tier)){ log(`🕳️ ${state.club.name} ne peut pas garder un·e entraîneur·euse au cœur d'un scandale : le contrat est rompu.`); state.club.sacked=true; state.sackings++; } }
+    narrative=fate.text;
+    const extraFate=coachApplyEffects(effects);
+    state.pendingResult={title:`${fate.icon} ${fate.label}`,subtitle:ev.title,narrative,before,after:coachSnapshot(),extra:extraFate,next:'offers'};
+    state.pendingChoice='choiceResult'; render(); return;
+  }
+  if(out==='jackpot'){ effects={talent:10,technique:10,reseau:12,reputation:12,pressure:-25,vestiaire:15,supporters:15,formation:10,staff:10,confidence:25,budget:.8}; narrative=ev.jackpotText; echo={icon:'✨',label:"Année de grâce",short:"tout tourne en ta faveur",delta:2.5,seasons:2}; unlockTrophy('r-jackpot'); }
+  else if(out==='malus'){ effects={talent:-4,reseau:-5,reputation:-6,pressure:12,vestiaire:-8,supporters:-6,confidence:-15,budget:-.2}; narrative="Un revers sérieux sans détruire ta carrière : ta réputation, ton vestiaire et la patience du président encaissent le choc."; echo={icon:'🌧️',label:"L'affaire te suit",short:"le doute pèse sur le groupe",delta:-2,seasons:2}; unlockTrophy('r-malus'); }
+  else { effects={talent:3,technique:3,reputation:3,pressure:-5,vestiaire:4,confidence:5}; narrative="Une seule porte s'entrouvre modestement : un peu d'élan pour la suite."; echo={icon:'🍀',label:"Un peu d'élan",short:"le vent tourne légèrement",delta:1,seasons:1}; unlockTrophy('r-small'); }
   const extra=coachApplyEffects(effects); log(`${ev.icon} <b>${ev.title}</b> → ${ev.choices[i]}. ${narrative}`);
+  if(echo){ state.rouletteEcho=echo; log(`${echo.icon} ${echo.label} : ${echo.short}, pour ${echo.seasons} saison${echo.seasons>1?'s':''}.`); }
   state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ev.choices[i],narrative,before,after:coachSnapshot(),extra,next:'offers'}; state.currentRoulette=null; state.pendingChoice='choiceResult'; render();
 }
 const PRESSURE_CHOICES=[
@@ -560,6 +601,8 @@ function coachChoosePressure(i){
 /* ---------- Fin ---------- */
 function coachCheckEnd(){
   if(state.ended) return true;
+  const f=state.rouletteFate;
+  if(f&&f.kind==='exclusive'&&f.installed&&(!state.club||state.club.sacked)){ coachEnd(`${f.icon} Le club auquel la clause te liait te retire le banc. Lié à vie et sans équipe, tu n'entraîneras plus jamais.`,'roulette'); return true; }
   if(state.age>=75){ unlockTrophy('c-old'); coachEnd("Tu atteins 75 ans : après une longue vie de football, le jeu clôt cette carrière et ouvre son bilan.",'age'); return true; }
   if(state.consecutiveSackings>=4){ coachEnd("Quatre licenciements d'affilée. Plus aucun président ne veut de toi : la carrière s'arrête.",'sacked'); return true; }
   if(state.noOfferYears>=2){ coachEnd(`Deux années sans proposition. À ${state.age} ans, le téléphone ne sonnera plus.`,'noOffers'); return true; }

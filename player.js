@@ -18,7 +18,7 @@ function playerFreshState(c){
   const st={technique:36,physique:36,mental:36}; [c.origin,c.trait].forEach(o=>Object.entries(o.bonus||{}).forEach(([k,v])=>st[k]=clamp(st[k]+v)));
   const g={corps:75,vestiaire:50,supporters:45,entourage:50}; [c.origin,c.trait].forEach(o=>Object.entries(o.gauges||{}).forEach(([k,v])=>g[k]=clamp(g[k]+v)));
   const nat=c.origin.nat==='AF'?pick(['SN','CI','ML','CM','DZ','MA']):'FR';
-  return { kind:'player', name:c.name, year:c.era.start, startEra:c.era.id, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
+  return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
     stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, ended:false, endingText:'', endingCause:null };
 }
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
@@ -98,7 +98,7 @@ function playerAcceptOffer(i){
 /* ---------- Saison ---------- */
 function playerMe(){ const corps=state.gauges.corps; return {id:'me',name:state.name,pos:state.pos,born:state.born,peak:pRating()/ageCurve(pAge()),dev:1,morale:70,form:0,injury:state.injury,real:true,isMe:true,trait:state.traitId==='leader'?'leader':state.traitId==='fetard'?'fetard':state.traitId==='fragile'?'fragile':'pro',traitId:state.traitId,fitness:state.fitness==null?100:state.fitness,yellows:state.yellows||0,suspended:state.suspended||0,injuryMod:(state.injuryMod||0)*.2+Math.max(0,50-corps)*.0004+(pAge()>=31?.006:0),selBonus:playerSelBonus()}; }
 /* Ce que le coach ajoute (ou retire) à ta note quand il compose : confiance, rôle promis, forme, jeunesse */
-function playerSelBonus(){ const c=state.club; return (state.coachTrust-50)*.12+(c&&c.role==='titulaire'?6:c&&c.role==='rotation'?2.5:0)+(state.forme-60)*.05+(state.minutesBonus||0)*10+(pAge()<=18?-1:0); }
+function playerSelBonus(){ const c=state.club; const e=state.rouletteEcho; return (state.coachTrust-50)*.12+(c&&c.role==='titulaire'?6:c&&c.role==='rotation'?2.5:0)+(state.forme-60)*.05+(state.minutesBonus||0)*10+(pAge()<=18?-1:0)+(e&&e.seasons>0?e.delta:0); }
 function playerFullSquad(){ return [...state.squad.filter(p=>!p.isMe),playerMe()]; }
 function playerSquadMap(){ return Object.fromEntries(playerFullSquad().map(p=>[p.id,p])); }
 function playerSyncMe(me){ state.injury=me.injury; state.fitness=me.fitness; state.yellows=me.yellows||0; state.suspended=me.suspended||0; }
@@ -273,6 +273,7 @@ function playerAfterPhase(){
 }
 function playerEndSeason(){
   const c=state.club, comp=state.comp, ss=state.seasonStats, year=state.year;
+  if(state.rouletteEcho&&state.rouletteEcho.seasons>0){ state.rouletteEcho.seasons--; if(!state.rouletteEcho.seasons){ log(`${state.rouletteEcho.icon} ${state.rouletteEcho.label} : c'est fini, la saison prochaine repart sur tes seules jambes.`); state.rouletteEcho=null; } }
   const table=sortTable(comp.table), pos=tablePos(comp.table,c.name), N=comp.teams.length;
   const champion=pos===1, relegated=pos>N-3;
   const cup=simCup(5,playerClubStrength,shuffledCopy(comp.teams.filter(n=>n!==c.name)).slice(0,5).map(n=>({name:n,strength:comp.strength[n]})));
@@ -320,10 +321,12 @@ function playerChooseRoulette(i){
   const r=state.currentRoulette, ev=r.event, out=r.outcomes[i];
   if(out==='end'){ unlockTrophy('r-death'); state.currentRoulette=null; playerEnd(`${ev.icon} ${ev.endText}`,'roulette'); render(); return; }
   const before=pSnapshot(); let e,narrative;
-  if(out==='jackpot'){ e={technique:8,physique:8,mental:8,forme:20,pressure:-25,corps:15,vestiaire:15,supporters:15,entourage:15,coachTrust:25,money:1.5}; narrative=ev.jackpotText; unlockTrophy('r-jackpot'); }
-  else if(out==='malus'){ e={mental:-4,forme:-10,pressure:12,corps:-10,supporters:-8,entourage:-6,coachTrust:-12,money:-.5}; narrative="Un revers sérieux : le corps, le moral et ta place dans le groupe encaissent."; unlockTrophy('r-malus'); }
-  else { e={mental:3,forme:5,pressure:-5,vestiaire:4,coachTrust:5}; narrative="Un petit coup de pouce du destin."; unlockTrophy('r-small'); }
+  let echo=null;
+  if(out==='jackpot'){ e={technique:8,physique:8,mental:8,forme:20,pressure:-25,corps:15,vestiaire:15,supporters:15,entourage:15,coachTrust:25,money:1.5}; narrative=ev.jackpotText; echo={icon:'✨',label:"Année de grâce",short:"le coach ne jure plus que par toi",delta:2.5,seasons:2}; unlockTrophy('r-jackpot'); }
+  else if(out==='malus'){ e={mental:-4,forme:-10,pressure:12,corps:-10,supporters:-8,entourage:-6,coachTrust:-12,money:-.5}; narrative="Un revers sérieux : le corps, le moral et ta place dans le groupe encaissent."; echo={icon:'🌧️',label:"L'affaire te suit",short:"le staff te regarde de travers",delta:-2,seasons:2}; unlockTrophy('r-malus'); }
+  else { e={mental:3,forme:5,pressure:-5,vestiaire:4,coachTrust:5}; narrative="Un petit coup de pouce du destin."; echo={icon:'🍀',label:"Un peu d'élan",short:"le vent tourne légèrement",delta:1,seasons:1}; unlockTrophy('r-small'); }
   const extra=playerApplyEffects(e); log(`${ev.icon} <b>${ev.title}</b> → ${ev.choices[i]}. ${narrative}`);
+  if(echo){ state.rouletteEcho=echo; log(`${echo.icon} ${echo.label} : ${echo.short}, pour ${echo.seasons} saison${echo.seasons>1?'s':''}.`); }
   state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ev.choices[i],narrative,before,after:pSnapshot(),extra,next:'offers'}; state.currentRoulette=null; state.pendingChoice='choiceResult'; render();
 }
 const PLAYER_PRESSURE_CHOICES=[
