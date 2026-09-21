@@ -34,3 +34,22 @@ const NATIONALITIES=[
   { id:'us', name:"Américaine", desc:"Formée à la data, au marketing et à l'optimisation.", favoredStyleIds:['direct','pressing'], bonus:{reseau:4, technique:2} },
   { id:'no', name:"Norvégienne", desc:"Pragmatisme scandinave et confiance dans les jeunes.", favoredStyleIds:['direct','formation'], bonus:{technique:3, moral:2} },
 ];
+
+/* ---------- Nationalités des joueurs ----------
+   Le quota d'étrangers sanctionne le recrutement : encore faut-il pouvoir
+   reconnaître un étranger. Chaque joueur porte un code pays dans `p.nat`. */
+const NAT_INFO={
+  FR:['🇫🇷',"France"], ES:['🇪🇸',"Espagne"], IT:['🇮🇹',"Italie"], DE:['🇩🇪',"Allemagne"], NL:['🇳🇱',"Pays-Bas"],
+  PT:['🇵🇹',"Portugal"], BE:['🇧🇪',"Belgique"], EN:['🏴󠁧󠁢󠁥󠁮󠁧󠁿',"Angleterre"], SC:['🏴󠁧󠁢󠁳󠁣󠁴󠁿',"Écosse"], WA:['🏴󠁧󠁢󠁷󠁬󠁳󠁿',"Pays de Galles"],
+  NI:['🇬🇧',"Irlande du Nord"], IE:['🇮🇪',"Irlande"], DK:['🇩🇰',"Danemark"], SE:['🇸🇪',"Suède"], NO:['🇳🇴',"Norvège"],
+  PL:['🇵🇱',"Pologne"], CZ:['🇨🇿',"Tchéquie"], HU:['🇭🇺',"Hongrie"], RO:['🇷🇴',"Roumanie"], BG:['🇧🇬',"Bulgarie"],
+  RS:['🇷🇸',"Serbie"], HR:['🇭🇷',"Croatie"], YU:['🏳️',"Yougoslavie"], RU:['🇷🇺',"Russie"], UA:['🇺🇦',"Ukraine"], GE:['🇬🇪',"Géorgie"],
+  BR:['🇧🇷',"Brésil"], AR:['🇦🇷',"Argentine"], UY:['🇺🇾',"Uruguay"], CL:['🇨🇱',"Chili"], CO:['🇨🇴',"Colombie"], MX:['🇲🇽',"Mexique"],
+  CA:['🇨🇦',"Canada"], US:['🇺🇸',"États-Unis"],
+  MA:['🇲🇦',"Maroc"], DZ:['🇩🇿',"Algérie"], EG:['🇪🇬',"Égypte"], SN:['🇸🇳',"Sénégal"], CI:['🇨🇮',"Côte d'Ivoire"],
+  CM:['🇨🇲',"Cameroun"], GH:['🇬🇭',"Ghana"], NG:['🇳🇬',"Nigeria"], ML:['🇲🇱',"Mali"], GA:['🇬🇦',"Gabon"], LR:['🇱🇷',"Liberia"],
+  AF:['🌍',"Afrique"], SA:['🇸🇦',"Arabie saoudite"], QA:['🇶🇦',"Qatar"], CN:['🇨🇳',"Chine"], JP:['🇯🇵',"Japon"],
+  KR:['🇰🇷',"Corée du Sud"], AU:['🇦🇺',"Australie"],
+};
+function natFlag(code){ const n=NAT_INFO[code]; return n?n[0]:'🏳️'; }
+function natName(code){ const n=NAT_INFO[code]; return n?n[1]:(code||'?'); }
