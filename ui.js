@@ -178,21 +178,50 @@ const FX_LABEL={talent:'🧠 Tactique',technique:'🗣️ Management',reseau:'�
   pressure:'🌡️ Pression',confidence:'🪑 Président',budget:'💰 Budget',form:'📈 Dynamique',
   physique:'💪 Physique',mental:'🧠 Mental',corps:'🩻 Corps',entourage:'👪 Entourage',coachTrust:'🎽 Confiance du coach',forme:'📈 Forme',money:'💰 Argent'};
 const FX_SPECIAL={injure:'🩼 Un blessé',sellStar:'💸 Ta star part',promoteYouth:'🌱 Un jeune monte',skipHalf:'⏭️ Une demi-saison sautée',stayLocal:'🏡 Plus de départ lointain',points:'⚖️ Points au classement',releaseCaptain:'👋 Un cadre s\'en va'};
+function project(k,v){ return state.kind==='player'?playerProject(k,v):coachProject(k,v); }
+/* Un arbitrage se prend en sachant d'où l'on part : chaque effet chiffrable
+   affiche sa valeur actuelle et celle qu'il donnerait. */
 function effectChips(effects,seed){
   const out=[];
   Object.entries(effects||{}).forEach(([k,v])=>{
     if(k==='noReinvest') return;
     if(FX_SPECIAL[k]){ out.push(`<i class="minus">${FX_SPECIAL[k]}</i>`); return; }
-    const lbl=FX_LABEL[k]; if(!lbl||!v) return;
-    // Le signe dit le sens du chiffre, la couleur dit si c'est une bonne nouvelle :
-    // « Pression −− » en vert se lit tout de suite.
+    const pr=project(k,v);
+    const lbl=FX_LABEL[(pr&&pr.as)||k]; if(!lbl||!v) return;
+    // La couleur dit si c'est une bonne nouvelle : « Pression 41 → 32 » en vert.
     const good=k==='pressure'?v<0:v>0;
+    if(pr&&Math.round(pr.cur)!==Math.round(pr.next)){
+      out.push(`<i class="${good?'plus':'minus'}">${lbl} <b>${Math.round(pr.cur)}</b>→<b>${Math.round(pr.next)}</b></i>`);
+      return;
+    }
     const big=k==='budget'?Math.abs(v)>=.05:Math.abs(v)>=6;
     const sign=(v>0?'+':'−').repeat(big?2:1);
     out.push(`<i class="${good?'plus':'minus'}">${lbl} ${sign}</i>`);
   });
   if(seed) out.push('<i>🌱 une suite, un jour</i>');
   return out.length?`<div class="traits">${out.join('')}</div>`:'';
+}
+/* Le tableau demandé sous les choix : où en est chaque indicateur que ce
+   choix va toucher, avant de trancher. */
+function stateTable(keys){
+  const seen=new Set(), rows=[];
+  keys.forEach(k=>{ const pr=project(k,0); if(!pr) return;
+    const key=pr.as||k; if(seen.has(key)||!FX_LABEL[key]) return; seen.add(key);
+    const v=pr.cur, pct=key==='form'?(v+6)/12*100:clamp(v);
+    const mood=key==='pressure'?(v>=85?'low':v>=50?'mid':''):(v>=65?'':v>=35?'mid':'low');
+    rows.push(`<div class="st-row ${mood}"><span class="st-lbl">${FX_LABEL[key]}</span><span class="st-bar"><i style="width:${pct}%"></i></span><b>${Math.round(v)}</b></div>`);
+  });
+  if(!rows.length) return '';
+  return `<div class="section-label">Où tu en es</div><div class="state-table">${rows.join('')}</div>`;
+}
+function effectKeys(list){ return list.flatMap(e=>Object.keys(e||{})); }
+/* Le coût d'un renoncement tient sur une ligne : quatre pastilles de plus
+   par option noyaient le choix. */
+function effectInline(effects){
+  return Object.entries(effects||{}).map(([k,v])=>{ const pr=project(k,v);
+    const lbl=FX_LABEL[(pr&&pr.as)||k]; if(!lbl||!v) return '';
+    return pr&&Math.round(pr.cur)!==Math.round(pr.next)?`${lbl} ${Math.round(pr.cur)}→${Math.round(pr.next)}`:`${lbl} ${v>0?'+':'−'}`;
+  }).filter(Boolean).join(' · ');
 }
 const PHASE_NAMES=['Automne','Hiver','Printemps','Sprint final'];
 /* Un seul écran d'événement : incident, dilemme, vie hors du terrain ou carrefour
@@ -203,7 +232,7 @@ function renderEvent(){
   const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Hors du terrain'}[ce.kind];
   const G=state.kind==='player'?PGAUGE:GAUGE_INFO;
   const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent';
-  return `<div class="card event-card"><div class="hint">${PHASE_NAMES[state.phase]||''} · ${kind}${ev.gauge?` · jauge ${G[ev.gauge]?G[ev.gauge].label:''} au plus bas`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div><div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`;
+  return `<div class="card event-card"><div class="hint">${PHASE_NAMES[state.phase]||''} · ${kind}${ev.gauge?` · jauge ${G[ev.gauge]?G[ev.gauge].label:''} au plus bas`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>${stateTable(effectKeys(ev.choices.map(c=>c.effects)))}<div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`;
 }
 /* Le carrefour : trois chantiers sur la table, un seul reçoit ton énergie du trimestre.
    Chaque option montre ce qu'elle fait avancer et ce qu'elle laisse reculer. */
@@ -212,10 +241,17 @@ function renderCrossroad(x){
   const AREAS=player?PFOCUS_AREAS:FOCUS_AREAS;
   const fn=player?'playerChooseCrossroad':'coachChooseCrossroad';
   const moment=x.phase===0?'Avant-saison':(PHASE_NAMES[state.phase]||'');
+  // Les mêmes facteurs que coachChooseCrossroad / playerChooseCrossroad :
+  // ce qui est annoncé est exactement ce qui sera appliqué.
+  const read=k=>k in state.stats?state.stats[k]:k in state.gauges?state.gauges[k]:null;
+  const gainOf=k=>focusScaled(AREAS[k].gain,read,.7), lossOf=k=>focusScaled(AREAS[k].loss,read,.65);
+  const touched=x.menu.flatMap(k=>[...Object.keys(AREAS[k].gain),...Object.keys(AREAS[k].loss)]);
   return `<div class="card event-card"><div class="hint">${moment} · Carrefour · où part ton énergie ce trimestre</div><div class="ico">${x.icon}</div><h2 class="display">${escapeHtml(x.title)}</h2><p class="narr">${escapeHtml(x.text)}</p>
     <div class="choice-list">${x.menu.map((k,i)=>{ const a=AREAS[k]; if(!a) return '';
-      const others=x.menu.filter(o=>o!==k).map(o=>AREAS[o]);
-      return `<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${a.icon}</span><div class="body"><b>${escapeHtml(a.label)}</b><small>${escapeHtml(a.desc)}</small>${effectChips(a.gain)}<span class="cost">Ça attendra : ${others.map(o=>`${o.icon} ${escapeHtml(o.label.toLowerCase())}`).join(' · ')}</span></div></button>`; }).join('')}</div>
+      const others=x.menu.filter(o=>o!==k);
+      const cost={}; others.forEach(o=>Object.entries(lossOf(o)).forEach(([ck,cv])=>{ cost[ck]=(cost[ck]||0)+cv; }));
+      return `<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${a.icon}</span><div class="body"><b>${escapeHtml(a.label)}</b><small>${escapeHtml(a.desc)}</small>${effectChips(gainOf(k))}<span class="cost"><b>Ça attendra</b> — ${others.map(o=>escapeHtml(AREAS[o].label.toLowerCase())).join(' et ')} : ${effectInline(cost)}</span></div></button>`; }).join('')}</div>
+    ${stateTable(touched)}
     <div class="hint">Tu ne peux en prendre qu'un. Les deux autres reculeront, et tu le sentiras.</div></div>`;
 }
 function renderRoulette(){ const ev=state.currentRoulette.event; const fn=state.kind==='player'?'playerChooseRoulette':'coachChooseRoulette';
