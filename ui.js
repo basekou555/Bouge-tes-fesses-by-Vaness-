@@ -366,19 +366,72 @@ function renderOffers(){
       <div class="budget">Budget transferts : ${$(o.budget)}</div><div class="offer-hint ${o.stay||o.poach?'good':o.styleWanted===state.favoriteStyleId?'good':''}">${o.stay?(o.underContract?'🏠 Tu honores ton contrat : continuité du projet':'🏠 Le président te garde et prolonge'):o.poach?'🎯 Un projet plus grand qui paie la clause':o.styleWanted===state.favoriteStyleId?'❤️ Le club veut ton style de jeu':o.tier==='amateur'||o.tier==='ligue2'?'🌱 Petit budget, présidents plus patients':'🎯 Objectif exigeant, moyens à la hauteur'}</div></div>`).join('')}</div>
     <div class="btn-row">${under?'<button class="btn secondary" onclick="if(confirm(\'Rompre ton contrat ? Réputation −4, cote −3.\')) coachBreakContract()">Rompre le contrat et écouter le marché</button>':''}<button class="btn secondary" onclick="coachSkipYear()">Refuser tout et prendre une année sabbatique</button></div></div>`;
 }
+/* ---------- Le mercato, dossier par dossier ----------
+   Un joueur à la fois, et sous lui exactement ce qu'il faut pour trancher :
+   ce que j'ai, ce qu'il coûte, qui il remplacerait, et qui vendre s'il manque
+   quelque chose. Plus de liste à fouiller. */
+const POS_PLURAL={G:'gardiens',D:'défenseurs',M:'milieux',A:'attaquants'};
+function posPlural(pos){ return POS_PLURAL[pos]||POS_LABEL[pos].toLowerCase(); }
+function moneyBar(cur,cap,warn){
+  const pct=Math.max(0,Math.min(100,cap>0?cur/cap*100:0));
+  return `<span class="mbar ${warn?'over':''}"><i style="width:${pct}%"></i></span>`;
+}
 function renderMercato(){
-  const m=state.market, c=state.club, y=state.year; const wages=state.squad.reduce((n,p)=>n+p.wage,0); const fmax=eraForeignersMax(y); const xi=bestXI(state.squad,FORMATIONS[state.formation],y);
+  const m=state.market, c=state.club, y=state.year;
+  const wages=squadWages(), fmax=eraForeignersMax(y);
   const kinds={all:'Tous',real:'Stars',pro:'Pros',youth:'Pépites',free:'Libres',academy:'Centre'};
-  const list=m.targets.map((t,i)=>({t,i})).filter(x=>marketFilter==='all'||x.t.kind===marketFilter);
-  const rowHTML=(p,inXI)=>`<tr class="${inXI?'xi':''} ${p.injury?'inj':''}"><td><span class="pos-badge pos-${p.pos}">${p.pos}</span></td><td class="${p.real?'real':''}">${natTag(p)} ${escapeHtml(p.name)}${p.fanFav?' ❤️':''}${p.promised?' ⭐':''}${p.injury?` 🩼${p.injury}s`:''}</td><td>${playerAge(p,y)}</td><td><b>${playerRating(p,y)}</b> ${stars(playerRating(p,y))}</td><td>${traitLabel(p.trait)}</td><td>${p.contractEnd}</td><td class="r">${$(p.wage)}</td><td class="r">${$(playerValue(p,y))}</td><td class="r"><button class="btn secondary" onclick="coachSell(${p.id})">Vendre</button></td></tr>`;
-  return `<div class="card no-sticky"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2><p class="hint">Vends, recrute, promeus. Les prix dépendent de l'époque (${eraForYear(y).name}). Les pépites viennent parfois d'une vidéo, d'un cousin ou d'un agent inconnu : certaines sont des arnaques. Un joueur hors de portée ne répond pas ; un « gros coup » coûte cher et exige une place de titulaire (⭐).</p>
-    <div class="mercato-head"><div>Budget restant<b>${$(m.budgetLeft)}</b></div><div class="${wages>c.wageCap*1.1?'warn-box':''}">Masse salariale<b>${$(wages)}</b>plafond ${$(c.wageCap)}</div><div>Effectif<b>${state.squad.length} / 27</b></div>${c.nat==='FR'&&fmax<99?`<div class="${foreignCount()>=fmax?'warn-box':''}">Étrangers<b>${foreignCount()} / ${fmax}</b></div>`:''}<div>Onze type<b>${(xi.reduce((n,p)=>n+playerRating(p,y),0)/Math.max(1,xi.length)).toFixed(1)}</b>force club ${c.strength}</div><div>Crédibilité<b>${Math.round(coachCredibility())}</b>niveau max accessible</div></div>
+  const cur=marketCurrent();
+  const head=`<div class="mk-head">
+      <div><span>Budget transferts</span><b>${$(m.budgetLeft)}</b></div>
+      <div class="${wages>c.wageCap?'warn-box':''}"><span>Masse salariale</span><b>${$(wages)}</b><small>plafond ${$(c.wageCap)}</small>${moneyBar(wages,c.wageCap,wages>c.wageCap)}</div>
+      <div><span>Effectif</span><b>${state.squad.length} / 27</b></div>
+      ${quotaActive()?`<div class="${foreignCount()>=fmax?'warn-box':''}"><span>Étrangers</span><b>${foreignCount()} / ${fmax}</b></div>`:''}
+    </div>`;
+  const tabs=`<div class="market-tabs">${Object.entries(kinds).map(([k,l])=>`<button class="${marketFilter===k?'on':''}" onclick="coachMarketFilter('${k}')">${l} (${k==='all'?m.targets.length:m.targets.filter(t=>t.kind===k).length})</button>`).join('')}</div>`;
+  let card;
+  if(!cur){
+    card=`<div class="mk-empty"><div class="ico">📭</div><b>Plus aucun dossier dans cette catégorie.</b><span>Change de catégorie, ou clos le mercato.</span></div>`;
+  } else {
+    const t=cur.t, p=t.p, blockers=coachBlockers(t), rivals=coachRivals(t), sales=coachSaleOptions(t);
+    const ok=!blockers.length;
+    const rating=t.kind==='youth'?`≈ ${t.shownRating}`:`${t.shownRating}`;
+    const better=rivals.filter(r=>r.rating<t.shownRating).length;
+    card=`<div class="mk-card ${t.access}">
+      <div class="mk-kind">${t.label} · via ${escapeHtml(t.source)}</div>
+      <div class="mk-name"><span class="pos-badge pos-${p.pos}">${p.pos}</span> <b class="${p.real?'real':''}">${escapeHtml(p.name)}</b> ${natTag(p,true)}</div>
+      <div class="mk-line">${t.age} ans · niveau <b>${rating}</b> ${t.kind==='youth'?'<i>(potentiel inconnu)</i>':stars(t.shownRating)} · ${traitLabel(p.trait)}</div>
+      <div class="mk-deal"><div><span>Transfert</span><b>${t.price>0?$(t.price):'libre'}</b></div><div><span>Salaire / an</span><b>${$(t.wage)}</b></div><div><span>Ton budget après</span><b class="${t.price>m.budgetLeft?'bad':''}">${$(m.budgetLeft-t.price)}</b></div></div>
+      ${t.access==='coup'?'<div class="mk-flag">⭐ Gros coup : il exige une place de titulaire.</div>':''}
+      ${t.access==='no'?'<div class="mk-flag bad">Il ne répond pas. Ta crédibilité est trop basse.</div>':''}
+
+      <div class="section-label">À son poste, tu as déjà</div>
+      <div class="mk-rivals">${rivals.length?rivals.slice(0,5).map(r=>`<div class="${r.rating<t.shownRating?'worse':''}"><span>${natTag(r.p)} ${escapeHtml(r.p.name)}</span><small>${r.age} ans</small><b>${r.rating}</b><small>${$(r.p.wage)}</small></div>`).join(''):'<div class="hint">Personne à ce poste. Tu en as besoin.</div>'}</div>
+      ${rivals.length?`<div class="hint">${better?`Il serait meilleur que ${better} de tes ${posPlural(p.pos)}.`:`Aucun de tes ${posPlural(p.pos)} ne fait moins bien que lui.`}</div>`:''}
+
+      ${blockers.length?`<div class="mk-block"><b>Ce qui bloque</b>${blockers.map(b=>`<span>${escapeHtml(b.txt)}</span>`).join('')}</div>`:''}
+      ${blockers.length?(sales.length&&coachSalesCover(t)
+        ?`<div class="section-label">Vendre pour le faire entrer</div><div class="mk-sales">${sales.map(x=>`<button class="mk-sale" onclick="coachSell(${x.p.id})"><span>${natTag(x.p)} ${escapeHtml(x.p.name)}</span><small>${x.age} ans · niveau ${x.rating} · salaire ${$(x.p.wage)}</small><b>+${$(x.value)}</b></button>`).join('')}</div>`
+        :`<div class="hint">Aucune vente de ton effectif ne comblerait l'écart. Ce dossier n'est pas pour cette saison.</div>`):''}
+
+      <div class="btn-row mk-actions">
+        <button class="btn secondary" onclick="coachMarketGo(-1)">← Précédent</button>
+        <button class="btn ${ok?'':'secondary'}" ${ok?'':'disabled'} onclick="coachBuy(${cur.i})">${ok?'Le recruter ✅':'Impossible pour l\'instant'}</button>
+        <button class="btn secondary" onclick="coachMarketGo(1)">Passer →</button>
+      </div>
+      <div class="mk-count">Dossier ${cur.pos} sur ${cur.total}</div>
+    </div>`;
+  }
+  const squadRow=p2=>`<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}</td><td>${playerAge(p2,y)}</td><td><b>${playerRating(p2,y)}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">Vendre</button></td></tr>`;
+  return `<div class="card no-sticky"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2>
+    ${head}
     ${m.message?`<div class="msg">${escapeHtml(m.message)}</div>`:''}
-    <div class="section-label">Ton effectif (onze type surligné)</div><div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niveau</th><th>Caractère</th><th>Fin</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(p=>p.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(p=>rowHTML(p,xi.includes(p))).join('')).join('')}</tbody></table></div>
+    ${tabs}
+    ${card}
     ${quotaHTML()}
-    <div class="section-label">Le marché</div><div class="market-tabs">${Object.entries(kinds).map(([k,l])=>`<button class="${marketFilter===k?'on':''}" onclick="marketFilter='${k}';render()">${l} (${k==='all'?m.targets.length:m.targets.filter(t=>t.kind===k).length})</button>`).join('')}</div>
-    <div class="market-list">${list.map(({t,i})=>`<div class="market-row ${t.access} ${t.kind}"><div><span class="lbl">${t.label}</span> · <span class="pos-badge pos-${t.p.pos}">${t.p.pos}</span> <b class="${t.p.real?'real':''}">${escapeHtml(t.p.name)}</b> ${natTag(t.p,true)} · ${t.age} ans · niveau ${t.kind==='youth'?'≈ '+t.shownRating+' (potentiel inconnu)':t.shownRating+' '+stars(t.shownRating)} · ${traitLabel(t.p.trait)}<div class="meta">Via ${t.source} · prix ${t.price>0?$(t.price):'libre'} · salaire ${$(t.wage)} / an${t.access==='coup'?' · exige d\'être titulaire':''}${t.access==='no'?' · ne répond pas':''}</div></div><button class="btn ${t.access==='no'?'secondary':''}" ${t.access==='no'?'disabled':''} onclick="coachBuy(${i})">Recruter</button></div>`).join('')||'<div class="hint">Rien dans cette catégorie.</div>'}</div>
-    ${m.bought.length||m.sold.length?`<div class="section-label">Bilan du mercato</div><div class="hint">${m.bought.map(b=>`➕ ${escapeHtml(b.name)} (${$(b.price)})`).join(' · ')}${m.bought.length&&m.sold.length?' · ':''}${m.sold.map(s=>`➖ ${escapeHtml(s.name)} (${$(s.price)})`).join(' · ')}</div>`:''}
+    ${m.bought.length||m.sold.length?`<div class="section-label">Ce que tu as fait</div><div class="hint">${m.bought.map(b=>`➕ ${escapeHtml(b.name)} (${$(b.price)})`).join(' · ')}${m.bought.length&&m.sold.length?' · ':''}${m.sold.map(x=>`➖ ${escapeHtml(x.name)} (${$(x.price)})`).join(' · ')}</div>`:''}
+    <details class="bil-more"><summary>Ton effectif complet (${state.squad.length} joueurs)</summary>
+      <div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niv.</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(x=>x.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(squadRow).join('')).join('')}</tbody></table></div>
+    </details>
     <div class="btn-row"><button class="btn" onclick="coachCloseMercato()">Clore le mercato →</button></div></div>`;
 }
 function renderTactic(){
@@ -584,7 +637,9 @@ function factorsHTML(f){ return `<div class="impact">${(f||[]).map(l=>`<div clas
 function scoreHero(rec,me){ const W=rec.res==='W'; return `<div class="score-hero ${rec.res}"><div class="teams"><span class="${rec.home===me?'us':''}">${escapeHtml(rec.home)}</span><span class="big">${rec.gh} – ${rec.ga}</span><span class="${rec.away===me?'us':''}">${escapeHtml(rec.away)}</span></div><div class="verdict">${W?'Victoire':rec.res==='D'?'Match nul':'Défaite'}${rec.ht?` · mi-temps ${rec.us==='home'?rec.ht[0]+'–'+rec.ht[1]:rec.ht[1]+'–'+rec.ht[0]}`:''} · journée ${rec.matchday+1}</div></div>`; }
 function tempoSelectHTML(){ const t=TEMPOS[state.tempo]?state.tempo:'temps_forts'; return `<div class="section-label">Rythme de la saison</div><select class="select tempo" onchange="setTempo(this.value)" title="${escapeHtml(TEMPOS[t].desc)}">${Object.entries(TEMPOS).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v.icon} ${v.label} — ${v.about}</option>`).join('')}</select><div class="hint">${escapeHtml(TEMPOS[t].desc)}</div>`; }
 function whyHTML(why){ return why&&why.length?`<div class="why-row">${why.map(w=>`<span class="why">${escapeHtml(w)}</span>`).join('')}</div>`:''; }
-function sinceHTML(list){ if(!list||!list.length) return ''; const W=list.filter(m=>m.res==='W').length, D=list.filter(m=>m.res==='D').length, L=list.filter(m=>m.res==='L').length; return `<div class="section-label">Pendant ce temps · ${list.length} match${list.length>1?'s':''} joué${list.length>1?'s':''} avec ta compo : ${W} V · ${D} N · ${L} D</div>${matchesHTML(list,state.club.name)}`; }
+function sinceHTML(list){ if(!list||!list.length) return '';
+  const W=list.filter(m=>m.res==='W').length, D=list.filter(m=>m.res==='D').length, L=list.filter(m=>m.res==='L').length;
+  return `<details class="since"><summary>Pendant ce temps · ${list.length} match${list.length>1?'s':''} joué${list.length>1?'s':''} sans toi · <b>${W} V · ${D} N · ${L} D</b></summary>${matchesHTML(list,state.club.name)}</details>`; }
 /* La roulette laisse une trace : destin scellé ou écho sur les saisons suivantes */
 function fateHTML(){
   const f=state.rouletteFate, e=state.rouletteEcho; if(!f&&!(e&&e.seasons>0)) return '';
@@ -617,11 +672,16 @@ function recapHTML(){
 }
 function renderMatchResult(){
   const rec=state.lastMatch, c=state.club, P=coachSquadMap(), comp=state.comp; const N=comp.teams.length; const last=state.matchday>=comp.phaseEnds[state.phase];
+  const goals=(rec.events||[]).filter(e=>e.kind==='goal').length, cards=(rec.events||[]).filter(e=>e.kind==='yellow'||e.kind==='red').length, injs=(rec.events||[]).filter(e=>e.kind==='injury').length;
   return `<div class="card">${recapHTML()}${scoreHero(rec,c.name)}<p class="narr story">${escapeHtml(rec.story)}${rec.htNote?` ${escapeHtml(rec.htNote)}`:''}</p>
-    <div class="two-cols"><div><div class="section-label">Le film du match</div>${eventsHTML(rec.events)}</div><div><div class="section-label">Les notes${rec.motm&&P[rec.motm]?` · homme du match ${escapeHtml(P[rec.motm].name)}`:''}</div>${ratingsHTML(rec,P)}</div></div>
+    <div class="res-line"><span>${escapeHtml(c.name)} <b>${ordinal(rec.pos)}</b> sur ${N}</span><span>objectif ${ordinal(c.objectivePos)}</span><span>${formChips(comp.form&&comp.form[c.name])}</span></div>
     ${rec.suspensions&&rec.suspensions.length?`<div class="warn">🟥 Suspension : ${rec.suspensions.map(escapeHtml).join(', ')}</div>`:''}
-    <div class="section-label">Pourquoi ce résultat</div>${factorsHTML(rec.factors)}
-    <div class="section-label">Classement</div><div class="hint">${escapeHtml(c.name)} ${ordinal(rec.pos)} sur ${N} · objectif ${ordinal(c.objectivePos)} · forme ${formChips(comp.form&&comp.form[c.name])}</div>${tableHTML(sortTable(comp.table),c.name,false)}
+    ${rec.motm&&P[rec.motm]?`<div class="hint">⭐ Homme du match : <b>${escapeHtml(P[rec.motm].name)}</b>${injs?` · 🩼 ${injs} blessé${injs>1?'s':''}`:''}${cards?` · 🟨 ${cards}`:''}</div>`:''}
+    <details class="bil-more"><summary>Le film, les notes, pourquoi, le classement</summary>
+      <div class="two-cols"><div><div class="section-label">Le film du match</div>${eventsHTML(rec.events)}</div><div><div class="section-label">Les notes</div>${ratingsHTML(rec,P)}</div></div>
+      <div class="section-label">Pourquoi ce résultat</div>${factorsHTML(rec.factors)}
+      <div class="section-label">Classement</div>${tableHTML(sortTable(comp.table),c.name,false)}
+    </details>
     <div class="btn-row"><button class="btn" onclick="coachAfterMatch()">${last?'Bilan de la phase →':'Continuer →'}</button></div></div>`;
 }
 

@@ -185,6 +185,43 @@ function squadWages(){ return state.squad.reduce((n,p)=>n+p.wage,0); }
 /* Plafond salarial : ce qu'un club de cette force paie à un groupe de 23 joueurs de son niveau, plus un quart de marge (et le mode de jeu) */
 function clubWageCap(c){ const ref={born:state.year-27,peak:(c.strength-1)/ageCurve(27),dev:1,form:0}; const nominal=23*playerWage(ref,state.year,c.tier); return Math.max(squadWages()*1.05,nominal*1.25*Math.sqrt(state.mode.budgetMult||1)); }
 function foreignCount(){ return state.squad.filter(p=>isForeign(p,state.club.nat)).length; }
+/* Ce qui manque pour boucler un dossier : prix, salaire, place, quota. */
+function coachBlockers(t){
+  const m=state.market, c=state.club, out=[];
+  if(!t) return out;
+  if(t.access==='no') out.push({k:'access',txt:`${t.p.name} ne répond pas : le club n'est pas à sa hauteur.`});
+  if(state.squad.length>=27) out.push({k:'place',txt:"Effectif complet : 27 joueurs maximum."});
+  if(t.price>m.budgetLeft+.0001) out.push({k:'budget',txt:`Il manque ${$(t.price-m.budgetLeft)} sur le transfert.`,need:t.price-m.budgetLeft});
+  const fmax=eraForeignersMax(state.year);
+  if(c.nat==='FR'&&isForeign(t.p,'FR')&&foreignCount()>=fmax) out.push({k:'quota',txt:`Quota d'étrangers atteint (${fmax}).`});
+  if(squadWages()+t.wage>c.wageCap) out.push({k:'salaire',txt:`Plafond salarial dépassé de ${$(squadWages()+t.wage-c.wageCap)}.`,needW:squadWages()+t.wage-c.wageCap});
+  return out;
+}
+/* Qui ce joueur viendrait concurrencer, à son poste. */
+function coachRivals(t){
+  const y=state.year;
+  return state.squad.filter(p=>p.pos===t.p.pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y))
+    .map(p=>({p,rating:playerRating(p,y),age:playerAge(p,y),value:playerValue(p,y)}));
+}
+/* Les ventes qui débloqueraient ce dossier, les plus évidentes d'abord. */
+function coachSaleOptions(t){
+  const y=state.year, b=coachBlockers(t);
+  const needM=(b.find(x=>x.k==='budget')||{}).need||0;
+  const needW=(b.find(x=>x.k==='salaire')||{}).needW||0;
+  const needPlace=b.some(x=>x.k==='place');
+  const needQuota=b.some(x=>x.k==='quota');
+  if(!needM&&!needW&&!needPlace&&!needQuota) return [];
+  return state.squad
+    .filter(p=>!(state.market.bought||[]).some(x=>x.p===p))
+    .filter(p=>!needQuota||isForeign(p,state.club.nat))
+    .map(p=>({p,rating:playerRating(p,y),age:playerAge(p,y),value:playerValue(p,y)*rand(.9,1),wage:p.wage}))
+    .filter(x=>(!needM||x.value>0)&&(!needW||x.wage>0))
+    .sort((a,b2)=>{
+      const fa=(needM?a.value/Math.max(.01,needM):0)+(needW?a.wage/Math.max(.01,needW):0)-a.rating/40;
+      const fb=(needM?b2.value/Math.max(.01,needM):0)+(needW?b2.wage/Math.max(.01,needW):0)-b2.rating/40;
+      return fb-fa;
+    }).slice(0,4);
+}
 function coachSell(pid){
   const p=state.squad.find(x=>x.id===pid); if(!p) return;
   const justSigned=p.joinedYear===state.year&&p.paid!=null;
@@ -211,6 +248,30 @@ function coachBuy(idx){
   log(`🖊️ ${p.name} (${POS_LABEL[p.pos].toLowerCase()}, ${t.age} ans) rejoint le club pour ${$(t.price)}${t.access==='coup'?' — un gros coup, avec une place de titulaire promise':''}.`);
   render();
 }
+function marketRank(t){
+  const b=coachBlockers(t);
+  if(!b.length) return 0;
+  if(b.some(x=>x.k==='access')) return 3;
+  return coachSaleOptions(t).length&&coachSalesCover(t)?1:2;
+}
+/* Les ventes proposées ne valent que si elles comblent vraiment l'écart. */
+function coachSalesCover(t){
+  const b=coachBlockers(t), sales=coachSaleOptions(t);
+  const needM=(b.find(x=>x.k==='budget')||{}).need||0;
+  const needW=(b.find(x=>x.k==='salaire')||{}).needW||0;
+  if(!sales.length) return false;
+  return sales.reduce((n,x)=>n+x.value,0)>=needM && sales.reduce((n,x)=>n+x.wage,0)>=needW;
+}
+function marketDeck(){ const m=state.market;
+  return m.targets.map((t,i)=>({t,i}))
+    .filter(x=>marketFilter==='all'||x.t.kind===marketFilter)
+    .sort((a,b)=>marketRank(a.t)-marketRank(b.t)||b.t.shownRating-a.t.shownRating);
+}
+function marketCurrent(){ const L=marketDeck(); if(!L.length) return null;
+  const m=state.market; let k=L.findIndex(x=>x.i===m.idx); if(k<0) k=0; m.idx=L[k].i; return {...L[k],pos:k+1,total:L.length}; }
+function coachMarketGo(d){ const L=marketDeck(); if(!L.length) return; const m=state.market;
+  let k=L.findIndex(x=>x.i===m.idx); if(k<0) k=0; k=(k+d+L.length)%L.length; m.idx=L[k].i; m.message=null; render(); }
+function coachMarketFilter(k){ marketFilter=k; const L=marketDeck(); state.market.idx=L.length?L[0].i:-1; state.market.message=null; render(); }
 function coachCloseMercato(){
   const m=state.market; const notes=[];
   // Effectif incomplet : le centre de formation fournit des jeunes (modestes) plutôt que de bloquer la saison
@@ -475,7 +536,7 @@ function coachMatchInterest(m){
    Intention : on ne compose pas, on tranche. Le calendrier tourne seul et ne
    s'arrête que quand une décision se présente ; le match qui suit est le
    résultat de cette décision, et on le lit. */
-const MEETING_QUOTA={complet:3,temps_forts:2,rapide:1};
+const MEETING_QUOTA={complet:8,temps_forts:6,rapide:3};
 
 function coachDrawMeeting(fx){
   const comp=state.comp, tempo=TEMPOS[state.tempo]?state.tempo:'temps_forts';
@@ -485,7 +546,8 @@ function coachDrawMeeting(fx){
   if((state.phaseStops||0)>=quota) return null;
   const m=state.match, it=coachMatchInterest(m);
   const left=comp.phaseEnds[state.phase]-state.matchday;
-  const cands=[coachMeetingInjured,coachMeetingFronts,coachMeetingCaptain,coachMeetingPresident,coachMeetingSquad,coachMeetingOpponent]
+  const cands=[coachMeetingInjured,coachMeetingFronts,coachMeetingCaptain,coachMeetingPresident,coachMeetingReturn,
+    coachMeetingBonus,coachMeetingTravel,coachMeetingPress,coachMeetingSquad,coachMeetingOpponent]
     .map(b=>b(m,it,left)).filter(Boolean);
   if(!cands.length) return null;
   const seen=state.recentMeetings||[];
@@ -614,6 +676,62 @@ function coachMeetingCaptain(m,it,left){
       {label:"Lui promettre du temps de jeu",sub:"Une promesse coûte peu. Tant qu'on la tient.",effects:{vestiaire:3,technique:1},
        seed:{in:1,icon:'🤥',title:"La promesse non tenue",text:`${sad.name} attend toujours. Le vestiaire a compris ce que valent tes promesses.`,effects:{vestiaire:-8,technique:-2}}},
       {label:"Dire au capitaine que ce n'est pas son rôle",sub:"Remettre la hiérarchie en place.",effects:{vestiaire:-7,confidence:2}},
+    ]};
+}
+
+/* La presse attend une phrase, et elle la sortira de son contexte. */
+function coachMeetingPress(m,it,left){
+  if(it.score<2) return null;
+  const c=state.club, f=(state.comp.form&&state.comp.form[c.name])||[];
+  const bad=f.slice(-3).filter(r=>r==='L').length>=2;
+  return {kind:'presse',icon:'🎙️',title:bad?"La conférence d'avant-match":"Le micro tendu",
+    text:bad?`Trois questions sur ta série, une sur ton avenir. ${m.themName} arrive, et la salle attend que tu dises quelque chose.`
+      :`Avant ${m.themName}, on te demande si ton équipe a le niveau. La réponse fera le titre de demain.`,
+    choices:[
+      {label:"Protéger tes joueurs",sub:"Tout prendre sur toi, devant tout le monde.",effects:{vestiaire:6,pressure:5,confidence:-2}},
+      {label:"Mettre la pression au groupe",sub:"Les nommer, presque. Ça réveille ou ça casse.",plan:{bonus:.7},effects:{vestiaire:-6,supporters:2}},
+      {label:"Promettre un résultat",sub:"Annoncer la victoire. On te le rappellera.",plan:{bonus:.5},effects:{supporters:6,pressure:7},
+       seed:{in:1,icon:'📰',title:"La phrase qu'on te ressort",text:"On rediffuse ta promesse à chaque contre-performance. Le vestiaire la connaît par cœur.",effects:{supporters:-7,pressure:6}}},
+      {label:"Ne rien dire d'intéressant",sub:"Langue de bois. Personne n'est content, personne n'est blessé.",effects:{supporters:-3,reputation:-2}},
+    ]};
+}
+/* Une prime se demande avant, jamais après. */
+function coachMeetingBonus(m,it,left){
+  if(it.score<4) return null;
+  const c=state.club;
+  return {kind:'prime',icon:'💰',title:"Les joueurs demandent une prime",
+    text:`Le match contre ${m.themName} vaut cher, et le groupe le sait. Les cadres sont venus à deux, poliment.`,
+    choices:[
+      {label:"Payer la prime sur le budget",sub:"Ils l'auront, et ils le sauront.",plan:{bonus:.9},effects:{budget:-.06,vestiaire:5,confidence:-3}},
+      {label:"La promettre en cas de victoire",sub:"Rien ne sort si on perd.",plan:{bonus:.6},effects:{vestiaire:2,pressure:3}},
+      {label:"Refuser net",sub:"On est payé pour jouer.",effects:{vestiaire:-8,confidence:4,technique:1}},
+      {label:"Renvoyer les cadres vers le président",sub:"Ce n'est pas ton budget. Qu'ils aillent le lui demander.",effects:{confidence:-5,vestiaire:2}},
+    ]};
+}
+/* Un joueur revient de blessure : trop tôt, c'est deux mois de plus. */
+function coachMeetingReturn(m,it,left){
+  const y=state.year;
+  const back=state.squad.filter(p=>p.injury===0&&p.fitness!=null&&p.fitness<62&&playerRating(p,y)>=state.club.strength-2&&!(state.metFor||[]).includes(-p.id))[0];
+  if(!back) return null;
+  (state.metFor=state.metFor||[]).push(-back.id);
+  return {kind:'retour',icon:'🧑‍⚕️',title:`${back.name} veut rejouer`,
+    text:`Il est remis, sur le papier. Fraîcheur ${Math.round(fit(back))} %, et il n'a pas joué depuis longtemps. Le staff propose de le ménager.`,
+    choices:[
+      {label:"Le titulariser tout de suite",sub:"Il en a besoin, l'équipe aussi.",plan:{forceIn:back.id,bonus:.5},effects:{staff:-4,vestiaire:2},
+       seed:{in:1,icon:'🩼',title:"Revenu trop tôt",text:`${back.name} a rechuté. Le staff n'a rien dit, mais il pense très fort.`,effects:{staff:-5,vestiaire:-3}}},
+      {label:"Une mi-temps, pas plus",sub:"Le compromis raisonnable.",effects:{staff:2}},
+      {label:"Encore deux semaines",sub:"Il va détester, le staff va approuver.",effects:{staff:5,vestiaire:-3}},
+    ]};
+}
+/* Un déplacement lointain se prépare, ou se subit. */
+function coachMeetingTravel(m,it,left){
+  if(m.home||it.score<3) return null;
+  return {kind:'voyage',icon:'🚌',title:`Le déplacement à ${m.themName}`,
+    text:"Six heures de route, ou un vol la veille et une nuit d'hôtel. Le club regarde la facture.",
+    choices:[
+      {label:"Partir la veille, en avion",sub:"Des jambes fraîches, une note salée.",plan:{bonus:.8},effects:{budget:-.03,confidence:-2}},
+      {label:"Le car le matin même",sub:"On économise, on arrive cuits.",plan:{bonus:-.7},effects:{confidence:3,staff:-2}},
+      {label:"En car, mais la veille",sub:"Le compromis de tous les clubs modestes.",effects:{budget:-.01}},
     ]};
 }
 

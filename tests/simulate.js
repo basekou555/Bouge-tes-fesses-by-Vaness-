@@ -24,7 +24,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
               if(state.squad.some(p=>!p.nat)) throw new Error('un joueur sans nationalité');
               if(!/class="nat/.test(h)) throw new Error('nationalités absentes du mercato');
               if(state.club.nat==='FR'&&eraForeignersMax(state.year)<99&&!/quota-box/.test(h)) throw new Error('quota d\'étrangers non affiché'); }
-            const m=state.market; let tries=0; while(tries<4){ tries++; const cand=m.targets.map((t,i)=>({t,i})).filter(x=>x.t.access!=='no'&&x.t.price<=m.budgetLeft*.6); if(!cand.length) break; const x=cand[rnd(cand.length)]; coachBuy(x.i); if(state.pendingChoice!=='mercato') break; } if(state.squad.length>25) coachSell(state.squad[state.squad.length-1].id); coachCloseMercato(); }
+            const m=state.market; let tries=0;
+            const h=renderMercato(); if(!h||!/mk-card|mk-empty/.test(h)) throw new Error('carte de mercato absente');
+            while(tries<6){ tries++; coachMarketGo(1); const cur=marketCurrent(); if(!cur) break;
+              if(!coachBlockers(cur.t).length&&Math.random()<.6) coachBuy(cur.i);
+              if(state.pendingChoice!=='mercato') break; }
+            if(state.squad.length>25) coachSell(state.squad[state.squad.length-1].id); coachCloseMercato(); }
           else if(pc==='tactic'){ coachSetTactic(pick(Object.keys(FORMATIONS)),Math.random()<.6?state.club.styleWanted:state.favoriteStyleId); }
           else if(pc==='event'){ const ce=state.currentEvent;
             if(ce.kind==='carrefour'){ cstat.carrefours++; coachChooseCrossroad(rnd(ce.event.menu.length)); }
