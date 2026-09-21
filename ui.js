@@ -128,6 +128,27 @@ function renderFilmstrip(){
   if(state.comp) frames.push(`<div class="frame current">${state.year} · phase ${Math.min(state.phase+1,4)}/4 · J${Math.min((state.matchday||0)+1,state.comp.schedule.length)}/${state.comp.schedule.length}</div>`);
   filmstripEl.innerHTML=frames.length?frames.join(''):'<div class="frame">Aucune saison pour l\'instant</div>';
 }
+/* Le quota d'étrangers ne vaut que pour les clubs français, et seulement
+   avant l'arrêt Bosman. Ailleurs il n'y a rien à surveiller. */
+function quotaActive(){ const c=state.club; return !!(c&&c.nat==='FR'&&eraForeignersMax(state.year)<99); }
+/* Un joueur doit pouvoir être reconnu étranger d'un coup d'œil. */
+function natTag(p,withCode){
+  if(!p||!p.nat) return '';
+  const foreign=state.club?isForeign(p,state.club.nat):false;
+  const counts=foreign&&quotaActive();
+  const title=`${natName(p.nat)}${counts?" — étranger, compte dans le quota":foreign?' — étranger':''}`;
+  return `<span class="nat${counts?' counts':''}" title="${escapeHtml(title)}">${natFlag(p.nat)}${withCode?` ${escapeHtml(p.nat)}`:''}</span>`;
+}
+/* La liste des joueurs qui occupent le quota, nommément. */
+function quotaHTML(){
+  if(!quotaActive()) return '';
+  const fmax=eraForeignersMax(state.year);
+  const list=state.squad.filter(p=>isForeign(p,state.club.nat)).sort((a,b)=>playerRating(b,state.year)-playerRating(a,state.year));
+  const over=list.length>=fmax;
+  return `<div class="quota-box ${over?'full':''}"><b>Quota d'étrangers · ${list.length} / ${fmax}</b>
+    <span>${eraForYear(state.year).name} : un club français ne peut aligner que ${fmax} joueur${fmax>1?'s':''} étranger${fmax>1?'s':''}.${over?" Tu ne peux plus en recruter un de plus sans en vendre un.":''}</span>
+    ${list.length?`<div class="quota-list">${list.map(p=>`<i>${natFlag(p.nat)} ${escapeHtml(p.name)} <small>${natName(p.nat)}</small></i>`).join('')}</div>`:'<div class="quota-list"><i>Aucun étranger dans l\'effectif.</i></div>'}</div>`;
+}
 function bar(label,v,cls=''){ return `<div class="stat-row"><div class="lbl"><span>${label}</span><b>${Math.round(v)}</b></div><div class="bar ${cls}"><i style="width:${clamp(v)}%"></i></div></div>`; }
 function gaugeRow(info,v){ const mood=v>=65?'':v>=35?'mid':'low'; return `<div class="gauge-row ${mood}" title="${escapeHtml(info.help)}"><span>${info.icon}</span><div><div class="bar"><i style="width:${clamp(v)}%"></i></div><div class="hint" style="font-size:10px">${info.label}</div></div><span>${Math.round(v)}</span></div>`; }
 function coachSidebar(){
@@ -214,7 +235,7 @@ function strengthRow(r,total){
 }
 function renderDashboard(){
   const c=state.club, st=state.stats, g=state.gauges, ss=state.seasonStats;
-  if(!c) return `<div class="card dash-card"><h2 class="display">Tableau de bord</h2><p class="narr">Tu es sans club : les capteurs reprennent dès que tu signes.</p>
+  if(!c) return `<div class="card no-sticky"><h2 class="display">Tableau de bord</h2><p class="narr">Tu es sans club : les capteurs reprennent dès que tu signes.</p>
     <div class="section-label">Toi</div>${Object.keys(CSTAT).map(k=>bar(CSTAT[k],st[k])).join('')}${bar('Pression',state.pressure,'pressure')}${coteHTML()}
     <div class="btn-row"><button class="btn" onclick="closeDashboard()">Retour →</button></div></div>`;
   const bd=coachStrengthBreakdown(), avg=coachLeagueAverage();
@@ -226,7 +247,7 @@ function renderDashboard(){
     .map(p=>({p,now:playerRating(p,state.year),d:p.lastDev}))
     .sort((a,b)=>b.d-a.d).slice(0,6);
   const hist=state.history.slice(-6);
-  return `<div class="card dash-card"><h2 class="display">Tableau de bord</h2>
+  return `<div class="card no-sticky"><h2 class="display">Tableau de bord</h2>
     <p class="narr">Ce que valent tes réglages, en chiffres. Chaque ligne ci-dessous s'additionne pour donner la force que ton équipe emmène sur le terrain.</p>
 
     <div class="section-label">La force de ton équipe</div>
@@ -250,6 +271,8 @@ function renderDashboard(){
     ${Object.keys(GAUGE_INFO).map(k=>gaugeRow(GAUGE_INFO[k],g[k])).join('')}
     <div class="hint">${escapeHtml(GAUGE_INFO.proches.help)}</div>
 
+    ${quotaActive()?`<div class="section-label">Le quota d'étrangers</div>${quotaHTML()}`:''}
+
     <div class="section-label">Le club</div>
     <div class="hint">${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${pos?` · ${ordinal(pos)}`:''} · objectif ${ordinal(c.objectivePos)} · confiance ${Math.round(c.confidence)}/100<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)} · ${state.squad.length} joueurs · fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %</div>
 
@@ -264,7 +287,7 @@ function renderPlayerDashboard(){
   const share=c?playerShare():0;
   const rivals=c?state.squad.filter(p=>p.pos===state.pos&&!p.isMe).map(p=>playerRating(p,state.year)).sort((a,b)=>b-a).slice(0,3):[];
   const avgNote=ss&&ss.notes&&ss.notes.length?ss.notes.reduce((a,b)=>a+b,0)/ss.notes.length:null;
-  return `<div class="card dash-card"><h2 class="display">Tableau de bord</h2>
+  return `<div class="card no-sticky"><h2 class="display">Tableau de bord</h2>
     <p class="narr">Ce qui décide si tu joues dimanche.</p>
     <div class="kpi-total"><b>${pRating().toFixed(1)}</b><span>ta note globale${rivals.length?` · concurrents à ton poste : ${rivals.map(r=>r.toFixed(1)).join(', ')}`:''}</span></div>
     ${c?`<div class="section-label">Ta place dans le groupe</div>
@@ -311,13 +334,14 @@ function renderMercato(){
   const m=state.market, c=state.club, y=state.year; const wages=state.squad.reduce((n,p)=>n+p.wage,0); const fmax=eraForeignersMax(y); const xi=bestXI(state.squad,FORMATIONS[state.formation],y);
   const kinds={all:'Tous',real:'Stars',pro:'Pros',youth:'Pépites',free:'Libres',academy:'Centre'};
   const list=m.targets.map((t,i)=>({t,i})).filter(x=>marketFilter==='all'||x.t.kind===marketFilter);
-  const rowHTML=(p,inXI)=>`<tr class="${inXI?'xi':''} ${p.injury?'inj':''}"><td><span class="pos-badge pos-${p.pos}">${p.pos}</span></td><td class="${p.real?'real':''}">${escapeHtml(p.name)}${p.fanFav?' ❤️':''}${p.promised?' ⭐':''}${p.injury?` 🩼${p.injury}s`:''}</td><td>${playerAge(p,y)}</td><td><b>${playerRating(p,y)}</b> ${stars(playerRating(p,y))}</td><td>${traitLabel(p.trait)}</td><td>${p.contractEnd}</td><td class="r">${$(p.wage)}</td><td class="r">${$(playerValue(p,y))}</td><td class="r"><button class="btn secondary" onclick="coachSell(${p.id})">Vendre</button></td></tr>`;
-  return `<div class="card"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2><p class="hint">Vends, recrute, promeus. Les prix dépendent de l'époque (${eraForYear(y).name}). Les pépites viennent parfois d'une vidéo, d'un cousin ou d'un agent inconnu : certaines sont des arnaques. Un joueur hors de portée ne répond pas ; un « gros coup » coûte cher et exige une place de titulaire (⭐).</p>
+  const rowHTML=(p,inXI)=>`<tr class="${inXI?'xi':''} ${p.injury?'inj':''}"><td><span class="pos-badge pos-${p.pos}">${p.pos}</span></td><td class="${p.real?'real':''}">${natTag(p)} ${escapeHtml(p.name)}${p.fanFav?' ❤️':''}${p.promised?' ⭐':''}${p.injury?` 🩼${p.injury}s`:''}</td><td>${playerAge(p,y)}</td><td><b>${playerRating(p,y)}</b> ${stars(playerRating(p,y))}</td><td>${traitLabel(p.trait)}</td><td>${p.contractEnd}</td><td class="r">${$(p.wage)}</td><td class="r">${$(playerValue(p,y))}</td><td class="r"><button class="btn secondary" onclick="coachSell(${p.id})">Vendre</button></td></tr>`;
+  return `<div class="card no-sticky"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2><p class="hint">Vends, recrute, promeus. Les prix dépendent de l'époque (${eraForYear(y).name}). Les pépites viennent parfois d'une vidéo, d'un cousin ou d'un agent inconnu : certaines sont des arnaques. Un joueur hors de portée ne répond pas ; un « gros coup » coûte cher et exige une place de titulaire (⭐).</p>
     <div class="mercato-head"><div>Budget restant<b>${$(m.budgetLeft)}</b></div><div class="${wages>c.wageCap*1.1?'warn-box':''}">Masse salariale<b>${$(wages)}</b>plafond ${$(c.wageCap)}</div><div>Effectif<b>${state.squad.length} / 27</b></div>${c.nat==='FR'&&fmax<99?`<div class="${foreignCount()>=fmax?'warn-box':''}">Étrangers<b>${foreignCount()} / ${fmax}</b></div>`:''}<div>Onze type<b>${(xi.reduce((n,p)=>n+playerRating(p,y),0)/Math.max(1,xi.length)).toFixed(1)}</b>force club ${c.strength}</div><div>Crédibilité<b>${Math.round(coachCredibility())}</b>niveau max accessible</div></div>
     ${m.message?`<div class="msg">${escapeHtml(m.message)}</div>`:''}
     <div class="section-label">Ton effectif (onze type surligné)</div><div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niveau</th><th>Caractère</th><th>Fin</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(p=>p.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(p=>rowHTML(p,xi.includes(p))).join('')).join('')}</tbody></table></div>
+    ${quotaHTML()}
     <div class="section-label">Le marché</div><div class="market-tabs">${Object.entries(kinds).map(([k,l])=>`<button class="${marketFilter===k?'on':''}" onclick="marketFilter='${k}';render()">${l} (${k==='all'?m.targets.length:m.targets.filter(t=>t.kind===k).length})</button>`).join('')}</div>
-    <div class="market-list">${list.map(({t,i})=>`<div class="market-row ${t.access} ${t.kind}"><div><span class="lbl">${t.label}</span> · <span class="pos-badge pos-${t.p.pos}">${t.p.pos}</span> <b class="${t.p.real?'real':''}">${escapeHtml(t.p.name)}</b> · ${t.age} ans · niveau ${t.kind==='youth'?'≈ '+t.shownRating+' (potentiel inconnu)':t.shownRating+' '+stars(t.shownRating)} · ${traitLabel(t.p.trait)}<div class="meta">Via ${t.source} · prix ${t.price>0?$(t.price):'libre'} · salaire ${$(t.wage)} / an${t.access==='coup'?' · exige d\'être titulaire':''}${t.access==='no'?' · ne répond pas':''}</div></div><button class="btn ${t.access==='no'?'secondary':''}" ${t.access==='no'?'disabled':''} onclick="coachBuy(${i})">Recruter</button></div>`).join('')||'<div class="hint">Rien dans cette catégorie.</div>'}</div>
+    <div class="market-list">${list.map(({t,i})=>`<div class="market-row ${t.access} ${t.kind}"><div><span class="lbl">${t.label}</span> · <span class="pos-badge pos-${t.p.pos}">${t.p.pos}</span> <b class="${t.p.real?'real':''}">${escapeHtml(t.p.name)}</b> ${natTag(t.p,true)} · ${t.age} ans · niveau ${t.kind==='youth'?'≈ '+t.shownRating+' (potentiel inconnu)':t.shownRating+' '+stars(t.shownRating)} · ${traitLabel(t.p.trait)}<div class="meta">Via ${t.source} · prix ${t.price>0?$(t.price):'libre'} · salaire ${$(t.wage)} / an${t.access==='coup'?' · exige d\'être titulaire':''}${t.access==='no'?' · ne répond pas':''}</div></div><button class="btn ${t.access==='no'?'secondary':''}" ${t.access==='no'?'disabled':''} onclick="coachBuy(${i})">Recruter</button></div>`).join('')||'<div class="hint">Rien dans cette catégorie.</div>'}</div>
     ${m.bought.length||m.sold.length?`<div class="section-label">Bilan du mercato</div><div class="hint">${m.bought.map(b=>`➕ ${escapeHtml(b.name)} (${$(b.price)})`).join(' · ')}${m.bought.length&&m.sold.length?' · ':''}${m.sold.map(s=>`➖ ${escapeHtml(s.name)} (${$(s.price)})`).join(' · ')}</div>`:''}
     <div class="btn-row"><button class="btn" onclick="coachCloseMercato()">Clore le mercato →</button></div></div>`;
 }
@@ -495,7 +519,7 @@ function renderPrematch(){
   const bmax=benchSize(y); matchFactors(m,P,{extra:coachBonusLines()});
   const status=p=>m.xi.includes(p.id)?'xi':m.bench.includes(p.id)?'bench':'out';
   const row=p=>{ const st=status(p), av=availableForMatch(p); const flags=`${p.injury>0?` <span class="flag bad">🩼 ${p.injury} sem.</span>`:''}${p.suspended>0?` <span class="flag bad">🟥 ${p.suspended} match${p.suspended>1?'s':''}</span>`:''}${p.promised?' ⭐':''}${p.fanFav?' ❤️':''}${m.captain===p.id?' ©':''}`; const slot=slots.find(s=>s.p===p);
-    return `<tr class="${st} ${av?'':'inj'}"><td>${av?`<button class="status-btn ${st}" onclick="coachToggleLineup(${p.id})">${st==='xi'?'Titulaire':st==='bench'?'Banc':'Tribune'}</button>`:'<span class="status-btn off">Indispo</span>'}</td><td><span class="pos-badge pos-${p.pos}">${p.pos}</span>${slot&&slot.pen?` <span class="flag bad" title="Hors poste">→${slot.slot} −${slot.pen}</span>`:''}</td><td class="${p.real?'real':''}">${escapeHtml(p.name)}${flags}</td><td>${playerAge(p,y)}</td><td><b>${Math.round(effRating(p,y))}</b>${fitnessMalus(p)>=1?` <span class="flag bad">−${fitnessMalus(p).toFixed(0)}</span>`:''}</td><td>${fitBar(fit(p))}</td><td class="r">${p.rated?notePill(p.sumRating/p.rated):'<span class="hint">—</span>'}</td><td class="r hint">${p.goals||0} b · ${p.assists||0} p${p.yellows?` · 🟨${p.yellows}`:''}</td></tr>`; };
+    return `<tr class="${st} ${av?'':'inj'}"><td>${av?`<button class="status-btn ${st}" onclick="coachToggleLineup(${p.id})">${st==='xi'?'Titulaire':st==='bench'?'Banc':'Tribune'}</button>`:'<span class="status-btn off">Indispo</span>'}</td><td><span class="pos-badge pos-${p.pos}">${p.pos}</span>${slot&&slot.pen?` <span class="flag bad" title="Hors poste">→${slot.slot} −${slot.pen}</span>`:''}</td><td class="${p.real?'real':''}">${natTag(p)} ${escapeHtml(p.name)}${flags}</td><td>${playerAge(p,y)}</td><td><b>${Math.round(effRating(p,y))}</b>${fitnessMalus(p)>=1?` <span class="flag bad">−${fitnessMalus(p).toFixed(0)}</span>`:''}</td><td>${fitBar(fit(p))}</td><td class="r">${p.rated?notePill(p.sumRating/p.rated):'<span class="hint">—</span>'}</td><td class="r hint">${p.goals||0} b · ${p.assists||0} p${p.yellows?` · 🟨${p.yellows}`:''}</td></tr>`; };
   const okXI=xi.length===11; const missing=['G','D','M','A'].filter(k=>count[k]<need[k]).map(k=>`${need[k]-count[k]} ${POS_LABEL[k].toLowerCase()}${need[k]-count[k]>1?'s':''}`);
   return `<div class="card"><h2 class="display">${matchdayLabel()} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}${whyHTML(m.why)}${sinceHTML(state.sinceLast)}
     ${oppCardHTML(m)}
