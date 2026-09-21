@@ -16,7 +16,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
         const era=ERAS[run%ERAS.length], mode=COACH_MODES[run%COACH_MODES.length];
         creation={kind:'coach',step:0,name:'C'+run,era,mode,origin:pick(COACH_ORIGINS),nationality:pick(NATIONALITIES),style:pick(STYLES),mentor:pick(COACHES_BY_ERA[era.id]),quality:pick(COACH_QUALITIES),flaw:pick(COACH_FLAWS)};
         launchCoach(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, screens={}, gaps=[], wagesR=[], mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0};
+        let steps=0, screens={}, gaps=[], wagesR=[], mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0}, dashSeen=false;
         while(!state.ended&&steps<6000){
           steps++; const pc=state.pendingChoice; screens[pc]=(screens[pc]||0)+1; if(steps%100===0) await new Promise(r=>setTimeout(r,0)); // laisse respirer le moteur de rendu
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ coachBreakContract(); if(!state.currentOffers.length){ coachSkipYear(); render(); continue; } } coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
@@ -27,7 +27,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='prematch'){ if(Math.random()<.6) coachSimPhase(); else { if(Math.random()<.5) coachAutoLineup(); else { const p=state.squad[rnd(state.squad.length)]; coachToggleLineup(p.id); } coachSetMatchOption('approach',pick(Object.keys(APPROACHES))); coachSetMatchOption('training',pick(Object.keys(TRAINING))); coachKickoff(); } }
           else if(pc==='halftime'){ mstat.ht++; coachHalftime(pick(HALFTIME_CHOICES).id); }
           else if(pc==='matchResult'){ const m=state.lastMatch; mstat.n++; mstat.g+=m.gh+m.ga; mstat.y+=m.events.filter(e=>e.kind==='yellow').length; mstat.r+=m.events.filter(e=>e.kind==='red'&&e.side==='us').length; mstat.inj+=m.events.filter(e=>e.kind==='injury').length; mstat.pen+=m.events.filter(e=>e.kind==='goal'&&/penalty/.test(e.text)||e.kind==='penmiss').length; mstat.sub+=m.events.filter(e=>e.kind==='sub').length; if(!m.ratings||!Object.keys(m.ratings).length) throw new Error('no ratings'); coachAfterMatch(); }
-          else if(pc==='phaseResult'){ coachAfterPhase(); }
+          else if(pc==='phaseResult'){ if(!dashSeen){ dashSeen=true; const h=renderDashboard(); if(!h||h.length<500) throw new Error('tableau de bord entraîneur vide'); } coachAfterPhase(); }
           else if(pc==='seasonEnd'){ gaps.push(Math.round((state.lastPhase.strength-state.club.strength)*10)/10); wagesR.push(Math.round(state.squad.reduce((n,p)=>n+p.wage,0)/state.club.wageCap*100)/100); coachAfterSeasonEnd();
             // une carrière sur trois force un destin de roulette, pour couvrir les suites (exclusivité, bannissement)
             if(run%3===0&&!state.ended&&!state.rouletteFate&&state.history.length===3){ state.currentRoulette={event:pick(COACH_ROULETTES.filter(r=>r.fate&&r.fate.kind!=='death'&&r.fate.kind!=='banned')),outcomes:['end','jackpot','small','malus']}; state.pendingChoice='roulette'; } }
@@ -45,7 +45,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
       try{
         localStorage.clear(); const era=ERAS[run%ERAS.length];
         creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0};
+        let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0}, pdashSeen=false;
         while(!state.ended&&steps<5000){
           steps++; const pc=state.pendingChoice; if(steps%100===0) await new Promise(r=>setTimeout(r,0));
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ playerBreakContract(); if(!state.currentOffers.length){ playerSkipYear(); render(); continue; } } playerAcceptOffer(rnd(state.currentOffers.length)); } else playerSkipYear(); }
@@ -54,7 +54,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='prematch'){ if(Math.random()<.6) playerSimPhase(); else playerKickoff(); }
           else if(pc==='penalty'){ pstat.pen++; playerPenaltyChoice(Math.random()<.7); }
           else if(pc==='matchResult'){ const m=state.lastMatch; pstat.n++; if(m.played) pstat.played++; if(m.start) pstat.start++; pstat.g+=m.gh+m.ga; if(m.inj) pstat.inj++; playerAfterMatch(); }
-          else if(pc==='phaseResult'){ playerAfterPhase(); }
+          else if(pc==='phaseResult'){ if(!pdashSeen){ pdashSeen=true; const h=renderPlayerDashboard(); if(!h||h.length<400) throw new Error('tableau de bord joueur vide'); } playerAfterPhase(); }
           else if(pc==='seasonEnd'){ playerAfterSeasonEnd(); }
           else if(pc==='roulette'){ playerChooseRoulette(rnd(4)); }
           else if(pc==='pressureCrisis'){ playerChoosePressure(rnd(3)); }
