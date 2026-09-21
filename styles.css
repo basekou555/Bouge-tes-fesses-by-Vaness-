@@ -1,10 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
-
+/* Les polices sont chargées par <link> dans index.html : un @import ici retarderait le premier affichage. */
 :root{
   --bg:#0b1210; --panel:#12201a; --panel-2:#182a22; --gold:#c9a24b; --gold-dim:#8a7238;
   --red:#8c2433; --sage:#4f9a6a; --green:#2f7d4f; --cream:#ece8d8; --muted:#94a094; --line:#26382f;
   --shadow-sm:0 2px 8px rgba(0,0,0,.32); --shadow-md:0 10px 26px rgba(0,0,0,.42),0 2px 6px rgba(0,0,0,.3);
-  --ease:cubic-bezier(.22,.82,.32,1);
+  --ease:cubic-bezier(.22,.82,.32,1); --card-pad:18px;
 }
 :root[data-theme="player"]{ --bg:#101422; --panel:#171c30; --panel-2:#1f2540; --gold:#e0b64a; --gold-dim:#9a7d33; --sage:#5da0c9; --green:#2f5f9a; --line:#2b3350; --muted:#9aa2bd; }
 
@@ -36,10 +35,10 @@ b{ font-weight:700; }
 .layout{ display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; align-items:start; }
 @media (max-width:900px){ .layout{ grid-template-columns:1fr; } .sidebar{ order:2; } }
 
-.card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:14px; box-shadow:var(--shadow-sm); }
+.card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:var(--card-pad); margin-bottom:14px; box-shadow:var(--shadow-sm); }
 .card h1,.card h2,.card h3{ margin:0 0 8px; }
-.card h1{ font-size:34px; }
-.card h2{ font-size:26px; }
+.card h1{ font-size:clamp(27px,7vw,34px); }
+.card h2{ font-size:clamp(22px,5.6vw,26px); }
 .card h3{ font-size:17px; }
 .subtitle{ color:var(--muted); font-size:13px; margin-bottom:10px; }
 .section-label{ color:var(--gold); text-transform:uppercase; letter-spacing:.1em; font-size:10px; margin:14px 0 8px; }
@@ -59,7 +58,7 @@ p.narr{ font-size:14px; }
 .small{ font-size:11px; }
 
 .home-hero{ text-align:center; padding:34px 18px 18px; }
-.home-hero h1{ font-size:66px; line-height:1; margin:0; }
+.home-hero h1{ font-size:clamp(46px,14vw,66px); line-height:1; margin:0; }
 .home-hero h1 span{ color:var(--gold); }
 .home-hero .tagline{ color:var(--muted); font-size:15px; margin-top:6px; }
 .home-pills{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:14px 0 20px; }
@@ -127,7 +126,7 @@ input[type=number]{ padding:8px 10px; border-radius:6px; border:1px solid var(--
 .choice-btn .body{ display:flex; flex-direction:column; gap:4px; flex:1; }
 .choice-btn b{ font-size:14px; }
 .choice-btn small{ color:var(--muted); font-size:12px; line-height:1.45; }
-.choice-btn .cost{ color:var(--gold); font-size:11px; }
+
 .choice-btn .traits{ display:flex; flex-wrap:wrap; gap:5px; margin-top:3px; }
 .choice-btn .traits i{ font-style:normal; font-size:10px; padding:2px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
 .choice-btn .traits i.plus{ color:#8fd0a3; border-color:var(--sage); }
@@ -284,3 +283,148 @@ input[type=number]{ padding:8px 10px; border-radius:6px; border:1px solid var(--
 .cup-path b{ color:var(--cream); }
 .era-banner{ padding:10px 12px; margin-bottom:10px; border:1px solid var(--gold-dim); border-radius:6px; background:rgba(201,162,75,.07); font-size:12px; color:var(--muted); }
 .era-banner b{ color:var(--gold); }
+
+/* ---------- Le match ---------- */
+.form-chips{ display:inline-flex; gap:2px; vertical-align:middle; }
+.form-chips i{ display:inline-block; width:16px; height:16px; line-height:16px; text-align:center; font-size:9px; font-style:normal; font-weight:700; border-radius:3px; background:var(--panel); border:1px solid var(--line); color:var(--muted); }
+.form-chips i.W{ background:#1d4a2d; color:#cfe9d5; border-color:var(--sage); } .form-chips i.L{ background:#4a1d24; color:#f0cfd3; border-color:var(--red); } .form-chips i.D{ background:#3a3320; color:#e7dcb8; }
+.opp-card{ padding:12px 14px; margin:8px 0; border:1px solid var(--gold-dim); border-radius:8px; background:rgba(201,162,75,.06); }
+.opp-top{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.opp-name{ font-size:20px; font-family:'Bebas Neue',sans-serif; letter-spacing:.03em; }
+.opp-meta{ color:var(--muted); font-size:12px; margin-top:6px; line-height:1.6; }
+.opp-meta b{ color:var(--cream); }
+.opt-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:6px; }
+.opt-grid button{ padding:8px 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel-2); color:var(--cream); cursor:pointer; text-align:left; font-size:12px; }
+.opt-grid button.on{ border-color:var(--gold); background:rgba(201,162,75,.12); }
+.opt-grid button small{ display:block; color:var(--muted); font-size:10.5px; margin-top:3px; line-height:1.4; }
+.lineup tr.xi td{ background:rgba(201,162,75,.08); } .lineup tr.bench td{ background:rgba(79,154,106,.06); } .lineup tr.out td{ opacity:.75; }
+.status-btn{ appearance:none; min-width:74px; padding:4px 8px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--muted); font-size:10.5px; font-weight:700; cursor:pointer; }
+.status-btn.xi{ border-color:var(--gold); color:var(--gold); } .status-btn.bench{ border-color:var(--sage); color:#8fd0a3; } .status-btn.off{ opacity:.5; cursor:default; }
+.flag{ font-size:10px; padding:1px 5px; border-radius:4px; border:1px solid var(--line); color:var(--muted); }
+.flag.bad{ color:#e08a95; border-color:var(--red); }
+.fit{ display:inline-block; width:64px; height:7px; border-radius:999px; background:#0b1512; border:1px solid var(--line); overflow:hidden; vertical-align:middle; }
+.fit i{ display:block; height:100%; background:var(--sage); } .fit.mid i{ background:var(--gold); } .fit.low i{ background:var(--red); }
+.note{ display:inline-block; min-width:30px; padding:1px 6px; border-radius:4px; text-align:center; font-weight:700; font-size:11px; background:var(--panel-2); border:1px solid var(--line); color:var(--cream); }
+.note.top{ color:var(--gold); border-color:var(--gold); } .note.good{ color:#8fd0a3; border-color:var(--sage); } .note.bad{ color:#e08a95; border-color:var(--red); }
+.select{ background:var(--panel-2); color:var(--cream); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12px; margin-left:6px; }
+.timeline{ display:flex; flex-direction:column; gap:3px; font-size:12px; }
+.timeline .ev{ display:flex; gap:8px; padding:5px 8px; border-radius:5px; background:var(--panel-2); border-left:3px solid var(--line); }
+.timeline .ev.goal.us{ border-left-color:var(--gold); } .timeline .ev.goal.them{ border-left-color:var(--red); } .timeline .ev.red{ border-left-color:var(--red); } .timeline .ev.injury{ border-left-color:#e08a95; } .timeline .ev.ht,.timeline .ev.choice{ border-left-color:var(--gold-dim); color:var(--muted); }
+.timeline .ico{ width:18px; text-align:center; }
+.score-hero{ text-align:center; padding:8px 0 12px; }
+.score-hero .teams{ display:flex; justify-content:center; align-items:center; gap:14px; font-size:20px; font-family:'Bebas Neue',sans-serif; letter-spacing:.03em; }
+.score-hero .teams .us{ color:var(--gold); } .score-hero .big{ font-size:44px; line-height:1; }
+.score-hero.W .big{ color:#8fd0a3; } .score-hero.L .big{ color:#e08a95; } .score-hero.D .big{ color:var(--cream); }
+.score-hero .verdict{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin-top:4px; }
+.story{ text-align:center; color:var(--gold); }
+.ratings .marks{ font-size:12px; letter-spacing:1px; }
+.ratings tr.me td{ background:rgba(201,162,75,.12); }
+.match .line{ display:flex; justify-content:space-between; gap:6px; } .match .sub{ color:var(--muted); font-size:10.5px; margin-top:3px; }
+.my-status{ padding:10px 12px; margin:10px 0; border-radius:6px; border:1px solid var(--line); background:var(--panel-2); }
+.my-status.xi{ border-color:var(--sage); } .my-status.bench{ border-color:var(--gold-dim); } .my-status.injured,.my-status.suspended{ border-color:var(--red); }
+.my-status b{ font-size:15px; }
+.my-line{ padding:10px 12px; margin:8px 0; border-radius:6px; border-left:3px solid var(--gold); background:var(--panel-2); font-size:13px; }
+.my-line.good{ border-left-color:var(--sage); } .my-line.bad{ border-left-color:var(--red); }
+.squad div.me{ border-color:var(--gold); color:var(--gold); }
+.why-row{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+.why{ padding:4px 10px; border-radius:999px; background:rgba(201,162,75,.14); border:1px solid var(--gold); color:var(--gold); font-size:11px; font-weight:700; }
+.select.tempo{ width:100%; margin:0 0 4px; }
+.offer-card.poach{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-dim); }
+
+/* ---------- Version 4 : le confort de jeu, d'abord au téléphone ---------- */
+
+/* Les chiffres qui se comparent s'alignent : classements, notes, jauges, scores. */
+.table,.squad-table,.score-box .v,.conf-big,.money,.score-hero .big,.note,.stat-row,.gauge-row,.frame,.mercato-head,.match .sc{ font-variant-numeric:tabular-nums; }
+
+/* Le clavier doit se voir, et le mouvement doit pouvoir s'arrêter. */
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+}
+
+/* Le tableau de bord se replie au téléphone : on joue d'abord, on consulte ensuite. */
+.side-fold>summary{ display:none; }
+.side-fold[open]>summary{ margin-bottom:10px; }
+
+/* Le score devient un vrai tableau d'affichage. */
+.score-hero{ position:relative; padding:16px 12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel-2); overflow:hidden; }
+.score-hero::before{ content:''; position:absolute; inset:0 0 auto; height:3px; background:var(--muted); }
+.score-hero.W::before{ background:var(--sage); } .score-hero.L::before{ background:var(--red); } .score-hero.D::before{ background:var(--gold-dim); }
+/* Trois colonnes : le club reçoit à gauche, le score au centre, le visiteur à droite. */
+.score-hero .teams{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
+.score-hero .teams>span:first-child{ text-align:right; }
+.score-hero .teams>span:last-child{ text-align:left; }
+.score-hero .teams>span{ line-height:1.15; }
+.score-hero .big{ font-size:clamp(38px,12vw,52px); white-space:nowrap; }
+
+@media (max-width:900px){
+  /* L'action principale reste sous le pouce tant que l'écran défile. */
+  .main>.card>.btn-row:last-child:has(>.btn:not(.secondary):not(.danger)){
+    position:sticky; bottom:0; z-index:5;
+    margin:14px calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+    padding:12px var(--card-pad) calc(12px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(180deg,rgba(11,18,16,0) 0%,var(--panel) 18%,var(--panel) 100%);
+    backdrop-filter:blur(3px);
+    border-top:1px solid var(--line);
+  }
+  .main>.card>.btn-row:last-child:has(>.btn:not(.secondary):not(.danger)) .btn{ flex:1 1 140px; }
+  .btn{ padding:12px 18px; }
+  /* La fiche se déplie d'une pression. */
+  .side-fold>summary{ display:flex; align-items:center; justify-content:space-between; gap:10px; list-style:none; cursor:pointer;
+    padding:13px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); color:var(--cream); font-size:13px; font-weight:600; }
+  .side-fold>summary::-webkit-details-marker{ display:none; }
+  .side-fold>summary::after{ content:'▾'; color:var(--gold); font-size:15px; transition:transform .2s var(--ease); }
+  .side-fold[open]>summary::after{ transform:rotate(180deg); }
+  .era-banner .era-rules{ display:none; }
+  .result-hero .verdict{ letter-spacing:.05em; font-size:12px; }
+  .result-hero h2{ font-size:clamp(25px,7.5vw,34px); text-wrap:balance; }
+}
+
+@media (max-width:700px){
+  /* La compo garde l'essentiel : statut, poste, nom, niveau, fraîcheur, note. */
+  .lineup th:nth-child(4),.lineup td:nth-child(4),
+  .lineup th:nth-child(8),.lineup td:nth-child(8){ display:none; }
+  .fit{ width:42px; }
+  .squad-table th,.squad-table td{ padding:6px 4px; }
+  .status-btn{ min-width:60px; padding:5px 6px; font-size:10px; }
+  .lineup td:nth-child(3){ line-height:1.35; }
+  .opt-grid{ grid-template-columns:1fr 1fr; }
+  .opt-grid button small{ display:none; }
+  .opt-grid button.on small{ display:block; }
+}
+
+@media (max-width:640px){
+  :root{ --card-pad:14px; }
+  /* Le bandeau de titre se fait discret : l'écran de jeu commence plus haut. */
+  .game-banner{ padding:10px 0 4px; }
+  .brand-button{ font-size:24px; }
+  .game-banner .edition-label{ display:none; }
+  .app{ padding:12px; }
+  .two-cols{ gap:8px; }
+  .score-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .score-box .v{ font-size:21px; }
+  .table th,.table td{ padding:6px 5px; }
+}
+
+/* L'accueil hiérarchise : reprendre, puis commencer, puis le reste. */
+.home-resume{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.resume-card{ display:flex; align-items:center; gap:12px; width:100%; padding:14px 16px; text-align:left; cursor:pointer;
+  color:var(--cream); background:linear-gradient(180deg,rgba(201,162,75,.16),rgba(201,162,75,.06)); border:1px solid var(--gold); border-radius:10px; }
+.resume-card .ico{ font-size:22px; }
+.resume-card .body{ display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+.resume-card b{ font-size:15px; }
+.resume-card small{ color:var(--muted); font-size:11.5px; }
+.resume-card .go{ color:var(--gold); font-size:18px; }
+.resume-card:hover{ filter:brightness(1.08); }
+.home-card.lead{ background:linear-gradient(180deg,var(--panel-2),var(--panel)); border-color:var(--gold-dim); }
+.home-card.lead b{ font-size:19px; }
+.home-links{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.home-links button{ flex:1 1 200px; display:flex; flex-direction:column; gap:2px; padding:11px 14px; text-align:left; cursor:pointer;
+  color:var(--cream); background:transparent; border:1px solid var(--line); border-radius:8px; font-size:13px; }
+.home-links button:hover{ border-color:var(--gold); color:var(--gold); }
+.home-links small{ color:var(--muted); font-size:11px; }
+
+/* Les priorités de la saison : cinq chantiers, deux places. */
+/* Le prix d'un carrefour : ce que l'option fait reculer, sous les gains. */
+.choice-btn .cost{ display:block; color:var(--muted); font-size:10.5px; font-style:italic; margin-top:2px; }
+.choice-btn .traits i{ line-height:1.5; }
