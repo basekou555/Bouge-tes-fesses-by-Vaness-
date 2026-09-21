@@ -34,13 +34,32 @@ function playerFreshState(c){
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
 function pAge(){ return state.year-state.born; }
 function pSnapshot(){ const s=state.stats,g=state.gauges; return {technique:s.technique,physique:s.physique,mental:s.mental,note:pRating(),coachTrust:state.coachTrust,forme:state.forme,pressure:state.pressure,corps:g.corps,vestiaire:g.vestiaire,supporters:g.supporters,entourage:g.entourage}; }
+/* Même principe qu'en mode entraîneur·euse : une seule source de vérité
+   pour ce qu'un choix va produire. */
+function playerProject(k,v){
+  const s=state.stats,g=state.gauges;
+  if(k in s) return {cur:s[k],next:clamp(s[k]+v)};
+  if(k in g) return {cur:g[k],next:clamp(g[k]+v)};
+  if(k==='reputation') return {cur:g.supporters,next:clamp(g.supporters+v*.5),as:'supporters'};
+  if(k==='coachTrust') return {cur:state.coachTrust,next:clamp(state.coachTrust+v)};
+  if(k==='pressure') return {cur:state.pressure,next:clamp(state.pressure+v)};
+  if(k==='forme') return {cur:state.forme,next:clamp(state.forme+v)};
+  return null;
+}
 function playerApplyEffects(e,ctx={}){
   const s=state.stats,g=state.gauges,out=[];
   Object.entries(e||{}).forEach(([k,v])=>{
-    if(k in s) s[k]=clamp(s[k]+v); else if(k in g) g[k]=clamp(g[k]+v);
-    else if(k==='reputation') state.gauges.supporters=clamp(g.supporters+v*.5);
-    else if(k==='coachTrust') state.coachTrust=clamp(state.coachTrust+v); else if(k==='pressure') state.pressure=clamp(state.pressure+v); else if(k==='forme') state.forme=clamp(state.forme+v);
-    else if(k==='money'){ const amt=v*Math.max(.2,state.club?state.club.salary*2:.2); state.totals.earned+=amt; out.push(`${amt>=0?'+':''}${money(amt,state.year)}`); }
+    const pr=playerProject(k,v);
+    if(pr){
+      if(k in s) s[k]=pr.next;
+      else if(k in g) g[k]=pr.next;
+      else if(k==='reputation') g.supporters=pr.next;
+      else if(k==='coachTrust') state.coachTrust=pr.next;
+      else if(k==='pressure') state.pressure=pr.next;
+      else if(k==='forme') state.forme=pr.next;
+      return;
+    }
+    if(k==='money'){ const amt=v*Math.max(.2,state.club?state.club.salary*2:.2); state.totals.earned+=amt; out.push(`${amt>=0?'+':''}${money(amt,state.year)}`); }
     else if(k==='injure'){ state.injury=Math.max(state.injury,v); out.push(`${v} semaines d'absence`); }
     else if(k==='minutes'){ state.minutesBonus=(state.minutesBonus||0)+v; }
     else if(k==='selectionBoost') state.selectionBoost+=v; else if(k==='bigOfferNext') state.bigOfferNext=true;

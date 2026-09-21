@@ -367,15 +367,32 @@ function coachDrawPhaseEvent(){
   COACH_HAPPENINGS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)).forEach(e=>bag.push({kind:'happening',event:e,w:2}));
   return weightedDraw(bag);
 }
+/* Où un effet chiffré mènerait, sans rien modifier. coachApplyEffects s'en sert
+   pour appliquer : l'écran de choix et le moteur ne peuvent donc pas diverger. */
+function coachProject(k,v,base){
+  const s=state.stats, g=state.gauges, c=state.club;
+  const proches=base&&base.proches!=null?base.proches:g.proches;
+  if(k in s) return {cur:s[k],next:clamp(s[k]+v)};
+  if(k in g) return {cur:g[k],next:clamp(g[k]+v)};
+  if(k==='pressure'){ const home=proches>=65?.82:proches<=30?1.25:1; return {cur:state.pressure,next:clamp(state.pressure+v*(v>0?state.mode.pressureMult*home:1))}; }
+  if(k==='confidence'&&c) return {cur:c.confidence,next:clamp(c.confidence+v*(v<0?(1-state.perks.confidenceRes):1))};
+  if(k==='form'&&state.seasonStats) return {cur:state.seasonStats.form,next:clamp(state.seasonStats.form+v,-6,6)};
+  return null;
+}
 function coachApplyEffects(effects,ctx={}){
   const s=state.stats, g=state.gauges, c=state.club, out=[];
+  const base={proches:g.proches};
   Object.entries(effects||{}).forEach(([k,v])=>{
-    if(k in s) s[k]=clamp(s[k]+v);
-    else if(k in g) g[k]=clamp(g[k]+v);
-    else if(k==='pressure'){ const home=g.proches>=65?.82:g.proches<=30?1.25:1; state.pressure=clamp(state.pressure+v*(v>0?state.mode.pressureMult*home:1)); }
-    else if(k==='confidence'&&c) c.confidence=clamp(c.confidence+v*(v<0?(1-state.perks.confidenceRes):1));
-    else if(k==='budget'&&c){ const amt=c.budget*v; c.budget+=amt; if(state.market) state.market.budgetLeft+=amt; out.push(`${amt>=0?'+':''}${$(amt)} de budget`); }
-    else if(k==='form'&&state.seasonStats) state.seasonStats.form=clamp(state.seasonStats.form+v,-6,6);
+    const pr=coachProject(k,v,base);
+    if(pr){
+      if(k in s) s[k]=pr.next;
+      else if(k in g) g[k]=pr.next;
+      else if(k==='pressure') state.pressure=pr.next;
+      else if(k==='confidence') c.confidence=pr.next;
+      else if(k==='form') state.seasonStats.form=pr.next;
+      return;
+    }
+    if(k==='budget'&&c){ const amt=c.budget*v; c.budget+=amt; if(state.market) state.market.budgetLeft+=amt; out.push(`${amt>=0?'+':''}${$(amt)} de budget`); }
     else if(k==='injure'){ const best=[...state.squad].filter(p=>!p.injury).sort((a,b)=>playerRating(b,state.year)-playerRating(a,state.year))[0]; if(best){ best.injury=v; out.push(`${best.name} absent ${v} semaines`); } }
     else if(k==='sellStar'){ const best=[...state.squad].sort((a,b)=>playerRating(b,state.year)-playerRating(a,state.year))[0]; if(best){ const price=playerValue(best,state.year)*v; state.squad=state.squad.filter(p=>p!==best); if(!effects.noReinvest){ c.budget+=price; } out.push(`${best.name} vendu ${$(price)}`); log(`💸 ${best.name} part pour ${$(price)}.`); } }
     else if(k==='releaseCaptain'){ const old=[...state.squad].sort((a,b)=>playerAge(b,state.year)-playerAge(a,state.year))[0]; if(old){ state.squad=state.squad.filter(p=>p!==old); out.push(`${old.name} quitte le club`); } }
