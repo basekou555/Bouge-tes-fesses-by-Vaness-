@@ -2,6 +2,38 @@
 
 Jeu de simulation de carrière football, 100 % statique (HTML, CSS, JavaScript sans build), en français, inspiré des mécaniques d'Absolut Director. Deux modes : entraîneur·euse et joueur·euse, à travers sept époques (1958 → aujourd'hui) avec clubs et joueurs réels.
 
+## Intention (dite par le propriétaire, 21/09/2026)
+
+**Vivre une carrière, dans un contexte de football.** L'équilibre entre les deux est le sujet,
+et il doit rester **impossible à trouver** : devoir sacrifier quelque chose est le plaisir du
+jeu, pas son défaut. Référence assumée : *Detroit: Become Human*.
+
+- **On ne fait rien, on choisit.** Le jeu est une suite de décisions face à des interlocuteurs
+  et à une situation qui évolue. Il n'exige aucune manipulation. *Composer une équipe,
+  remplacer soi-même un blessé : hors sujet.* Décider quoi faire d'un blessé (le remplaçant,
+  le jeune, le faire jouer quand même, déléguer à l'adjoint), où porter l'effort entre deux
+  compétitions, comment aborder un adversaire qui joue de telle manière : **c'est ça, le jeu.**
+- **Chaque décision a un effet court terme et un effet long terme**, et les deux doivent se
+  voir. Faire jouer le remplaçant, c'est priver le jeune d'une occasion ; ça se paiera.
+- **Après les décisions vient le temps où l'on souffle** et où l'on lit ce qu'elles ont produit.
+  Ce moment doit être beau et distinct — c'était la force d'Absolut Director. La fin de saison
+  est un **écran-bilan** (réussites, échecs, qui veut partir, qui veut rester, la famille, le
+  club, le président, les supporters), pas une liste de plus.
+- **Un écran ne doit pas ressembler au précédent.** La répétition visuelle tue le rythme.
+- Une session dure **30 min à 1 h par jour**. Environ **dix moments de décision par saison**
+  est le bon rythme (calibré et validé).
+- Le football est un terrain familier pour le propriétaire : **les chiffres ne le gênent pas**,
+  tant qu'ils servent une décision. (Un jeu de foot *sans aucune statistique*, rien que des
+  décisions, est une piste qui l'intrigue — à garder en tête, pas à appliquer.)
+- **Une carrière doit laisser une trace.** Aujourd'hui elle en laisse trop peu : « on ne
+  s'attache pas vraiment aux carrières, c'est un peu sans effet sauf quand c'est le jackpot. »
+  C'est le problème de fond à résoudre.
+- Le jeu est fait **pour le propriétaire seul** : pas de tutoriel, pas d'onboarding public.
+- Le **mercato est sa partie préférée** du mode entraîneur·euse. Le mode joueur·euse doit
+  atteindre le même niveau, **mais autrement** : il lui manque son équivalent du mercato.
+- Décisions tranchées : la **coupe doit devenir jouable** (comme suite de décisions, pas de
+  matchs à opérer).
+
 ## Fichiers
 - `index.html` charge dans l'ordre : `profile.js` (styles de jeu, nationalités), `players.js` (≈400 joueurs réels `[nom, poste, naissance, niveau, nationalité]`), `eras.js` (époques, clubs FR/Europe/monde avec force par décennie, entraîneurs réels), `content.js` (incidents, coups du sort, dilemmes, carrefours, roulettes, arnaques, présidents — vingt événements de vie et vingt dilemmes par mode), `core.js` (moteur partagé : joueurs, effectifs, marché, championnats, coupes, développement, badges, persistance), `match.js` (le match : familles de styles, approche, entraînement, fraîcheur, suspensions, compo automatique, moteur minute par minute avec buts, penaltys, cartons, blessures, remplacements, mi-temps, notes, récit), `coach.js` (carrière entraîneur·euse), `player.js` (carrière joueur·euse), `ui.js` (tous les écrans).
 - Tout l'état d'une carrière est dans l'objet global `state` (sérialisé dans localStorage). `state.pendingChoice` désigne l'écran courant ; `render()` dans `ui.js` dispatche.
