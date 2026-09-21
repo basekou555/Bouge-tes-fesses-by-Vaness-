@@ -359,7 +359,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,su
 
 @media (max-width:900px){
   /* L'action principale reste sous le pouce tant que l'écran défile. */
-  .main>.card>.btn-row:last-child:has(>.btn:not(.secondary):not(.danger)){
+  .main>.card:not(.dash-card)>.btn-row:last-child:has(>.btn:not(.secondary):not(.danger)){
     position:sticky; bottom:0; z-index:5;
     margin:14px calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
     padding:12px var(--card-pad) calc(12px + env(safe-area-inset-bottom,0px));
@@ -367,7 +367,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,su
     backdrop-filter:blur(3px);
     border-top:1px solid var(--line);
   }
-  .main>.card>.btn-row:last-child:has(>.btn:not(.secondary):not(.danger)) .btn{ flex:1 1 140px; }
+  .main>.card:not(.dash-card)>.btn-row:last-child:has(>.btn:not(.secondary):not(.danger)) .btn{ flex:1 1 140px; }
   .btn{ padding:12px 18px; }
   /* La fiche se déplie d'une pression. */
   .side-fold>summary{ display:flex; align-items:center; justify-content:space-between; gap:10px; list-style:none; cursor:pointer;
@@ -428,3 +428,46 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,su
 /* Le prix d'un carrefour : ce que l'option fait reculer, sous les gains. */
 .choice-btn .cost{ display:block; color:var(--muted); font-size:10.5px; font-style:italic; margin-top:2px; }
 .choice-btn .traits i{ line-height:1.5; }
+
+
+/* ---------- Tableau de bord : les capteurs ---------- */
+.dash-btn{ margin-left:auto; background:rgba(201,162,75,.14); color:var(--gold); border:1px solid var(--gold-dim);
+  border-radius:999px; padding:7px 13px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.dash-btn:hover{ background:rgba(201,162,75,.24); }
+.kpi-total{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:6px 0 10px; }
+.kpi-total b{ font-family:'Bebas Neue',Impact,sans-serif; font-size:44px; line-height:1; color:var(--gold); font-variant-numeric:tabular-nums; }
+.kpi-total span{ color:var(--muted); font-size:12px; }
+.kpi-list{ display:flex; flex-direction:column; gap:2px; }
+.kpi-row{ display:grid; grid-template-columns:22px 1fr auto 58px; align-items:center; gap:8px; padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.05); }
+.kpi-row.base{ grid-template-columns:22px 1fr auto; border-bottom:1px solid var(--gold-dim); padding-bottom:9px; }
+.kpi-ico{ font-size:15px; }
+.kpi-lbl{ display:flex; flex-direction:column; min-width:0; }
+.kpi-lbl b{ font-size:13px; }
+.kpi-lbl small{ color:var(--muted); font-size:10.5px; line-height:1.4; }
+.kpi-val{ font-variant-numeric:tabular-nums; font-weight:700; font-size:13.5px; }
+.kpi-row.up .kpi-val{ color:var(--green,#5fbf7f); }
+.kpi-row.down .kpi-val{ color:#e07a6b; }
+.kpi-row.base .kpi-val{ color:var(--gold); font-size:15px; }
+.kpi-bar{ display:block; height:5px; background:rgba(255,255,255,.07); border-radius:999px; overflow:hidden; }
+.kpi-bar i{ display:block; height:100%; border-radius:999px; }
+.kpi-bar i.up{ background:#5fbf7f; }
+.kpi-bar i.down{ background:#e07a6b; }
+.kpi-train{ display:flex; gap:10px; align-items:flex-start; padding:10px; border:1px solid var(--gold-dim); border-radius:10px; }
+.kpi-train .ico{ font-size:22px; }
+.kpi-train b{ display:block; font-size:13.5px; }
+.kpi-train small{ color:var(--muted); font-size:11px; }
+.kpi-young div{ display:grid; grid-template-columns:1fr auto 44px; align-items:center; gap:8px; padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.05); font-size:12.5px; }
+.kpi-young small{ color:var(--muted); }
+.kpi-young b{ font-variant-numeric:tabular-nums; }
+.kpi-young b.up{ color:#5fbf7f; }
+.kpi-young b.down{ color:#e07a6b; }
+.kpi-young .n{ text-align:right; color:var(--muted); font-variant-numeric:tabular-nums; }
+.kpi-hist div{ display:grid; grid-template-columns:52px 1fr auto; gap:8px; padding:4px 0; font-size:12.5px;
+  border-bottom:1px solid rgba(255,255,255,.05); }
+.kpi-hist .y{ color:var(--muted); font-variant-numeric:tabular-nums; }
+@media(max-width:700px){
+  .kpi-row{ grid-template-columns:20px 1fr auto; }
+  .kpi-row .kpi-bar{ grid-column:2/4; height:4px; }
+}

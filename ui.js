@@ -4,6 +4,17 @@ let creation=null, marketFilter='all', tacticSel=null;
 function applyTheme(){ const player=state&&state.kind==='player'; document.documentElement.setAttribute('data-theme',player?'player':'coach'); const brand=gameTopBannerEl.querySelector('.brand'); if(brand) brand.innerHTML=(player?'ABSOLUT PLAYER':'ABSOLUT COACH')+'<span>.</span>'; document.title=player?'Absolut Player':'Absolut Coach'; editionLabelEl.textContent=state?`${eraForYear(state.year).icon} ${eraForYear(state.year).name} · ${state.year}`:'Une vie de football à travers les époques'; }
 function showHomeBanner(){ homeCreditStripEl.style.display=''; gameTopBannerEl.style.display='none'; filmstripEl.style.display='none'; applyTheme(); }
 function showGameBanner(){ homeCreditStripEl.style.display='none'; gameTopBannerEl.style.display=''; applyTheme(); }
+/* Le tableau de bord se consulte à tout moment : c'est là qu'on voit ce que
+   chaque réglage produit. Il ne vit pas dans la sauvegarde, c'est juste un écran. */
+let dashOpen=false;
+function openDashboard(){ dashOpen=true; render(); }
+function closeDashboard(){ dashOpen=false; render(); }
+function dashButton(){
+  const b=document.getElementById('dashBtn'); if(!b) return;
+  b.style.display=state&&!state.ended?'':'none';
+  b.textContent=dashOpen?'✕ Fermer':'📊 Tableau de bord';
+  b.onclick=dashOpen?closeDashboard:openDashboard;
+}
 function goHomeFromGame(){ if(state&&!state.ended) saveGame(); state=null; creation=null; renderStart(); }
 function scrollTop(){ window.scrollTo(0,0); }
 function $(v){ return money(v,state?state.year:2015); }
@@ -95,7 +106,9 @@ function render(){
   if(state.ended){ state.kind==='player'?renderPlayerEnd():renderCoachEnd(); return; }
   const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
   const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
-  const fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
+  let fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
+  if(dashOpen) fn=state.kind==='player'?renderPlayerDashboard:renderDashboard;
+  dashButton();
   const side=state.kind==='player'?playerSidebar():coachSidebar();
   app.innerHTML=`<div class="layout fade-in"><div class="main">${eraBannerHTML()}${fn()}</div><div class="sidebar"><details class="side-fold" open><summary><span>📋 Ta fiche, le club et le journal</span></summary>${side}</details></div></div>`;
   applySideFold(); scrollTop();
@@ -187,6 +200,87 @@ function renderCrossroad(x){
 function renderRoulette(){ const ev=state.currentRoulette.event; const fn=state.kind==='player'?'playerChooseRoulette':'coachChooseRoulette';
   const fk=(ev.fate&&ev.fate.kind)||'death'; const sealed=fk!=='death'&&fk!=='banned';
   return `<div class="card event-card"><div class="hint">🎲 Roulette du destin · une seule des quatre issues ${sealed?'scelle le reste de ta carrière':'met fin à la carrière'}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="roulette-grid">${ev.choices.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><div class="body"><b>${escapeHtml(c)}</b></div></button>`).join('')}</div><div class="hint" style="margin-top:10px">Issues cachées : ${sealed?`${ev.fate.icon} ${escapeHtml(ev.fate.label.toLowerCase())}`:'☠️ fin'} · 🌠 jackpot · 🍀 petit bonus · 🌧️ malus. Chaque issue laisse une trace sur les saisons suivantes.</div></div>`; }
+/* ---------- Tableau de bord : les capteurs ---------- */
+function strengthRow(r,total){
+  const w=Math.min(100,Math.abs(r.v)/Math.max(.5,Math.abs(total)*.35)*100);
+  const sign=r.abs?'':(r.v>0?'+':r.v<0?'−':'');
+  const val=r.abs?r.v.toFixed(1):Math.abs(r.v).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')||'0';
+  return `<div class="kpi-row ${r.abs?'base':r.v>0?'up':r.v<0?'down':''}">
+    <span class="kpi-ico">${r.icon}</span>
+    <span class="kpi-lbl"><b>${escapeHtml(r.label)}</b><small>${escapeHtml(r.help)}</small></span>
+    <span class="kpi-val">${sign}${val}</span>
+    ${r.abs?'':`<span class="kpi-bar"><i class="${r.v>=0?'up':'down'}" style="width:${w}%"></i></span>`}
+  </div>`;
+}
+function renderDashboard(){
+  const c=state.club, st=state.stats, g=state.gauges, ss=state.seasonStats;
+  if(!c) return `<div class="card dash-card"><h2 class="display">Tableau de bord</h2><p class="narr">Tu es sans club : les capteurs reprennent dès que tu signes.</p>
+    <div class="section-label">Toi</div>${Object.keys(CSTAT).map(k=>bar(CSTAT[k],st[k])).join('')}${bar('Pression',state.pressure,'pressure')}${coteHTML()}
+    <div class="btn-row"><button class="btn" onclick="closeDashboard()">Retour →</button></div></div>`;
+  const bd=coachStrengthBreakdown(), avg=coachLeagueAverage();
+  const pos=state.comp?tablePos(state.comp.table,c.name):null;
+  const tr=TRAINING[state.training]||TRAINING.tactique;
+  const weeks=(ss&&ss.trainWeeks)||{};
+  const totalWeeks=Object.values(weeks).reduce((a,b)=>a+b,0);
+  const young=state.squad.filter(p=>playerAge(p,state.year)<=23&&p.lastDev!=null)
+    .map(p=>({p,now:playerRating(p,state.year),d:p.lastDev}))
+    .sort((a,b)=>b.d-a.d).slice(0,6);
+  const hist=state.history.slice(-6);
+  return `<div class="card dash-card"><h2 class="display">Tableau de bord</h2>
+    <p class="narr">Ce que valent tes réglages, en chiffres. Chaque ligne ci-dessous s'additionne pour donner la force que ton équipe emmène sur le terrain.</p>
+
+    <div class="section-label">La force de ton équipe</div>
+    <div class="kpi-total"><b>${bd.total.toFixed(1)}</b><span>${avg!=null?`moyenne du championnat ${avg.toFixed(1)} · tu es ${bd.total>avg+2?'au-dessus':bd.total<avg-2?'en dessous':'dans la moyenne'}`:''}</span></div>
+    <div class="kpi-list">${bd.rows.map(r=>strengthRow(r,bd.total)).join('')}</div>
+    <div class="hint">Change l'entraînement ou le style avant un match : la ligne correspondante bouge tout de suite.</div>
+
+    <div class="section-label">L'entraînement de la semaine</div>
+    <div class="kpi-train"><span class="ico">${tr.icon}</span><div><b>${tr.label}</b><small>${escapeHtml(tr.desc)}</small></div></div>
+    ${totalWeeks?`<div class="hint">Cette saison : ${Object.entries(weeks).map(([k,n])=>`${(TRAINING[k]||{}).icon||''} ${(TRAINING[k]||{}).label||k} ${n} sem.`).join(' · ')}</div>`:'<div class="hint">Aucune semaine encore comptée cette saison.</div>'}
+    ${young.length?`<div class="section-label">Ce que les jeunes ont gagné la saison dernière</div><div class="kpi-young">${young.map(y=>`<div><span>${escapeHtml(y.p.name)} <small>${playerAge(y.p,state.year)} ans</small></span><b class="${y.d>=.4?'up':y.d<=-.4?'down':''}">${y.d>=0?'+':'−'}${Math.abs(y.d).toFixed(1)}</b><span class="n">${y.now.toFixed(1)}</span></div>`).join('')}</div><div class="hint">Le bilan est appliqué à l'intersaison. Ce que tu fais maintenant compte pour la prochaine colonne : ${ss&&ss.youthWeeks?`${ss.youthWeeks} semaine${ss.youthWeeks>1?'s':''} d'entraînement « jeunes » cette saison`:'aucune semaine d\'entraînement « jeunes » cette saison'}, jauge Formation ${Math.round(g.formation)}.</div>`:`<div class="section-label">Les jeunes</div><div class="hint">Leur progression est calculée à l'intersaison : cette colonne apparaîtra après ta première saison complète. Ce qui la nourrit : l'entraînement « jeunes » (${ss&&ss.youthWeeks?ss.youthWeeks:0} semaine${ss&&ss.youthWeeks>1?'s':''} cette saison), la jauge Formation (${Math.round(g.formation)}) et le temps de jeu que tu leur donnes.</div>`}
+
+    <div class="section-label">Tes indicateurs</div>
+    ${bar(CSTAT.talent+' — '+(st.talent>=70?'tu peux imposer les styles exigeants':'les styles prestigieux te coûtent encore'),st.talent)}
+    ${bar(CSTAT.technique+' — vestiaire, jeunes, présidents',st.technique)}
+    ${bar(CSTAT.reseau+' — la qualité des offres et des pistes',st.reseau)}
+    ${bar(CSTAT.reputation+' — ce que la presse et les clubs retiennent',st.reputation)}
+    ${bar('Pression — au-delà de 85, la crise guette',state.pressure,'pressure')}
+
+    <div class="section-label">Les cinq jauges</div>
+    ${Object.keys(GAUGE_INFO).map(k=>gaugeRow(GAUGE_INFO[k],g[k])).join('')}
+    <div class="hint">${escapeHtml(GAUGE_INFO.proches.help)}</div>
+
+    <div class="section-label">Le club</div>
+    <div class="hint">${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${pos?` · ${ordinal(pos)}`:''} · objectif ${ordinal(c.objectivePos)} · confiance ${Math.round(c.confidence)}/100<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)} · ${state.squad.length} joueurs · fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %</div>
+
+    ${hist.length?`<div class="section-label">Tes dernières saisons</div><div class="kpi-hist">${hist.map(h=>`<div><span class="y">${h.year}</span><span class="cl">${escapeHtml(h.club)}</span><span class="r">${h.sacked?'🪓':h.pos?ordinal(h.pos):'—'}</span></div>`).join('')}</div>`:''}
+
+    ${tempoSelectHTML()}
+    <div class="btn-row"><button class="btn" onclick="closeDashboard()">Retour au jeu →</button></div></div>`;
+}
+/* Version joueur·euse : ce que le coach voit de toi, et ce que ton corps encaisse */
+function renderPlayerDashboard(){
+  const st=state.stats, g=state.gauges, c=state.club, ss=state.seasonStats;
+  const share=c?playerShare():0;
+  const rivals=c?state.squad.filter(p=>p.pos===state.pos&&!p.isMe).map(p=>playerRating(p,state.year)).sort((a,b)=>b-a).slice(0,3):[];
+  const avgNote=ss&&ss.notes&&ss.notes.length?ss.notes.reduce((a,b)=>a+b,0)/ss.notes.length:null;
+  return `<div class="card dash-card"><h2 class="display">Tableau de bord</h2>
+    <p class="narr">Ce qui décide si tu joues dimanche.</p>
+    <div class="kpi-total"><b>${pRating().toFixed(1)}</b><span>ta note globale${rivals.length?` · concurrents à ton poste : ${rivals.map(r=>r.toFixed(1)).join(', ')}`:''}</span></div>
+    ${c?`<div class="section-label">Ta place dans le groupe</div>
+    ${bar('Chances d\'être titulaire (%)',share*100)}
+    ${bar('Confiance du coach',state.coachTrust)}
+    ${bar('Forme',state.forme)}
+    <div class="hint">Rôle promis : ${ROLES[c.role].name.toLowerCase()} · ${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${avgNote?` · moyenne cette saison ${avgNote.toFixed(2)}`:''}</div>`:''}
+    <div class="section-label">Tes qualités</div>
+    ${Object.keys(PSTAT).map(k=>bar(PSTAT[k],st[k])).join('')}
+    ${bar('Pression',state.pressure,'pressure')}
+    <div class="section-label">Tes quatre jauges</div>
+    ${Object.keys(PGAUGE).map(k=>gaugeRow(PGAUGE[k],g[k])).join('')}
+    <div class="hint">${escapeHtml(PGAUGE.corps.help)}</div>
+    ${tempoSelectHTML()}
+    <div class="btn-row"><button class="btn" onclick="closeDashboard()">Retour au jeu →</button></div></div>`;
+}
 function renderPressure(){ const list=state.kind==='player'?PLAYER_PRESSURE_CHOICES:PRESSURE_CHOICES; const fn=state.kind==='player'?'playerChoosePressure':'coachChoosePressure'; return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">${state.kind==='player'?'Craquage':'Crise de pression'}</h2><p class="narr">La pression atteint ${Math.round(state.pressure)}/100. Insomnies, malaise, une famille inquiète. Il faut décider.</p><div class="choice-list">${list.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`; }
 function tableHTML(table,me,full){
   const N=table.length, meIdx=table.findIndex(r=>r.name===me);
@@ -383,7 +477,7 @@ function ratingsHTML(rec,P,meId){
 }
 function factorsHTML(f){ return `<div class="impact">${(f||[]).map(l=>`<div class="${l.d>=.5?'up':l.d<=-.5?'down':''}">${l.d>=.5?'▲':l.d<=-.5?'▼':'•'} ${escapeHtml(l.t)}</div>`).join('')}</div>`; }
 function scoreHero(rec,me){ const W=rec.res==='W'; return `<div class="score-hero ${rec.res}"><div class="teams"><span class="${rec.home===me?'us':''}">${escapeHtml(rec.home)}</span><span class="big">${rec.gh} – ${rec.ga}</span><span class="${rec.away===me?'us':''}">${escapeHtml(rec.away)}</span></div><div class="verdict">${W?'Victoire':rec.res==='D'?'Match nul':'Défaite'}${rec.ht?` · mi-temps ${rec.us==='home'?rec.ht[0]+'–'+rec.ht[1]:rec.ht[1]+'–'+rec.ht[0]}`:''} · journée ${rec.matchday+1}</div></div>`; }
-function tempoSelectHTML(){ const t=TEMPOS[state.tempo]?state.tempo:'temps_forts'; return `<div class="section-label">Rythme de la saison</div><select class="select tempo" onchange="setTempo(this.value)" title="${escapeHtml(TEMPOS[t].desc)}">${Object.entries(TEMPOS).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select><div class="hint">${escapeHtml(TEMPOS[t].desc)}</div>`; }
+function tempoSelectHTML(){ const t=TEMPOS[state.tempo]?state.tempo:'temps_forts'; return `<div class="section-label">Rythme de la saison</div><select class="select tempo" onchange="setTempo(this.value)" title="${escapeHtml(TEMPOS[t].desc)}">${Object.entries(TEMPOS).map(([k,v])=>`<option value="${k}" ${t===k?'selected':''}>${v.icon} ${v.label} — ${v.about}</option>`).join('')}</select><div class="hint">${escapeHtml(TEMPOS[t].desc)}</div>`; }
 function whyHTML(why){ return why&&why.length?`<div class="why-row">${why.map(w=>`<span class="why">${escapeHtml(w)}</span>`).join('')}</div>`:''; }
 function sinceHTML(list){ if(!list||!list.length) return ''; const W=list.filter(m=>m.res==='W').length, D=list.filter(m=>m.res==='D').length, L=list.filter(m=>m.res==='L').length; return `<div class="section-label">Pendant ce temps · ${list.length} match${list.length>1?'s':''} joué${list.length>1?'s':''} avec ta compo : ${W} V · ${D} N · ${L} D</div>${matchesHTML(list,state.club.name)}`; }
 /* La roulette laisse une trace : destin scellé ou écho sur les saisons suivantes */
