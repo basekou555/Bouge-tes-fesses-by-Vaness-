@@ -274,6 +274,9 @@ function coachStartSeason(){
   state.squad.forEach(p=>{ p.apps=0; p.goals=0; p.assists=0; p.sumRating=0; p.rated=0; p.yellows=0; p.suspended=0; p.fitness=100; p.r0=Math.round(playerRating(p,state.year)*10)/10; });
   c.wageCap=clubWageCap(c);
   state.seasonStats.youthWeeks=0; state.seasonStats.injuries=[]; state.seasonStats.trainWeeks={}; state.phaseStops=0;
+  state.effort=null; state.metFor=[]; state.nextMatchBonus=0; state.meeting=null; state.meetingRecap=null;
+  state.seasonStats.g0={...state.gauges,pressure:state.pressure,confidence:c.confidence,cote:state.cote==null?30:state.cote};
+  state.seasonStats.meetings=0;
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
   log(`📅 La saison ${state.year}-${state.year+1} commence en ${c.leagueName} : ${state.comp.teams.length} clubs, ${state.comp.schedule.length} journées.`);
   coachPlayPhase();
@@ -286,6 +289,8 @@ function coachBonus(withNoise=true){
   if(state.stats.talent<style.prestige*60) bonus-=(style.prestige*60-state.stats.talent)*.06;
   bonus+=(TRAINING[state.training]||TRAINING.tactique).strength;
   if(state.rouletteEcho&&state.rouletteEcho.seasons>0) bonus+=state.rouletteEcho.delta;
+  // Porter l'année sur une compétition se paie dans l'autre.
+  if(state.effort==='championnat') bonus+=.8; else if(state.effort==='coupe') bonus-=.8;
   if(withNoise) bonus+=rand(-1.5,1.5)*state.mode.variance;
   return bonus;
 }
@@ -452,8 +457,7 @@ function coachBuildMatch(fx){
   state.match=newMatch({year,home:fx.isHome,usName:c.name,themName:fx.opp,themStrength:comp.strength[fx.opp]+rand(-1.5,1.5),themStyle:oppStyle(comp,fx.opp,year),themNat:comp.nat,ourStyle:state.styleId,xi,bench,captain,approach:state.approach,formation:state.formation,matchday:state.matchday,label:`Journée ${state.matchday+1}`});
 }
 /* Pourquoi ce match mérite un arrêt (selon le rythme choisi) ; null = on le joue en coulisses */
-/* L'intérêt d'un match, noté de 0 à 5. Sert à ne garder que les vrais temps forts :
-   sans note, la moitié du calendrier passait pour un sommet. */
+/* L'intérêt d'un match, noté de 0 à 5. Sert à ne garder que les vrais temps forts. */
 function coachMatchInterest(m){
   const comp=state.comp, c=state.club;
   const N=comp.teams.length, my=tablePos(comp.table,c.name), op=tablePos(comp.table,m.themName);
@@ -466,33 +470,220 @@ function coachMatchInterest(m){
   if(state.matchday===comp.phaseEnds[3]-1){ score=5; why.length=0; why.push("Dernière journée de la saison"); }
   return {score,why};
 }
-/* Une alerte n'interrompt la saison que si elle change vraiment quelque chose. */
-function coachSevereAlerts(){
-  return (state.alerts||[]).filter(a=>/🩼|🟥|📉|🕴️/.test(a)).slice(0,3);
-}
-const STOP_QUOTA={temps_forts:2,rapide:0};
-function coachStopReasons(m){
+
+/* ---------- Les rendez-vous ----------
+   Intention : on ne compose pas, on tranche. Le calendrier tourne seul et ne
+   s'arrête que quand une décision se présente ; le match qui suit est le
+   résultat de cette décision, et on le lit. */
+const MEETING_QUOTA={complet:3,temps_forts:2,rapide:1};
+
+function coachDrawMeeting(fx){
   const comp=state.comp, tempo=TEMPOS[state.tempo]?state.tempo:'temps_forts';
   const start=state.phase===0?0:comp.phaseEnds[state.phase-1];
-  if(state.matchday===start){
-    state.phaseStops=0;
-    return [state.phase===0?"Première journée : ta compo de départ":"Reprise après la trêve"];
-  }
-  if(tempo==='complet') return ["Rythme complet"];
-  const quota=STOP_QUOTA[tempo]==null?2:STOP_QUOTA[tempo];
+  if(state.matchday===start) state.phaseStops=0;
+  const quota=MEETING_QUOTA[tempo]==null?2:MEETING_QUOTA[tempo];
   if((state.phaseStops||0)>=quota) return null;
-  const it=coachMatchInterest(m), alerts=coachSevereAlerts();
-  const score=it.score+(alerts.length?2:0);
-  // La barre descend à mesure que la phase s'achève : si rien d'énorme n'est venu,
-  // tu reprends quand même la main avant la fin.
+  const m=state.match, it=coachMatchInterest(m);
   const left=comp.phaseEnds[state.phase]-state.matchday;
-  const bar=left>5?5:left>2?4:3;
-  if(score<bar) return null;
+  const cands=[coachMeetingInjured,coachMeetingFronts,coachMeetingCaptain,coachMeetingPresident,coachMeetingSquad,coachMeetingOpponent]
+    .map(b=>b(m,it,left)).filter(Boolean);
+  if(!cands.length) return null;
+  const seen=state.recentMeetings||[];
+  const fresh=cands.filter(x=>!seen.includes(x.kind));
+  const mt=pick(fresh.length?fresh:cands);
+  state.recentMeetings=[...seen,mt.kind].slice(-3);
   state.phaseStops=(state.phaseStops||0)+1;
-  const why=[...it.why,...alerts];
-  return why.length?why:["Match à ne pas déléguer"];
+  mt.opponent=`${m.themName} · ${m.home?'à domicile':'à l\'extérieur'}`;
+  return mt;
 }
+
+/* Un cadre est absent : quelqu'un doit prendre sa place, et ce quelqu'un s'en souviendra. */
+function coachMeetingInjured(m){
+  const y=state.year;
+  const out=state.squad.filter(p=>(p.injury>0||p.suspended>0)&&playerRating(p,y)>=state.club.strength-1&&!(state.metFor||[]).includes(p.id))
+    .sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
+  if(!out) return null;
+  const pool=state.squad.filter(p=>p!==out&&p.pos===out.pos&&availableForMatch(p));
+  const vet=pool.filter(p=>playerAge(p,y)>=23).sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
+  const kid=pool.filter(p=>playerAge(p,y)<=21).sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
+  if(!vet&&!kid) return null;
+  (state.metFor=state.metFor||[]).push(out.id);
+  const why=out.suspended>0?`suspendu`:`blessé ${out.injury} semaine${out.injury>1?'s':''}`;
+  const choices=[];
+  if(vet) choices.push({label:`Aligner ${vet.name}`,sub:`${playerAge(vet,y)} ans · niveau ${playerRating(vet,y)} · le choix sûr`,
+    plan:{forceIn:vet.id},effects:{},
+    seed:kid?{in:2,icon:'🌱',title:"Le jeune qu'on n'a pas lancé",text:`${kid.name} attendait cette ouverture. Il l'a attendue toute la saison, puis il a signé ailleurs.`,effects:{formation:-6,vestiaire:-3}}:null});
+  if(kid) choices.push({label:`Lancer ${kid.name}`,sub:`${playerAge(kid,y)} ans · niveau ${playerRating(kid,y)} · jamais titularisé`,
+    plan:{forceIn:kid.id,bonus:-.8},effects:{formation:4,supporters:2},
+    seed:{in:2,icon:'🌟',title:"Celui que tu as lancé",text:`${kid.name} n'a plus jamais quitté le onze. Il raconte partout qui lui a donné sa chance.`,effects:{formation:6,reputation:4,vestiaire:3}}});
+  if(out.injury>0&&out.injury<=2) choices.push({label:`Faire jouer ${out.name} quand même`,sub:`La blessure est légère. Le médecin n'est pas d'accord.`,
+    plan:{playHurt:out.id,bonus:1},effects:{staff:-5},
+    seed:{in:1,icon:'🫀',title:"La rechute annoncée",text:`${out.name} n'a jamais vraiment récupéré de ce match-là. Le staff te l'avait dit.`,effects:{staff:-4,vestiaire:-4}}});
+  choices.push({label:"Laisser l'adjoint trancher",sub:"Tu as d'autres soucis. Il décidera bien.",plan:{delegate:true},effects:{staff:3,technique:-1}});
+  return {kind:'homme',icon:'🩼',title:`${out.name} est ${why}`,
+    text:`${out.name} (${POS_LABEL[out.pos].toLowerCase()}, niveau ${playerRating(out,y)}) ne jouera pas. Sa place est à prendre, et celui qui la prend prive quelqu'un d'autre.`,
+    choices};
+}
+
+/* Deux compétitions, un seul effectif : il faut choisir où porter l'année. */
+function coachMeetingFronts(m,it,left){
+  const c=state.club;
+  if(!c.euroQualified||state.phase<1||state.effort) return null;
+  const euro=eraForYear(state.year).euroCup;
+  return {kind:'fronts',icon:'⚖️',title:"Deux fronts",
+    text:`Tu joues le championnat et la ${euro}. Ton groupe ne tiendra pas les deux à plein régime. Où passe l'année ?`,
+    choices:[
+      {label:"Le championnat avant tout",sub:"La régularité, la place, la sécurité du club.",plan:{effort:'championnat'},effects:{confidence:4,supporters:-3}},
+      {label:`Tout pour la ${euro}`,sub:"Une soirée européenne vaut dix journées.",plan:{effort:'coupe'},effects:{supporters:6,confidence:-5}},
+      {label:"Tenir les deux",sub:"Personne n'y arrive vraiment.",plan:{effort:'equilibre'},effects:{staff:-3,vestiaire:-2}},
+    ]};
+}
+
+/* Un symptôme se voit dans le groupe : on y répond, au prix d'autre chose. */
+function coachMeetingSquad(m,it,left){
+  const y=state.year, g=state.gauges;
+  const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
+  if(fitAvg<82&&state.training!=='recuperation'){
+    return {kind:'symptome',icon:'🥵',title:"Le groupe est à bout",
+      text:`Fraîcheur moyenne ${Math.round(fitAvg)} %. Les jambes sont lourdes, les blessures guettent, et il reste ${left} journée${left>1?'s':''} avant la trêve.`,
+      choices:[
+        {label:"Semaine de récupération",sub:"Les séances s'allègent. La tactique attendra.",plan:{training:'recuperation'},effects:{staff:2}},
+        {label:"Faire tourner sur ce match",sub:"Les cadres soufflent, les remplaçants jouent.",plan:{rotate:true,bonus:-1.4},effects:{vestiaire:3}},
+        {label:"Serrer les dents",sub:"On verra en janvier.",plan:{bonus:.5},effects:{staff:-4,vestiaire:-3}},
+      ]};
+  }
+  if(g.vestiaire<45){
+    return {kind:'symptome',icon:'🧊',title:"Le vestiaire s'est refroidi",
+      text:`Vestiaire ${Math.round(g.vestiaire)}/100. Les séances sont silencieuses et personne ne se parle après les matchs.`,
+      choices:[
+        {label:"Une mise au point collective",sub:"Tout le monde parle, ça pique.",plan:{bonus:-.6},effects:{vestiaire:9,technique:1}},
+        {label:"Voir les cadres un par un",sub:"Discret, long, et ça laisse les autres de côté.",effects:{vestiaire:5,proches:-4}},
+        {label:"Laisser le terrain répondre",sub:"Une victoire règle tout, dit-on.",plan:{bonus:.6},effects:{vestiaire:-4}},
+      ]};
+  }
+  return null;
+}
+
+/* L'adversaire joue de telle manière : comment tu abordes ça. */
+function coachMeetingOpponent(m,it,left){
+  if(it.score<3) return null;
+  const theirs=m.themStyle, tf=styleFamily(theirs), ti=FAMILY_INFO[tf];
+  const counter=Object.keys(FAMILY_INFO).find(f=>FAMILY_INFO[f].beats===tf);
+  const counterStyle=STYLES.filter(x=>styleFamily(x.id)===counter&&x.prestige*60<=state.stats.talent+10)
+    .sort((a,b)=>b.prestige-a.prestige)[0];
+  const choices=[
+    {label:"Garder ton plan",sub:`Tu joues ${styleById(state.styleId).name.toLowerCase()}, comme toujours. ${matchupText(state.styleId,theirs)}.`,effects:{}},
+  ];
+  if(counterStyle&&counterStyle.id!==state.styleId) choices.push({
+    label:`Passer en ${counterStyle.name.toLowerCase()}`,sub:`${ti.label} se fait punir par ça. Mais tes joueurs perdent leurs repères.`,
+    plan:{style:counterStyle.id,bonus:.8},effects:{vestiaire:-4}});
+  choices.push({label:"Fermer le jeu",sub:"Un point, c'est un point. Le parcage n'aimera pas.",plan:{approach:'defensif'},effects:{supporters:-3}});
+  choices.push({label:"Tout devant",sub:"Les prendre à la gorge. Derrière, on verra.",plan:{approach:'offensif'},effects:{supporters:3,confidence:-1}});
+  return {kind:'adversaire',icon:ti.icon,title:`${m.themName} joue ${styleById(theirs).name.toLowerCase()}`,
+    text:`${it.why[0]||'Match important'}. ${ti.label} : ${ti.how}. Leur force est estimée à ${Math.round(m.themStrength)}, la tienne à ${Math.round(coachStrength())}.`,
+    choices};
+}
+
+/* Le président a un avis, et il ne demande pas vraiment. */
+function coachMeetingPresident(m,it,left){
+  if(it.score<2) return null;
+  const y=state.year, c=state.club;
+  const costly=state.squad.filter(p=>p.wage>0).sort((a,b)=>b.wage-a.wage)[0];
+  if(!costly) return null;
+  const benched=!state.match.xi.includes(costly.id);
+  if(!benched) return null;
+  return {kind:'president',icon:'🕴️',title:`${capitalize(c.presidentName)} veut voir ${costly.name} jouer`,
+    text:`« Je paie ${$(costly.wage)} par an pour qu'il regarde les matchs ? » ${costly.name} (niveau ${playerRating(costly,y)}) est le plus gros salaire du club, et il n'est pas dans ton onze.`,
+    choices:[
+      {label:"Le titulariser",sub:"Le président se tait. Le vestiaire comprend qui décide.",plan:{forceIn:costly.id},effects:{confidence:6,vestiaire:-5}},
+      {label:"Expliquer ton choix sportif",sub:"Argumenter, chiffres à l'appui. Ça passe ou ça casse.",effects:{confidence:-6,technique:2,vestiaire:4}},
+      {label:"Le mettre sur la liste des transferts",sub:"Trancher pour de bon, et assumer la masse salariale perdue.",effects:{confidence:-3,vestiaire:2,supporters:-4},
+       seed:{in:2,icon:'💸',title:"Celui que tu avais écarté",text:`${costly.name} cartonne ailleurs depuis deux saisons. On te le rappelle à chaque conférence de presse.`,effects:{reputation:-5,confidence:-4}}},
+    ]};
+}
+/* Le capitaine vient te voir : il porte la parole du groupe. */
+function coachMeetingCaptain(m,it,left){
+  const y=state.year, P=coachSquadMap();
+  const cap=state.captainId!=null?P[state.captainId]:null; if(!cap) return null;
+  const sad=state.squad.filter(p=>p.morale<50&&p!==cap&&!state.match.xi.includes(p.id)).sort((a,b)=>a.morale-b.morale)[0];
+  if(!sad) return null;
+  return {kind:'capitaine',icon:'🎽',title:`${cap.name} vient te parler de ${sad.name}`,
+    text:`« Il ne dort plus, il ne parle plus à personne. Si tu ne fais rien, on va le perdre — et pas seulement lui. » ${sad.name} n'a plus joué depuis longtemps.`,
+    choices:[
+      {label:`Le titulariser ce match`,sub:"Un geste, tout de suite, devant tout le monde.",plan:{forceIn:sad.id,bonus:-.5},effects:{vestiaire:7}},
+      {label:"Lui promettre du temps de jeu",sub:"Une promesse coûte peu. Tant qu'on la tient.",effects:{vestiaire:3,technique:1},
+       seed:{in:1,icon:'🤥',title:"La promesse non tenue",text:`${sad.name} attend toujours. Le vestiaire a compris ce que valent tes promesses.`,effects:{vestiaire:-8,technique:-2}}},
+      {label:"Dire au capitaine que ce n'est pas son rôle",sub:"Remettre la hiérarchie en place.",effects:{vestiaire:-7,confidence:2}},
+    ]};
+}
+
+/* Ce que la décision fait au match qui suit. */
+function coachApplyPlan(plan){
+  const m=state.match, P=coachSquadMap(), y=state.year, notes=[];
+  if(!plan) return notes;
+  let pl={...plan};
+  if(pl.delegate){
+    // L'adjoint choisit à ta place, d'autant mieux que ton staff est bon.
+    const kid=state.squad.filter(p=>playerAge(p,y)<=21&&availableForMatch(p)).sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
+    const good=Math.random()<clamp(state.gauges.staff,0,100)/100;
+    if(good||!kid){ notes.push("Ton adjoint a aligné le plus sûr des remplaçants."); }
+    else { pl.forceIn=kid.id; pl.bonus=(pl.bonus||0)-.8; notes.push(`Ton adjoint a lancé ${kid.name}, 
+      sans te prévenir.`.replace(/\s+/g,' ')); }
+  }
+  if(pl.forceIn!=null){
+    const p=state.squad.find(x=>x.id===pl.forceIn);
+    if(p&&!m.xi.includes(p.id)){
+      const worst=m.xi.map(id=>P[id]).filter(x=>x&&x.pos===p.pos).sort((a,b)=>playerRating(a,y)-playerRating(b,y))[0];
+      const drop=worst||m.xi.map(id=>P[id]).filter(Boolean).sort((a,b)=>playerRating(a,y)-playerRating(b,y))[0];
+      if(drop){ m.xi=m.xi.map(id=>id===drop.id?p.id:id); m.bench=m.bench.filter(id=>id!==p.id);
+        if(m.bench.length<benchSize(y)&&!m.bench.includes(drop.id)) m.bench.push(drop.id);
+        drop.morale=clamp(drop.morale-6); }
+      notes.push(`${p.name} est titulaire.`);
+    }
+  }
+  if(pl.playHurt!=null){
+    const p=state.squad.find(x=>x.id===pl.playHurt);
+    if(p){ state.hurtGamble={id:p.id,weeks:p.injury}; p.injury=0;
+      if(!m.xi.includes(p.id)){ const drop=m.xi.map(id=>P[id]).filter(x=>x&&x.pos===p.pos).sort((a,b)=>playerRating(a,y)-playerRating(b,y))[0]; if(drop) m.xi=m.xi.map(id=>id===drop.id?p.id:id); }
+      notes.push(`${p.name} joue sur une jambe.`); }
+  }
+  if(pl.rotate){
+    const tired=m.xi.map(id=>P[id]).filter(Boolean).sort((a,b)=>fit(a)-fit(b)).slice(0,3);
+    const fresh=state.squad.filter(p=>!m.xi.includes(p.id)&&availableForMatch(p)).sort((a,b)=>fit(b)-fit(a));
+    tired.forEach(t=>{ const inP=fresh.find(p=>p.pos===t.pos&&!m.xi.includes(p.id))||fresh.find(p=>!m.xi.includes(p.id));
+      if(inP){ m.xi=m.xi.map(id=>id===t.id?inP.id:id); m.bench=m.bench.filter(id=>id!==inP.id); } });
+    notes.push("Trois cadres au repos.");
+  }
+  if(pl.approach){ state.approach=pl.approach; m.approach=pl.approach; notes.push(`Approche : ${APPROACHES[pl.approach].label.toLowerCase()}.`); }
+  if(pl.style){ state.styleId=pl.style; m.ourStyle=pl.style; notes.push(`Style : ${styleById(pl.style).name.toLowerCase()}.`); }
+  if(pl.training){ state.training=pl.training; notes.push(`Semaine : ${TRAINING[pl.training].label.toLowerCase()}.`); }
+  if(pl.bonus) state.nextMatchBonus=(state.nextMatchBonus||0)+pl.bonus;
+  if(pl.effort){ state.effort=pl.effort; }
+  return notes;
+}
+
+function coachChooseMeeting(i){
+  const mt=state.meeting, ch=mt&&mt.choices[i]; if(!ch) return;
+  const before=coachSnapshot();
+  const extra=coachApplyEffects(ch.effects||{});
+  const notes=coachApplyPlan(ch.plan);
+  if(ch.seed) plantSeed({...ch.seed,from:`${mt.title} → ${ch.label}`});
+  log(`${mt.icon} <b>${mt.title}</b> → ${ch.label}.`);
+  state.meetingRecap={title:mt.title,icon:mt.icon,choice:ch.label,notes,before,extra};
+  if(state.seasonStats) state.seasonStats.meetings=(state.seasonStats.meetings||0)+1;
+  (state.seasonStats.decisions=state.seasonStats.decisions||[]).push({icon:mt.icon,title:mt.title,choice:ch.label});
+  state.meeting=null;
+  coachKickoff(true);
+  // Le pari sur un joueur diminué se paie parfois tout de suite.
+  const hg=state.hurtGamble; state.hurtGamble=null;
+  if(hg){ const p=state.squad.find(x=>x.id===hg.id);
+    if(p){ if(Math.random()<.45){ p.injury=hg.weeks+randInt(2,4); log(`🩼 ${p.name} sort sur blessure : ${p.injury} semaines. Le pari a coûté cher.`); }
+      else { p.injury=Math.max(0,hg.weeks-1); log(`💪 ${p.name} a tenu. Le pari est passé.`); } } }
+  saveGame(); render();
+}
+
 /* Ce qui a changé après un match joué en coulisses et justifie de te redonner la main */
+
 function coachAlertsAfter(rec){
   const a=[], P=coachSquadMap(), c=state.club;
   (rec.xi||[]).forEach(id=>{ const p=P[id]; if(!p) return; if(p.injury>0) a.push(`🩼 ${p.name} est blessé (${p.injury} sem.)`); else if(p.suspended>0) a.push(`🟥 ${p.name} est suspendu`); });
@@ -507,8 +698,9 @@ function coachAdvance(){
     if(state.matchday>=comp.phaseEnds[state.phase]){ coachFinishPhase(); return; }
     const fx=ourFixture(comp,state.matchday,c.name);
     if(!fx){ playOthers(comp,state.matchday,c.name); state.matchday++; continue; }
-    coachBuildMatch(fx); const why=coachStopReasons(state.match);
-    if(why){ state.match.why=why; state.sinceLast=state.skipped||[]; state.skipped=[]; state.alerts=[]; state.pendingChoice='prematch'; saveGame(); return; }
+    coachBuildMatch(fx);
+    const mt=coachDrawMeeting(fx);
+    if(mt){ state.meeting=mt; state.sinceLast=state.skipped||[]; state.skipped=[]; state.alerts=[]; state.pendingChoice='meeting'; saveGame(); return; }
     coachKickoff(true);
     const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,scorers:rec.scorers,matchday:rec.matchday});
     state.alerts=coachAlertsAfter(rec);
@@ -517,16 +709,6 @@ function coachAdvance(){
 }
 function coachNextMatch(){ coachAdvance(); }
 /* Modifications de compo depuis l'écran d'avant-match */
-function coachToggleLineup(pid){
-  const m=state.match; if(!m||m.half!==0||m.minute) return; const p=state.squad.find(x=>x.id===pid); if(!p||!availableForMatch(p)) return;
-  if(m.xi.includes(pid)){ m.xi=m.xi.filter(id=>id!==pid); if(m.bench.length<benchSize(state.year)) m.bench.push(pid); }
-  else if(m.bench.includes(pid)){ m.bench=m.bench.filter(id=>id!==pid); }
-  else { if(m.xi.length<11) m.xi.push(pid); else if(m.bench.length<benchSize(state.year)) m.bench.push(pid); }
-  m.onPitch=[...m.xi]; if(m.captain!=null&&!m.xi.includes(m.captain)) m.captain=null;
-  render();
-}
-function coachAutoLineup(){ const m=state.match; if(!m) return; const a=autoLineup(state.squad,FORMATIONS[m.formation],state.year); m.xi=a.xi.map(p=>p.id); m.bench=a.bench.map(p=>p.id); m.onPitch=[...m.xi]; if(m.captain==null||!m.xi.includes(m.captain)){ const c=defaultCaptain(a.xi); m.captain=c?c.id:null; } render(); }
-function coachSetMatchOption(key,value){ const m=state.match; if(!m) return; if(key==='formation'){ m.formation=value; state.formation=value; } else if(key==='approach'){ m.approach=value; state.approach=value; } else if(key==='training'){ state.training=value; } else if(key==='captain'){ m.captain=Number(value); state.captainId=m.captain; } render(); }
 function coachKickoff(auto=false){
   const m=state.match; if(!m||m.half!==0) return; const P=coachSquadMap(); const year=state.year;
   // compo incomplète : on complète automatiquement
@@ -535,18 +717,11 @@ function coachKickoff(auto=false){
   if(m.captain==null||!m.xi.includes(m.captain)){ const c=defaultCaptain(m.xi.map(id=>P[id])); m.captain=c?c.id:null; }
   state.captainId=m.captain; m.onPitch=[...m.xi]; m.played={}; m.xi.forEach(id=>{ m.played[id]={min:0,start:true,goals:0,assists:0,yellow:0,red:0,inj:0,sub:false}; });
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
-  m.bonus=coachBonus(); m.approach=state.approach; matchFactors(m,P,{extra:coachBonusLines()});
+  m.bonus=coachBonus()+(state.nextMatchBonus||0); state.nextMatchBonus=0; m.approach=state.approach; matchFactors(m,P,{extra:coachBonusLines()});
   const ctx={injuryMult:1-(state.gauges.staff-50)*.006};
   matchPlayHalf(m,P,ctx);
   if(auto){ matchApplyHalftime(m,P,'keep',{}); matchPlayHalf(m,P,ctx); coachAfterMatchSim(); return; }
   state.pendingChoice='halftime'; saveGame();
-}
-function coachHalftime(choiceId){
-  const m=state.match; if(!m||m.half!==1||m.done) return; const P=coachSquadMap();
-  matchApplyHalftime(m,P,choiceId,{management:state.stats.technique,vestiaire:state.gauges.vestiaire});
-  if(choiceId==='talk'&&m.talkResult==='ko') state.gauges.vestiaire=clamp(state.gauges.vestiaire-2);
-  matchPlayHalf(m,P,{injuryMult:1-(state.gauges.staff-50)*.006});
-  coachAfterMatchSim(); render();
 }
 /* Après le coup de sifflet final : classement, autres matchs, effectif, statistiques */
 function coachAfterMatchSim(){
@@ -572,15 +747,6 @@ function coachAfterMatch(){
   coachAdvance(); render();
 }
 /* Joue toutes les journées restantes de la phase avec la compo automatique */
-function coachSimPhase(){
-  let guard=0;
-  const keep=state.tempo; state.tempo='rapide'; state.alerts=[];
-  while((state.pendingChoice==='prematch'||state.pendingChoice==='matchResult')&&guard++<60){
-    if(state.pendingChoice==='prematch'){ if(!state.match||state.match.half!==0) break; coachKickoff(true); }
-    else { const notes=recoverSquad(state.squad,state.year,{training:state.training,staff:state.gauges.staff}); if(notes.length) state.seasonStats.injuries.push(...notes); const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,scorers:rec.scorers,matchday:rec.matchday}); coachAdvance(); }
-  }
-  state.tempo=keep; render();
-}
 function coachAutoLineupSilent(){ const m=state.match; const a=autoLineup(state.squad,FORMATIONS[m.formation],state.year); m.xi=a.xi.map(p=>p.id); m.bench=a.bench.map(p=>p.id); m.onPitch=[...m.xi]; if(m.captain==null||!m.xi.includes(m.captain)){ const c=defaultCaptain(a.xi); m.captain=c?c.id:null; } }
 /* Bilan de phase : confiance du président, pression, jauges */
 function coachFinishPhase(){
@@ -607,7 +773,7 @@ function coachAfterPhase(){
   if(c.confidence<=0){
     if(coachFateProtects()){ c.confidence=25; log(`${state.rouletteFate.icon} ${capitalize(c.presidentName)} voudrait te virer, mais la clause d'exclusivité te protège autant qu'elle t'enferme : tu restes.`); }
     else { coachSacked(); render(); return; } }
-  if(state.phase>=4){ coachEndSeason(); render(); return; }
+  if(state.phase>=4){ coachEndConf(); render(); return; }
   if(state.pressure>=100){ state.pendingChoice='pressureCrisis'; unlockTrophy('x-pressure'); render(); return; }
   if(state.phase===2&&eraHasWinterMercato(state.year)){ coachOpenMercato(true); render(); return; }
   coachPlayPhase(); render();
@@ -623,7 +789,7 @@ function coachSacked(){
   c.sacked=true; state.comp=null; state.match=null; state.year++; state.age++;
   state.pendingChoice='sacked';
 }
-function coachEndSeason(){
+function coachEndConf(){
   const c=state.club, comp=state.comp, ss=state.seasonStats, year=state.year;
   const table=sortTable(comp.table), pos=tablePos(comp.table,c.name), N=comp.teams.length;
   const champion=pos===1, relegated=pos>N-3, objectiveMet=pos<=c.objectivePos;
@@ -690,6 +856,24 @@ function coachEndSeason(){
   const topScorer=Object.entries(ss.scorers).sort((a,b)=>b[1]-a[1])[0];
   const bestPlayer=[...state.squad].filter(p=>(p.rated||0)>=8).sort((a,b)=>(b.sumRating/b.rated)-(a.sumRating/a.rated))[0];
   const season={year,club:c.name,league:c.leagueName,tier:c.tier,pos,teams:N,objective:c.objectivePos,objectiveMet,champion,promotion,relegated,cupWon,cupRounds:state.cup.roundsReached,cupPath:state.cup.path,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached,path:euro.path}:null,award,goals:ss.goals,conceded:ss.conceded,topScorer:topScorer?`${topScorer[0]} (${topScorer[1]})`:null,bestPlayer:bestPlayer?`${bestPlayer.name} (${(bestPlayer.sumRating/bestPlayer.rated).toFixed(2)})`:null,table:table.map(t=>({...t})),phases:ss.phases.map(p=>({n:p.n,W:p.W,D:p.D,L:p.L,pos:p.pos})),devNotes,contracts,dConf:Math.round(dConf),confidence:Math.round(c.confidence),formation:state.formation,style:styleById(state.styleId).name,budgetUsed:c.budget-(state.market?state.market.budgetLeft:0),cote:{before:Math.round(coteBefore),after:Math.round(state.cote),why:coteWhy,level:coteLabel(coteToStrength(state.cote))},contractEnd:c.contractEnd};
+  // Ce que la saison laisse chez les gens : c'est ça, le bilan.
+  const all=(ss.phases||[]).flatMap(ph=>ph.matches||[]);
+  const margin=x=>(x.us==='home'?x.gh-x.ga:x.ga-x.gh);
+  const best=all.filter(x=>x.res==='W').sort((a,b)=>margin(b)-margin(a))[0]||null;
+  const worst=all.filter(x=>x.res==='L').sort((a,b)=>margin(a)-margin(b))[0]||null;
+  const wantOut=state.squad.filter(p=>p.morale<42).sort((a,b)=>a.morale-b.morale).slice(0,4)
+    .map(p=>({name:p.name,age:playerAge(p,year),morale:Math.round(p.morale),rating:playerRating(p,year)}));
+  const loyal=state.squad.filter(p=>p.morale>=72).sort((a,b)=>playerRating(b,year)-playerRating(a,year)).slice(0,3)
+    .map(p=>({name:p.name,age:playerAge(p,year),rating:playerRating(p,year)}));
+  const risen=state.squad.filter(p=>playerAge(p,year)<=23&&p.lastDev>0).sort((a,b)=>b.lastDev-a.lastDev).slice(0,3)
+    .map(p=>({name:p.name,age:playerAge(p,year),gain:p.lastDev,rating:playerRating(p,year)}));
+  const g0=ss.g0||{};
+  const presLine=dConf>=6?`« Voilà pourquoi je t'ai choisi. »`:dConf>=0?`« C'est correct. Je n'ai pas dit plus. »`:dConf>=-8?`« On va devoir parler, toi et moi. »`:`« Je ne sais pas ce que tu fais encore là. »`;
+  season.bilan={best,worst,wantOut,loyal,risen,presLine,
+    meetings:ss.meetings||0,decisions:(ss.decisions||[]).slice(-3),
+    gauges:Object.keys(GAUGE_INFO).map(k=>({k,icon:GAUGE_INFO[k].icon,label:GAUGE_INFO[k].label,before:Math.round(g0[k]==null?state.gauges[k]:g0[k]),after:Math.round(state.gauges[k])})),
+    pressure:{before:Math.round(g0.pressure==null?state.pressure:g0.pressure),after:Math.round(state.pressure)},
+    effort:state.effort||null};
   state.history.push(season); state.lastSeason=season;
   c.since=c.since||1;
   if(c.since>=6) unlockTrophy('c-loyal'); if(state.clubsCoached.length>=8) unlockTrophy('c-nomad'); if(state.history.filter(h=>!h.sacked).length>=10) unlockTrophy('c-ten');
