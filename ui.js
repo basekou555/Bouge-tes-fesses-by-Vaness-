@@ -93,8 +93,8 @@ function render(){
   if(!state){ renderStart(); return; }
   showGameBanner(); renderFilmstrip();
   if(state.ended){ state.kind==='player'?renderPlayerEnd():renderCoachEnd(); return; }
-  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
-  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
+  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure,priorities:renderPriorities};
+  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure,priorities:renderPriorities};
   const fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
   const side=state.kind==='player'?playerSidebar():coachSidebar();
   app.innerHTML=`<div class="layout fade-in"><div class="main">${eraBannerHTML()}${fn()}</div><div class="sidebar"><details class="side-fold" open><summary><span>📋 Ta fiche, le club et le journal</span></summary>${side}</details></div></div>`;
@@ -138,10 +138,50 @@ function deltaChips(before,after,extra=[]){
   return chips.length?`<div class="delta-chips">${chips.join('')}</div>`:'<div class="hint">Aucun changement immédiat visible.</div>';
 }
 function renderChoiceResult(){ const r=state.pendingResult; const cont=state.kind==='player'?'playerContinueChoiceResult()':'coachContinueChoiceResult()'; return `<div class="card"><h2 class="display">${r.title}</h2><div class="subtitle">${escapeHtml(r.subtitle||'')}</div><p class="narr">${escapeHtml(r.narrative||'')}</p>${deltaChips(r.before,r.after,r.extra||[])}<div class="btn-row"><button class="btn" onclick="${cont}">Continuer →</button></div></div>`; }
-function renderEvent(){ const ce=state.currentEvent, ev=ce.event; const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Intersaison'}[ce.kind]; const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent'; return `<div class="card event-card"><div class="hint">${kind}${ev.gauge?` · jauge ${(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge]?(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge].label:''}`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map((c,i)=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b></div></button>`).join('')}</div></div>`; }
+/* Un arbitrage ne vaut que s'il se voit : chaque option annonce ce qu'elle donne et ce qu'elle coûte. */
+const FX_LABEL={talent:'🧠 Tactique',technique:'🗣️ Management',reseau:'🤝 Réseau',reputation:'📰 Réputation',
+  vestiaire:'✊ Vestiaire',supporters:'📣 Supporters',formation:'🎓 Formation',staff:'🧑‍🤝‍🧑 Staff',proches:'🏡 Proches',
+  pressure:'🌡️ Pression',confidence:'🪑 Président',budget:'💰 Budget',form:'📈 Dynamique',
+  physique:'💪 Physique',mental:'🧠 Mental',corps:'🩻 Corps',entourage:'👪 Entourage',coachTrust:'🎽 Confiance du coach',forme:'📈 Forme',money:'💰 Argent'};
+const FX_SPECIAL={injure:'🩼 Un blessé',sellStar:'💸 Ta star part',promoteYouth:'🌱 Un jeune monte',skipHalf:'⏭️ Une demi-saison sautée',stayLocal:'🏡 Plus de départ lointain',points:'⚖️ Points au classement',releaseCaptain:'👋 Un cadre s\'en va'};
+function effectChips(effects,seed){
+  const out=[];
+  Object.entries(effects||{}).forEach(([k,v])=>{
+    if(k==='noReinvest') return;
+    if(FX_SPECIAL[k]){ out.push(`<i class="minus">${FX_SPECIAL[k]}</i>`); return; }
+    const lbl=FX_LABEL[k]; if(!lbl||!v) return;
+    // Le signe dit le sens du chiffre, la couleur dit si c'est une bonne nouvelle :
+    // « Pression −− » en vert se lit tout de suite.
+    const good=k==='pressure'?v<0:v>0;
+    const big=k==='budget'?Math.abs(v)>=.05:Math.abs(v)>=6;
+    const sign=(v>0?'+':'−').repeat(big?2:1);
+    out.push(`<i class="${good?'plus':'minus'}">${lbl} ${sign}</i>`);
+  });
+  if(seed) out.push('<i>🌱 une suite, un jour</i>');
+  return out.length?`<div class="traits">${out.join('')}</div>`:'';
+}
+function renderEvent(){ const ce=state.currentEvent, ev=ce.event; const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Intersaison'}[ce.kind]; const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent'; return `<div class="card event-card"><div class="hint">${kind}${ev.gauge?` · jauge ${(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge]?(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge].label:''}`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div><div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`; }
 function renderRoulette(){ const ev=state.currentRoulette.event; const fn=state.kind==='player'?'playerChooseRoulette':'coachChooseRoulette';
   const fk=(ev.fate&&ev.fate.kind)||'death'; const sealed=fk!=='death'&&fk!=='banned';
   return `<div class="card event-card"><div class="hint">🎲 Roulette du destin · une seule des quatre issues ${sealed?'scelle le reste de ta carrière':'met fin à la carrière'}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="roulette-grid">${ev.choices.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><div class="body"><b>${escapeHtml(c)}</b></div></button>`).join('')}</div><div class="hint" style="margin-top:10px">Issues cachées : ${sealed?`${ev.fate.icon} ${escapeHtml(ev.fate.label.toLowerCase())}`:'☠️ fin'} · 🌠 jackpot · 🍀 petit bonus · 🌧️ malus. Chaque issue laisse une trace sur les saisons suivantes.</div></div>`; }
+/* Deux priorités, trois renoncements : l'arbitrage de la saison. */
+function renderPriorities(){
+  const player=state.kind==='player';
+  const AREAS=player?PFOCUS_AREAS:FOCUS_AREAS, PICKS=player?PFOCUS_PICKS:FOCUS_PICKS;
+  const toggle=player?'playerToggleFocus':'coachToggleFocus', confirm=player?'playerConfirmFocus':'coachConfirmFocus';
+  const picked=state.focus||[]; const left=PICKS-picked.length;
+  return `<div class="card"><h2 class="display">Où passe ton année ?</h2>
+    <p class="narr">Une saison ne tient pas tout. Choisis ${PICKS} chantiers : ils avanceront. Les trois autres reculeront, et tu le sentiras.</p>
+    <div class="section-label">${picked.length} choisi${picked.length>1?'s':''} sur ${PICKS}${left>0?` · il en reste ${left}`:' · tu peux échanger'}</div>
+    <div class="focus-grid">${Object.entries(AREAS).map(([k,a])=>{ const on=picked.includes(k);
+      return `<button class="focus-card ${on?'on':''}" onclick="${toggle}('${k}')">
+        <span class="ico">${a.icon}</span>
+        <span class="body"><b>${escapeHtml(a.label)}</b><small>${escapeHtml(a.desc)}</small>
+        ${effectChips(a.gain)}
+        <span class="cost">Laissé de côté : ${Object.entries(a.loss).map(([ck,cv])=>`${(FX_LABEL[ck]||ck)} ${cv>0?'+':'−'}`).join(' · ')}</span></span>
+        <span class="mark">${on?'✓':''}</span></button>`; }).join('')}</div>
+    <div class="btn-row"><button class="btn" ${picked.length<PICKS?'disabled':''} onclick="${confirm}()">${picked.length<PICKS?`Choisis encore ${left} chantier${left>1?'s':''}`:'Lancer la saison →'}</button></div></div>`;
+}
 function renderPressure(){ const list=state.kind==='player'?PLAYER_PRESSURE_CHOICES:PRESSURE_CHOICES; const fn=state.kind==='player'?'playerChoosePressure':'coachChoosePressure'; return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">${state.kind==='player'?'Craquage':'Crise de pression'}</h2><p class="narr">La pression atteint ${Math.round(state.pressure)}/100. Insomnies, malaise, une famille inquiète. Il faut décider.</p><div class="choice-list">${list.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`; }
 function tableHTML(table,me,full){
   const N=table.length, meIdx=table.findIndex(r=>r.name===me);
@@ -233,10 +273,23 @@ function renderSeasonEnd(){
 }
 function renderSacked(){ const h=state.history[state.history.length-1]; return `<div class="card"><div class="result-hero"><span class="result-hero-icon">🪓</span><h2 class="display">Licencié·e</h2><div class="verdict">${escapeHtml(h.club)} · après la phase ${h.phase} · ${ordinal(h.pos)} pour un objectif de ${ordinal(h.objective)}</div></div><p class="narr">La confiance du président est tombée à zéro. Le communiqué tient en trois lignes, ton bureau est vidé avant midi. Ta réputation en prend un coup, ton téléphone continuera de sonner… un peu moins fort.</p><div class="btn-row"><button class="btn" onclick="coachIntersaison();render()">Continuer →</button></div></div>`; }
 function seasonLine(f,i){ const badge=f.sacked?'🪓':f.champion?'🏆':f.relegated?'⬇️':f.objectiveMet?'✅':'❌'; return `<div class="season-line"><span><span class="pos">${badge} ${f.pos?ordinal(f.pos):'—'}</span> ${f.year} · ${escapeHtml(f.club)} · ${escapeHtml(f.league)}</span><span>${f.sacked?'licencié·e phase '+f.phase:(f.cupWon?'🥇 ':'')+(f.euro&&f.euro.won?'⭐ ':'')+(f.award?'🎖️ ':'')+(f.topScorer?escapeHtml(f.topScorer):'')}</span></div>`; }
+/* Ce qu'il reste quand le football s'arrête : la contrepartie de tous les arbitrages. */
+function lifeVerdict(v,player){
+  if(v>=72) return {cls:'milestone',text:player?"Tu as gardé les tiens à côté de toi. Le vestiaire s'oublie, eux sont restés."
+    :"Tu as tenu les deux bouts : une carrière, et des gens qui t'attendaient encore à la maison le soir du dernier match."};
+  if(v>=45) return {cls:'punchline',text:player?"Ta vie d'à côté a tenu, sans jamais passer en premier."
+    :"Ta vie d'à côté a survécu aux déménagements, un peu abîmée, jamais tout à fait prioritaire."};
+  if(v>=22) return {cls:'punchline',text:player?"Beaucoup de monde autour de toi, peu de gens vraiment proches."
+    :"Tu as beaucoup donné au football. Ceux qui t'attendaient ont fini par ne plus attendre."};
+  return {cls:'warn',text:player?"Personne au bout du couloir après le dernier match. Le football aura tout pris."
+    :"Le dernier vestiaire refermé, il n'y a personne au bout du couloir. Le football aura tout pris, et tu l'as laissé faire."};
+}
 function renderCoachEnd(){
   const t=state.titles, newB=[...new Set(state.newBadges||[])].map(id=>TROPHY_MAP[id]).filter(Boolean);
+  const life=lifeVerdict(state.gauges.proches==null?50:state.gauges.proches,false);
   app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">${state.endingCause==='death'||state.endingCause==='roulette'?'⚰️':'🏁'}</span><h2 class="display">${escapeHtml(state.name)} — ${coachEpithet()}</h2><div class="verdict">${state.modeIcon} ${state.modeName} · ${state.startYear||ERAS.find(e=>e.id===state.startEra).name} → ${state.year} · fin à ${state.age} ans · score ${coachScore()}</div></div><p class="narr">${escapeHtml(state.endingText)}</p>
     <div class="score-grid"><div class="score-box gold"><div class="v">${state.history.filter(h=>!h.sacked).length}</div><div class="k">Saisons complètes</div></div><div class="score-box good"><div class="v">${t.league+t.promo}</div><div class="k">Titres et montées</div></div><div class="score-box good"><div class="v">${t.cup+t.euro+t.euro2}</div><div class="k">Coupes</div></div><div class="score-box gold"><div class="v">${state.awards}</div><div class="k">Récompenses</div></div><div class="score-box"><div class="v">${state.clubsCoached.length}</div><div class="k">Clubs</div></div><div class="score-box bad"><div class="v">${state.sackings}</div><div class="k">Licenciements</div></div></div>
+    <div class="section-label">Ce qu'il en reste</div><div class="${life.cls}">🏡 ${life.text} <span class="hint">Proches ${Math.round(state.gauges.proches==null?50:state.gauges.proches)}/100.</span></div>
     ${newB.length?`<div class="section-label">Badges débloqués</div><div class="badge-grid">${newB.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
     <div class="section-label">Toutes les saisons</div>${state.history.map(seasonLine).join('')||'<div class="hint">Aucune saison.</div>'}
     <div class="btn-row"><button class="btn" onclick="state=null;startCoachCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button></div></div></div>`; scrollTop();
@@ -284,8 +337,10 @@ function renderPSeasonEnd(){
 }
 function renderPlayerEnd(){
   const t=state.totals, newB=[...new Set(state.newBadges||[])].map(id=>TROPHY_MAP[id]).filter(Boolean);
+  const life=lifeVerdict(state.gauges.entourage==null?50:state.gauges.entourage,true);
   app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">🎗️</span><h2 class="display">${escapeHtml(state.name)}</h2><div class="verdict">${state.posIcon} ${state.posName} · ${state.startYear||ERAS.find(e=>e.id===state.startEra).name} → ${state.year} · fin à ${pAge()} ans · score ${playerScore()}</div></div><p class="narr">${escapeHtml(state.endingText)}</p>
     <div class="score-grid"><div class="score-box gold"><div class="v">${state.history.length}</div><div class="k">Saisons</div></div><div class="score-box"><div class="v">${t.apps}</div><div class="k">Matchs</div></div><div class="score-box good"><div class="v">${t.goals}</div><div class="k">Buts</div></div><div class="score-box good"><div class="v">${t.assists}</div><div class="k">Passes</div></div><div class="score-box gold"><div class="v">${t.titles+t.cups+t.euros}</div><div class="k">Trophées</div></div><div class="score-box"><div class="v">${t.caps}</div><div class="k">Sélections</div></div><div class="score-box gold"><div class="v">${t.ballons}</div><div class="k">Ballons d'or</div></div><div class="score-box good"><div class="v">${$(t.earned)}</div><div class="k">Gains</div></div></div>
+    <div class="section-label">Ce qu'il en reste</div><div class="${life.cls}">🏡 ${life.text} <span class="hint">Entourage ${Math.round(state.gauges.entourage==null?50:state.gauges.entourage)}/100.</span></div>
     ${newB.length?`<div class="section-label">Badges débloqués</div><div class="badge-grid">${newB.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
     <div class="section-label">Saisons</div>${state.history.map(f=>`<div class="season-line"><span><span class="pos">${f.ballon?'🏅':f.champion?'🏆':f.note.toFixed(1)}</span> ${f.year} · ${escapeHtml(f.club)} · ${escapeHtml(f.league)}</span><span>${f.apps} m · ${f.goals} b · ${f.assists} p${f.selected?' · 🇫🇷':''}</span></div>`).join('')}
     <div class="btn-row"><button class="btn" onclick="state=null;startPlayerCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button></div></div></div>`; scrollTop();

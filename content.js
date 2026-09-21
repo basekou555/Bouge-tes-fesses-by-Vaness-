@@ -151,62 +151,68 @@ const COACH_INCIDENTS=[
 ];
 
 const COACH_HAPPENINGS=[
- {id:'h-livre',icon:'📚',title:"Un éditeur veut ton livre",text:"« Ma méthode » : trois cents pages sur ta vision du football.",choices:[
-  {label:"Écrire un livre sincère",result:"Un succès d'estime, des passages qui vexent d'anciens présidents.",effects:{reputation:5,reseau:-2,talent:1}},
-  {label:"Publier un livre de motivation",result:"Vendu en tête de gondole, moqué par les puristes.",effects:{reputation:-2,reseau:3,supporters:2}},
-  {label:"Refuser",result:"Tu gardes tes secrets.",effects:{pressure:-2}}]},
+ {id:'h-livre',icon:'📚',title:"Un éditeur veut ton livre",text:"« Ma méthode » : trois cents pages sur ta vision du football. Elles s'écriront la nuit.",choices:[
+  {label:"Écrire un livre sincère",result:"Un succès d'estime, des passages qui vexent d'anciens présidents, et six mois de nuits courtes.",effects:{reputation:5,talent:1,reseau:-3,proches:-6},
+   seed:{in:3,icon:'📚',title:"Ton livre te revient",text:"Un dirigeant que tu égratignais dans « Ma méthode » siège désormais à la commission qui distribue les postes. On se souvient de la page 214.",effects:{reseau:-6,reputation:2}}},
+  {label:"Publier un livre de motivation",result:"Vendu en tête de gondole, moqué par les puristes.",effects:{reseau:3,supporters:2,reputation:-3,proches:-3}},
+  {label:"Refuser",result:"Tu gardes tes secrets. On te trouve fermé.",effects:{pressure:-2,reputation:-1}}]},
  {id:'h-burnout',icon:'🛌',title:"Le corps dit stop",text:"Malaise au bord du terrain, hospitalisation et un médecin qui exige du repos.",choices:[
-  {label:"Prendre deux mois de recul",result:"Ton adjoint assure. Tu reviens avec des idées.",effects:{pressure:-18,technique:-1,staff:3}},
-  {label:"Revenir après une semaine",result:"Le public applaudit ton courage. Le médecin soupire.",effects:{pressure:6,reputation:2}},
-  {label:"Changer d'hygiène de vie",result:"Sport, sommeil, moins de café. Une nouvelle personne.",effects:{pressure:-10,talent:1}}]},
+  {label:"Prendre deux mois de recul",result:"Ton adjoint assure. Tu reviens avec des idées, le président avec des doutes.",effects:{pressure:-18,staff:3,proches:9,technique:-1,confidence:-6}},
+  {label:"Revenir après une semaine",result:"Le public applaudit ton courage. Le médecin soupire.",effects:{pressure:6,reputation:2,proches:-6},
+   seed:{in:2,icon:'🫀',title:"La rechute",text:"Le corps n'avait rien oublié. Cette fois, l'arrêt n'est pas négociable.",effects:{pressure:14,technique:-3,proches:-5}}},
+  {label:"Changer d'hygiène de vie",result:"Sport, sommeil, moins de dîners tardifs. Une nouvelle personne, et un carnet d'adresses qui refroidit.",effects:{pressure:-10,proches:5,reseau:-4}}]},
  {id:'h-selection',icon:'🇫🇷',title:"La fédération te sonde",text:"Le poste de sélectionneur des espoirs se libère.",choices:[
-  {label:"Décliner poliment",result:"On te rappellera. Peut-être.",effects:{reputation:1}},
-  {label:"Accepter un rôle de conseiller",result:"Quelques stages, beaucoup de réseau, un peu de fatigue.",effects:{reseau:6,technique:2,pressure:4}},
-  {label:"Faire campagne pour le poste principal",result:"Tu n'es pas retenu·e, mais tout le monde connaît ton nom.",effects:{reputation:3,reseau:3,pressure:3}}]},
+  {label:"Décliner poliment",result:"On te rappellera. Probablement pas.",effects:{reseau:-4,pressure:-1}},
+  {label:"Accepter un rôle de conseiller",result:"Quelques stages, beaucoup de réseau, des week-ends qui sautent.",effects:{reseau:6,technique:2,pressure:4,proches:-7}},
+  {label:"Faire campagne pour le poste principal",result:"Tu n'es pas retenu·e, mais tout le monde connaît ton nom. Ton président aussi a lu la presse.",effects:{reputation:3,reseau:3,pressure:3,confidence:-6,proches:-4}}]},
  {id:'h-mentor',icon:'🧓',title:"Ton mentor t'appelle",text:"L'entraîneur qui t'a formé traverse une mauvaise passe et cherche un adjoint pour six mois.",choices:[
-  {label:"Prendre une pause pour l'aider",result:"Une demi-saison à ses côtés, une leçon d'humilité.",effects:{talent:5,technique:2,reseau:3,pressure:-5,skipHalf:true}},
-  {label:"Lui envoyer ton adjoint",result:"Ton adjoint part et revient plus fort.",effects:{staff:4}},
-  {label:"Décliner",result:"Il comprend. Vous ne parlerez plus jamais de la même façon.",effects:{reseau:-2}}]},
- {id:'h-stage',icon:'🎓',title:"Formation continue",text:"Un stage d'élite réunit les meilleurs techniciens du monde pendant un mois.",choices:[
-  {label:"Y aller à tout prix",result:"Un mois intense, des idées neuves et un carnet d'adresses doré.",effects:{talent:4,technique:3,reseau:4}},
-  {label:"Suivre à distance",result:"Moins immersif, mais efficace.",effects:{talent:2,technique:2}},
-  {label:"Rester au club",result:"Tu préfères le terrain.",effects:{vestiaire:2}}]},
+  {label:"Prendre une demi-saison pour l'aider",result:"Une leçon d'humilité à ses côtés. Ton club, lui, tourne sans toi.",effects:{talent:5,technique:2,reseau:3,pressure:-4,confidence:-9,proches:-5,skipHalf:true}},
+  {label:"Lui envoyer ton adjoint",result:"Ton adjoint part six mois. Le staff encaisse, ton mentor s'en sort.",effects:{staff:-3,reseau:3,form:-1},
+   seed:{in:2,icon:'🧓',title:"L'adjoint revient grandi",text:"Six mois auprès d'un maître : ton adjoint rentre avec des idées et un carnet d'adresses.",effects:{staff:8,talent:2}}},
+  {label:"Décliner",result:"Il comprend. Vous ne parlerez plus jamais de la même façon.",effects:{reseau:-3,technique:-2,proches:3}}]},
+ {id:'h-stage',icon:'🎓',title:"Formation continue",text:"Un stage d'élite réunit les meilleurs techniciens du monde pendant un mois, à l'autre bout de l'Europe.",choices:[
+  {label:"Y aller le mois entier",result:"Des idées neuves et un carnet d'adresses doré. Un mois sans voir ni ton groupe ni ta famille.",effects:{talent:5,technique:3,reseau:4,vestiaire:-5,proches:-9,confidence:-3}},
+  {label:"Suivre à distance, le soir",result:"Moins immersif, et les soirées y passent quand même.",effects:{talent:2,technique:2,proches:-4}},
+  {label:"Rester au club",result:"Tu préfères le terrain. Le football, lui, avance ailleurs.",effects:{vestiaire:3,talent:-2,reseau:-2}}]},
  {id:'h-rival',icon:'😤',title:"Un entraîneur rival te provoque",text:"En conférence de presse, un coach célèbre qualifie ton football de « ennuyeux à mourir ».",choices:[
-  {label:"Répondre avec humour",result:"La punchline fait le tour du pays.",effects:{reputation:4,supporters:2}},
-  {label:"Ne rien dire",result:"Le silence est classe, un peu frustrant.",effects:{reputation:1}},
-  {label:"Déclencher une guerre médiatique",result:"Six mois de piques et deux amendes.",effects:{supporters:3,pressure:6,reputation:-2}}]},
- {id:'h-famille',icon:'👨‍👩‍👧',title:"La famille craque",text:"Quatre déménagements en cinq ans. Ta famille veut poser les valises.",choices:[
-  {label:"Promettre de rester dans la région",result:"Tu refuseras certains projets lointains. Le foyer respire.",effects:{pressure:-8,reseau:-3,stayLocal:true}},
-  {label:"Négocier une saison de plus",result:"Un compromis fragile.",effects:{pressure:3}},
-  {label:"Le football d'abord",result:"Tu le regretteras peut-être.",effects:{pressure:5,technique:2}}]},
+  {label:"Répondre avec humour",result:"La punchline fait le tour du pays. Et installe un duel dont on te reparlera à chaque match.",effects:{reputation:4,supporters:2,pressure:3}},
+  {label:"Ne rien dire",result:"Le silence est classe. Le parcage, lui, attendait une réponse.",effects:{reputation:1,supporters:-3}},
+  {label:"Déclencher une guerre médiatique",result:"Six mois de piques, deux amendes et un téléphone qui sonne à toute heure.",effects:{supporters:3,pressure:6,reputation:-2,proches:-5}}]},
+ {id:'h-famille',icon:'🏡',title:"La famille craque",text:"Quatre déménagements en cinq ans, des dimanches au stade, des anniversaires manqués. Ta famille veut poser les valises.",choices:[
+  {label:"Promettre de rester dans la région",result:"Tu refuseras des projets lointains. Le foyer respire.",effects:{proches:16,pressure:-8,reseau:-4,stayLocal:true}},
+  {label:"Négocier une saison de plus",result:"Un compromis fragile, que personne ne croit vraiment.",effects:{proches:-5,pressure:3}},
+  {label:"Le football d'abord",result:"Tu le diras autrement, mais c'est ce que tout le monde a entendu.",effects:{talent:2,technique:2,proches:-16,pressure:5},
+   seed:{in:2,icon:'📦',title:"L'anniversaire de trop",text:"Un carton dans l'entrée, une lettre sur la table. Tu rentreras dans un appartement vide après les matchs.",effects:{proches:-14,pressure:12,technique:-2}}}]},
  {id:'h-ancien',icon:'🎁',title:"Un ancien joueur te remercie",text:"Un international que tu as lancé il y a dix ans te dédie son trophée.",choices:[
-  {label:"L'inviter au centre pour parler aux jeunes",result:"Une journée magique pour le centre de formation.",effects:{formation:6,supporters:3}},
-  {label:"Le remercier discrètement",result:"Un message privé, une amitié préservée.",effects:{reseau:2}},
-  {label:"Le recruter comme adjoint",result:"Il rejoint ton staff avec fougue et sans diplôme.",effects:{staff:5,talent:-1}}]},
+  {label:"L'inviter au centre pour parler aux jeunes",result:"Une journée magique pour le centre, un week-end de plus au club.",effects:{formation:6,supporters:3,proches:-3}},
+  {label:"Le remercier discrètement",result:"Un message privé, une amitié préservée, personne n'en saura rien.",effects:{reseau:2,supporters:-2}},
+  {label:"Le recruter comme adjoint",result:"Il rejoint ton staff avec fougue et sans diplôme. Le reste du staff grince.",effects:{staff:5,talent:-1,vestiaire:-3,budget:-.02}}]},
  {id:'h-statue',icon:'🏙️',title:"La ville te propose une statue",text:"Le maire veut inaugurer une place à ton nom. Des opposants trouvent ça ridicule.",choices:[
-  {label:"Accepter avec émotion",result:"Une cérémonie, des larmes et un banc à ton nom.",effects:{supporters:5,pressure:2}},
-  {label:"Proposer un terrain pour les jeunes à la place",result:"Un geste salué par tout le monde.",effects:{reputation:4,formation:4}},
-  {label:"Refuser tout honneur",result:"Modestie exemplaire.",effects:{reputation:2}}]},
+  {label:"Accepter avec émotion",result:"Une cérémonie, des larmes, et une tribune d'opposants dans le journal local.",effects:{supporters:5,pressure:2,reputation:-3}},
+  {label:"Proposer un terrain pour les jeunes à la place",result:"Un geste salué par tout le monde, financé en partie par le club.",effects:{reputation:4,formation:5,budget:-.05}},
+  {label:"Refuser tout honneur",result:"Modestie exemplaire. La ville se vexe un peu.",effects:{reputation:2,supporters:-5}}]},
  {id:'h-paris',icon:'🎰',title:"Soupçons de paris",text:"Un joueur de ton effectif est cité dans une enquête sur les paris sportifs.",choices:[
-  {label:"Collaborer totalement",result:"Le club est blanchi, le joueur suspendu.",effects:{reputation:3,form:-1}},
-  {label:"Protéger le club avant tout",result:"Des avocats, des silences, une image abîmée.",effects:{reputation:-6,confidence:3}},
-  {label:"Laisser la justice faire",result:"Neutralité prudente.",effects:{pressure:3}}]},
- {id:'h-tele',icon:'🎙️',title:"Consultant télé pendant l'été",text:"Une chaîne te propose de commenter la grande compétition internationale.",minYear:1982,choices:[
-  {label:"Accepter",result:"Ton visage entre dans tous les salons.",effects:{reputation:5,reseau:3,pressure:2}},
-  {label:"Refuser pour préparer la saison",result:"Ton président apprécie.",effects:{confidence:3,technique:1}},
-  {label:"Accepter une seule émission",result:"Un passage remarqué.",effects:{reputation:2,reseau:1}}]},
+  {label:"Collaborer totalement",result:"Le club est blanchi, le joueur suspendu, et le vestiaire te regarde autrement.",effects:{reputation:4,vestiaire:-6,confidence:-2,form:-1}},
+  {label:"Protéger le club avant tout",result:"Des avocats, des silences, une image abîmée.",effects:{reputation:-6,confidence:3,vestiaire:4},
+   seed:{in:3,icon:'⚖️',title:"L'enquête ressort",text:"Trois ans plus tard, un journaliste publie les écoutes. Ton nom est dans le dossier des silences.",effects:{reputation:-8,confidence:-10,pressure:8}}},
+  {label:"Laisser la justice faire son travail",result:"Neutralité prudente, que personne ne trouve courageuse.",effects:{pressure:3,supporters:-4}}]},
+ {id:'h-tele',icon:'🎙️',title:"Consultant télé pendant l'été",text:"Une chaîne te propose de commenter la grande compétition internationale. Tout l'été.",minYear:1982,choices:[
+  {label:"Accepter tout l'été",result:"Ton visage entre dans tous les salons. Ta préparation, elle, commence sans toi.",effects:{reputation:5,reseau:3,pressure:2,technique:-2,proches:-8}},
+  {label:"Refuser pour préparer la saison",result:"Ton président apprécie. Ton été y passe aussi.",effects:{confidence:4,technique:2,reputation:-2,proches:-4}},
+  {label:"Accepter une seule émission",result:"Un passage remarqué, un week-end sacrifié.",effects:{reputation:2,reseau:1,proches:-2}}]},
  {id:'h-heritage',icon:'🏚️',title:"Le club de ton enfance coule",text:"Le club amateur où tu as commencé est menacé de dissolution.",choices:[
-  {label:"Organiser un match de gala",result:"Tes anciens joueurs viennent. Le club survit.",effects:{reputation:3,reseau:2,supporters:2}},
-  {label:"Donner de ta poche",result:"Discret et efficace.",effects:{pressure:-2}},
-  {label:"Ne rien faire",result:"Le club disparaît. Tu y penses souvent.",effects:{pressure:2}}]},
+  {label:"Organiser un match de gala",result:"Tes anciens joueurs viennent. Le club survit, ton mois de juin disparaît.",effects:{reputation:3,reseau:2,supporters:2,proches:-5,pressure:2}},
+  {label:"Donner de ta poche",result:"Discret et efficace. L'économie de la maison encaisse.",effects:{pressure:-2,proches:-4,reputation:1}},
+  {label:"Ne rien faire",result:"Le club disparaît. Tu y penses souvent.",effects:{pressure:3,reputation:-2}}]},
  {id:'h-diplome',icon:'📜',title:"Réforme des diplômes",text:"La fédération exige un nouveau diplôme pour entraîner au plus haut niveau.",choices:[
-  {label:"Passer le diplôme",result:"Six week-ends de cours. Tu apprends des choses.",effects:{technique:3,pressure:3}},
-  {label:"Demander une dérogation",result:"Accordée, mais la presse en parle.",effects:{reputation:-2}},
-  {label:"Contester la réforme",result:"Tu deviens le porte-parole des vieux briscards.",effects:{reseau:3,reputation:-1}}]},
+  {label:"Passer le diplôme",result:"Six week-ends de cours. Tu apprends des choses, tu manques six dimanches.",effects:{technique:4,pressure:3,proches:-6}},
+  {label:"Demander une dérogation",result:"Accordée, mais la presse en parle et la fédération s'en souvient.",effects:{reputation:-3,reseau:-3}},
+  {label:"Contester la réforme",result:"Tu deviens le porte-parole des vieux briscards.",effects:{reseau:3,reputation:-2,confidence:-4}}]},
  {id:'h-ecole',icon:'🏫',title:"Ouvrir ton académie",text:"Des investisseurs proposent de créer une académie de football à ton nom.",minYear:2000,choices:[
-  {label:"Se lancer",result:"Un projet chronophage mais une source de jeunes talents.",effects:{formation:8,pressure:5,reseau:3}},
-  {label:"Prêter ton nom seulement",result:"Un chèque et une signature.",effects:{reputation:-1,reseau:2}},
-  {label:"Refuser",result:"Le terrain d'abord.",effects:{talent:1}}]},
+  {label:"Se lancer à fond",result:"Un projet passionnant, chronophage, et qui ne dort jamais.",effects:{formation:8,reseau:3,pressure:6,proches:-10},
+   seed:{in:3,icon:'🏫',title:"La première promotion",text:"Trois gamins de ton académie signent pro la même année. On associe ton nom à leur trajectoire.",effects:{formation:7,reputation:5,reseau:3}}},
+  {label:"Prêter ton nom seulement",result:"Un chèque, une signature, et une académie que tu ne contrôles pas.",effects:{reseau:3,reputation:-4,formation:1}},
+  {label:"Refuser",result:"Le terrain d'abord. L'offre ira à un autre.",effects:{talent:1,reseau:-3}}]},
 ];
 
 /* Dilemmes déclenchés par une jauge basse (entraîneur·euse) */
@@ -222,7 +228,19 @@ const COACH_DILEMMAS=[
  {gauge:'formation',icon:'📘',title:"La bible du club",text:"Le directeur sportif propose d'écrire un projet de jeu commun des U8 à l'équipe première.",choices:[{label:"Rédiger la bible avec les formateurs",effects:{formation:7,talent:1,pressure:2}},{label:"Signer un document minimal",effects:{formation:2}},{label:"Refuser toute contrainte",effects:{formation:-3,talent:1}}]},
  {gauge:'staff',icon:'🧑‍🤝‍🧑',title:"Le staff épuisé",text:"Ton préparateur physique et ton analyste enchaînent les nuits blanches et menacent de partir.",choices:[{label:"Recruter du renfort",effects:{staff:7,budget:-.03}},{label:"Leur offrir une semaine de repos",effects:{staff:4,form:-1}},{label:"Leur demander un dernier effort",effects:{staff:-6,pressure:3}}]},
  {gauge:'staff',icon:'🍽️',title:"Le dîner du président",text:"Le président t'invite pour parler « stratégie ». Il veut surtout choisir l'équipe.",choices:[{label:"Écouter et expliquer patiemment",effects:{confidence:6,staff:1,pressure:1}},{label:"Poser une limite claire",effects:{confidence:-2,vestiaire:2,staff:2}},{label:"Annuler le dîner",effects:{confidence:-6}}]},
- {gauge:'staff',icon:'🎓',title:"Le stage du staff",text:"Ton staff demande à partir en observation chez un grand club étranger.",choices:[{label:"Accepter et financer",effects:{staff:8,budget:-.02,talent:1}},{label:"Accepter sans financer",effects:{staff:3}},{label:"Refuser",effects:{staff:-4}}]},
+ {gauge:'staff',icon:'🎓',title:"Le stage du staff",text:"Ton staff demande à partir en observation chez un grand club étranger.",choices:[{label:"Accepter et financer",effects:{staff:8,budget:-.02,talent:1}},{label:"Accepter sans financer",effects:{staff:3,vestiaire:-2}},{label:"Refuser",effects:{staff:-4,technique:1}}]},
+ {gauge:'proches',icon:'🏡',title:"Le dimanche de trop",text:"Ton fils joue la finale de son championnat dimanche. Toi aussi.",choices:[
+  {label:"Déléguer le match à ton adjoint et aller le voir",effects:{proches:14,confidence:-7,vestiaire:-4,form:-2}},
+  {label:"Promettre d'être là la prochaine fois",effects:{proches:-6,pressure:3}},
+  {label:"Regarder la vidéo le soir, en boucle",effects:{proches:-2,pressure:4,technique:1}}]},
+ {gauge:'proches',icon:'📞',title:"Le téléphone du dimanche soir",text:"Chez toi, on a pris l'habitude de ne plus t'attendre pour dîner. Un proche te le dit franchement.",choices:[
+  {label:"Couper le téléphone deux soirs par semaine",effects:{proches:11,reseau:-5,talent:-1}},
+  {label:"Emmener toute la famille au stade",effects:{proches:6,supporters:3,pressure:2}},
+  {label:"Expliquer que c'est le métier qui veut ça",effects:{proches:-8,technique:2,pressure:3}}]},
+ {gauge:'proches',icon:'🧳',title:"Le déménagement de trop",text:"Un club t'attend à 700 km. Les valises de la maison ne sont même pas défaites.",choices:[
+  {label:"Refuser tout départ pendant deux ans",effects:{proches:13,reseau:-6,reputation:-3,stayLocal:true}},
+  {label:"Partir seul·e, rentrer le week-end",effects:{proches:-10,pressure:6,reseau:3}},
+  {label:"Faire suivre tout le monde, encore",effects:{proches:-6,pressure:4,reputation:2}}]},
 ];
 
 const COACH_ROULETTES=[
@@ -343,37 +361,37 @@ const PLAYER_INCIDENTS=[
 const PLAYER_HAPPENINGS=[
  {id:'ph-vacances',icon:'🏝️',title:"Été de fête",text:"Ibiza, yachts, photos partout. Ton agent te conseille la discrétion.",choices:[
   {label:"Profiter",result:"Une rentrée difficile.",effects:{forme:-8,supporters:2,reputation:-2,mental:2}},
-  {label:"Trois jours puis stage",result:"Le compromis du pro.",effects:{forme:-2,mental:1}},
-  {label:"Rester au vert",result:"Tu reprends en avance.",effects:{forme:5,coachTrust:3}}]},
+  {label:"Trois jours puis stage",result:"Le compromis du pro : personne n'est tout à fait content.",effects:{forme:-2,mental:1,entourage:-2}},
+  {label:"Rester au vert tout l'été",result:"Tu reprends en avance, sans avoir vu personne.",effects:{forme:5,coachTrust:3,entourage:-6}}]},
  {id:'ph-mariage',icon:'💍',title:"Mariage médiatique",text:"Ton mariage attire les magazines et une chaîne de télé.",minYear:1990,choices:[
   {label:"Vendre l'exclusivité",result:"Un chèque, des photos et quelques moqueries.",effects:{money:.3,reputation:-2,entourage:3}},
-  {label:"Mariage privé",result:"Une journée à toi.",effects:{entourage:6,mental:2}}]},
+  {label:"Mariage privé",result:"Une journée à toi, payée par toi, et des magazines vexés.",effects:{entourage:7,mental:2,money:-.08,supporters:-3}}]},
  {id:'ph-livre',icon:'📚',title:"Autobiographie",text:"Un éditeur veut raconter ta vie, à 26 ans.",choices:[
   {label:"Accepter",result:"Des chapitres sur tes coachs qui ne passent pas.",effects:{money:.1,reputation:2,coachTrust:-3}},
-  {label:"Attendre la retraite",result:"Sage.",effects:{mental:1}}]},
+  {label:"Attendre la retraite",result:"Sage. L'éditeur ira voir un autre joueur, et le chèque avec lui.",effects:{mental:1,reputation:-2}}]},
  {id:'ph-fondation',icon:'🤲',title:"Créer une fondation",text:"Un ami te propose de créer une fondation pour les enfants de ton quartier d'origine.",choices:[
   {label:"Se lancer",result:"Un engagement qui te dépasse.",effects:{reputation:5,supporters:4,money:-.1,pressure:2}},
   {label:"Donner sans s'exposer",result:"Discret.",effects:{money:-.05,mental:2}},
-  {label:"Plus tard",result:"Le foot d'abord.",effects:{}}]},
+  {label:"Plus tard",result:"Le foot d'abord. Le quartier te l'a entendu dire.",effects:{reputation:-3,entourage:-3}}]},
  {id:'ph-blessure-ete',icon:'🏄',title:"Accident de vacances",text:"Un jet-ski, un rocher, une cheville.",choices:[
   {label:"Le cacher au club",result:"La reprise révèle tout.",effects:{injure:6,coachTrust:-5,corps:-3}},
   {label:"Prévenir immédiatement",result:"Le club gère la rééducation.",effects:{injure:4,coachTrust:2}}]},
  {id:'ph-contrat',icon:'📝',title:"Renégociation de contrat",text:"Ton agent veut renégocier ton contrat un an avant la fin.",choices:[
   {label:"Exiger une grosse hausse",result:"Le club cède, mais te met sur la liste des transferts en cas de baisse.",effects:{money:.25,coachTrust:-3,entourage:3}},
-  {label:"Prolonger raisonnablement",result:"Tout le monde est content.",effects:{money:.1,coachTrust:3,supporters:2}},
+  {label:"Prolonger raisonnablement",result:"Le club est content. Ton agent et tes proches espéraient mieux.",effects:{money:.1,coachTrust:3,supporters:2,entourage:-5}},
   {label:"Attendre d'être libre",result:"L'arrêt Bosman te tend les bras.",minYear:1996,effects:{entourage:4,bigOfferNext:true}}]},
  {id:'ph-jeux',icon:'🎮',title:"Jeu vidéo",text:"Un éditeur veut ton visage sur la jaquette du jeu de l'année.",minYear:1996,choices:[
   {label:"Accepter",result:"Des millions d'enfants jouent avec toi.",effects:{money:.2,supporters:5,reputation:2}},
-  {label:"Refuser",result:"Le foot ne se joue pas sur un canapé.",effects:{reputation:1}}]},
+  {label:"Refuser",result:"Le foot ne se joue pas sur un canapé. Les enfants joueront avec un autre visage.",effects:{reputation:1,supporters:-4,money:-.05}}]},
  {id:'ph-service',icon:'🎖️',title:"Service militaire",text:"L'armée t'appelle pour dix mois. Le bataillon de Joinville accueille les sportifs.",maxYear:1996,choices:[
-  {label:"Joinville",result:"Tu t'entraînes avec les meilleurs jeunes du pays.",effects:{physique:2,mental:2,vestiaire:2}},
+  {label:"Joinville",result:"Tu t'entraînes avec les meilleurs jeunes du pays, loin de ton club et de chez toi.",effects:{physique:3,mental:2,vestiaire:2,coachTrust:-5,entourage:-4}},
   {label:"Demander un report",result:"Accordé. La presse en parle.",effects:{reputation:-2}}]},
  {id:'ph-transfert-raté',icon:'✈️',title:"Le transfert avorté",text:"Tu étais dans l'avion pour signer ailleurs. Le fax n'est jamais arrivé.",minYear:1990,choices:[
   {label:"Revenir la tête haute",result:"Le vestiaire t'accueille avec des blagues.",effects:{vestiaire:2,mental:2,coachTrust:-2}},
   {label:"Bouder",result:"Six mois de tension.",effects:{coachTrust:-6,minutes:-.1,mental:-2}}]},
  {id:'ph-reconversion',icon:'🎓',title:"Préparer l'après",text:"La fédération propose une formation d'entraîneur en parallèle de ta carrière.",choices:[
-  {label:"S'inscrire",result:"Tu regardes le jeu autrement.",effects:{mental:3,pressure:2,coachTrust:2}},
-  {label:"Plus tard",result:"Il reste du temps.",effects:{}}]},
+  {label:"S'inscrire",result:"Tu regardes le jeu autrement. Tes soirées y passent.",effects:{mental:3,pressure:2,coachTrust:2,entourage:-5,physique:-1}},
+  {label:"Plus tard",result:"Il reste du temps. C'est ce que disent tous ceux qui n'en ont plus.",effects:{mental:-2}}]},
 ];
 
 const PLAYER_DILEMMAS=[

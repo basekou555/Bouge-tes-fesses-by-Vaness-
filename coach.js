@@ -34,7 +34,18 @@ const COACH_FLAWS=[
 ];
 const TIER_INFO={amateur:{label:"Monde amateur",icon:'🌾'},ligue2:{label:"Deuxième division",icon:'🥈'},ligue1:{label:"Élite française",icon:'🇫🇷'},etranger:{label:"Aventure lointaine",icon:'🌎'},europe:{label:"Grand club européen",icon:'🇪🇺'},superclub:{label:"Super-club",icon:'👑'}};
 const CSTAT={talent:"Tactique",technique:"Management",reseau:"Réseau",reputation:"Réputation"};
-const GAUGE_INFO={vestiaire:{icon:'✊',label:"Vestiaire",help:"Cohésion du groupe : force de l'équipe, grèves, ambiance."},supporters:{icon:'📣',label:"Supporters",help:"Ferveur : pression du public, patience en cas de crise, recettes."},formation:{icon:'🎓',label:"Formation",help:"Qualité du centre : progression des jeunes, moins d'arnaques."},staff:{icon:'🧑‍🤝‍🧑',label:"Staff",help:"Qualité du staff : blessures, préparation, développement."}};
+const GAUGE_INFO={vestiaire:{icon:'✊',label:"Vestiaire",help:"Cohésion du groupe : force de l'équipe, grèves, ambiance."},supporters:{icon:'📣',label:"Supporters",help:"Ferveur : pression du public, patience en cas de crise, recettes."},formation:{icon:'🎓',label:"Formation",help:"Qualité du centre : progression des jeunes, moins d'arnaques."},staff:{icon:'🧑‍🤝‍🧑',label:"Staff",help:"Qualité du staff : blessures, préparation, développement."},proches:{icon:'🏡',label:"Proches",help:"Ta vie en dehors du terrain : elle amortit la pression, et c'est ce qui reste quand le football s'arrête."}};
+
+/* ---------- Où passe ton année : deux priorités, trois renoncements ----------
+   Le temps d'une saison est fini. Tout ce que tu ne choisis pas recule. */
+const FOCUS_AREAS={
+  terrain:{icon:'⚽',label:"Le terrain",desc:"Vidéo, séances, adversaires décortiqués.",gain:{talent:5,technique:1},loss:{talent:-2}},
+  vestiaire:{icon:'🤝',label:"Le vestiaire",desc:"Les entretiens un à un, les cas difficiles, les egos.",gain:{vestiaire:9,technique:3},loss:{vestiaire:-6}},
+  centre:{icon:'🎓',label:"Le centre",desc:"Les jeunes, les éducateurs, les matchs de la réserve.",gain:{formation:10},loss:{formation:-6}},
+  club:{icon:'📣',label:"Le club et les médias",desc:"Le président, la presse, les sponsors, le carnet d'adresses.",gain:{reseau:5,reputation:4,supporters:5,confidence:4},loss:{reseau:-2,supporters:-4,confidence:-3}},
+  proches:{icon:'🏡',label:"Tes proches",desc:"Les dîners, les anniversaires, les gens qui t'attendent.",gain:{proches:16,pressure:-9},loss:{proches:-7,pressure:3}},
+};
+const FOCUS_PICKS=2;
 
 function coachFreshState(c){
   const mode=c.mode, era=c.era;
@@ -42,13 +53,13 @@ function coachFreshState(c){
   const alias={repPublic:'reputation',repCritique:'reputation',moral:'technique'};
   [c.origin,c.nationality,c.mentor,c.quality,c.flaw].forEach(o=>Object.entries((o&&o.bonus)||{}).forEach(([k,v])=>{ const key=alias[k]||k; if(key in st) st[key]+=v; }));
   Object.keys(st).forEach(k=>st[k]=clamp(st[k]));
-  const gauges={vestiaire:50,supporters:50,formation:40+(mode.youthBonus||0)+(c.origin.youthBonus||0),staff:45};
+  const gauges={vestiaire:50,supporters:50,formation:40+(mode.youthBonus||0)+(c.origin.youthBonus||0),staff:45,proches:62};
   [c.quality,c.flaw].forEach(o=>Object.entries((o&&o.gauge)||{}).forEach(([k,v])=>gauges[k]=clamp(gauges[k]+v)));
   return { kind:'coach', name:c.name, year:era.start, startYear:era.start, startEra:era.id, age:30, modeId:mode.id, modeName:mode.name, modeIcon:mode.icon, mode:{budgetMult:mode.budgetMult,toleranceMult:mode.toleranceMult,variance:mode.variance,incidentMult:mode.incidentMult*(c.flaw.incidentMult||1),objMult:mode.objMult||1,pressureMult:mode.pressureMult||1},
     originName:c.origin.name, nationality:c.nationality, nationalityStyles:(c.nationality&&c.nationality.favoredStyleIds)||[], favoriteStyleId:c.favoriteStyle.id, mentorName:c.mentor.name, mentorStyles:c.mentor.styleIds||[], qualityName:c.quality.name, flawName:c.flaw.name,
     perks:{pressureRes:(c.origin.pressureRes||0)+(c.quality.pressureRes||0)+(c.flaw.pressureRes||0),confidenceRes:(c.quality.confidenceRes||0)+(c.flaw.confidenceRes||0),scamRes:(c.quality.scamRes||0)+(c.flaw.scamRes||0),budgetLeak:c.flaw.budgetLeak||0},
     stats:st, pressure:8, gauges, cote:clamp(18+(st.reputation-40)*.6+(st.reseau-18)*.2,10,60), coteDelta:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], club:null, squad:[], usedNames:[], formation:'4-4-2', styleId:c.favoriteStyle.id, approach:'equilibre', training:'tactique', captainId:null, comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, cup:null, euro:null,
-    history:[], sackings:0, consecutiveSackings:0, clubsCoached:[], titles:{league:0,cup:0,euro:0,euro2:0,promo:0}, awards:0, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, market:null, newBadges:[], lastRouletteSeason:-99, rouletteCount:0, rouletteFate:null, rouletteEcho:null, pressureCrisisCooldown:0, noOfferYears:0, scamsSuffered:0, stayLocal:false, ended:false, endingText:'', endingCause:null };
+    history:[], sackings:0, consecutiveSackings:0, clubsCoached:[], titles:{league:0,cup:0,euro:0,euro2:0,promo:0}, awards:0, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, market:null, newBadges:[], lastRouletteSeason:-99, rouletteCount:0, rouletteFate:null, rouletteEcho:null, focus:[], lastFocus:null, seeds:[], pressureCrisisCooldown:0, noOfferYears:0, scamsSuffered:0, stayLocal:false, ended:false, endingText:'', endingCause:null };
 }
 function coachEra(){ return eraForYear(state.year); }
 function usedSet(){ return new Set(state.usedNames); }
@@ -210,7 +221,45 @@ function coachCloseMercato(){
 function coachSetTactic(formation,styleId){
   state.formation=formation; state.styleId=styleId;
   if(state.tacticAfterWinter){ state.tacticAfterWinter=false; coachPlayPhase(); return; }
-  coachStartSeason();
+  state.focus=[]; state.pendingChoice='priorities'; saveGame();
+}
+/* Deux priorités par saison, pas trois : ce qui n'est pas choisi recule. */
+function coachToggleFocus(k){
+  if(!FOCUS_AREAS[k]) return;
+  const i=state.focus.indexOf(k);
+  if(i>=0) state.focus.splice(i,1);
+  else if(state.focus.length<FOCUS_PICKS) state.focus.push(k);
+  else { state.focus.shift(); state.focus.push(k); }
+  render();
+}
+/* Un chantier déjà au point progresse moins ; un chantier au fond ne tombe plus très bas.
+   Les deux règles ensemble poussent chaque domaine vers l'équilibre que tes choix lui donnent,
+   pas vers 0 ni vers 100. */
+function focusScaled(effects,read){
+  const out={};
+  Object.entries(effects).forEach(([k,v])=>{
+    const cur=read(k);
+    if(cur==null||!v){ out[k]=v; return; }
+    if(v>0) out[k]=Math.max(1,Math.round(v*(1-cur/150)*10)/10);
+    else out[k]=Math.min(-.5,Math.round(v*Math.max(.3,Math.min(1.3,.35+cur/110))*10)/10);
+  });
+  return out;
+}
+function coachConfirmFocus(){
+  if(state.focus.length<FOCUS_PICKS) return;
+  const before=coachSnapshot(), lines=[];
+  const read=k=>k in state.stats?state.stats[k]:k in state.gauges?state.gauges[k]:null;
+  Object.entries(FOCUS_AREAS).forEach(([k,a])=>{
+    const on=state.focus.includes(k);
+    coachApplyEffects(focusScaled(on?a.gain:a.loss,read));
+    if(!on) lines.push(`${a.icon} ${a.label} : laissé de côté`);
+  });
+  state.lastFocus=[...state.focus];
+  log(`🕰️ Cette saison, tu mets ton énergie sur ${state.focus.map(k=>FOCUS_AREAS[k].label.toLowerCase()).join(' et ')}. Le reste attendra.`);
+  state.pendingResult={title:'🕰️ Ton année',subtitle:state.focus.map(k=>`${FOCUS_AREAS[k].icon} ${FOCUS_AREAS[k].label}`).join(' · '),
+    narrative:"Une saison ne tient pas tout. Ce que tu as choisi avance, ce que tu as laissé recule un peu.",
+    before,after:coachSnapshot(),extra:lines,next:'season'};
+  state.pendingChoice='choiceResult'; render();
 }
 function coachStartSeason(){
   const c=state.club; const lg=buildLeagueTeams(c,state.year); c.leagueName=lg.name;
@@ -269,7 +318,7 @@ function coachApplyEffects(effects,ctx={}){
   Object.entries(effects||{}).forEach(([k,v])=>{
     if(k in s) s[k]=clamp(s[k]+v);
     else if(k in g) g[k]=clamp(g[k]+v);
-    else if(k==='pressure') state.pressure=clamp(state.pressure+v*(v>0?state.mode.pressureMult:1));
+    else if(k==='pressure'){ const home=g.proches>=65?.82:g.proches<=30?1.25:1; state.pressure=clamp(state.pressure+v*(v>0?state.mode.pressureMult*home:1)); }
     else if(k==='confidence'&&c) c.confidence=clamp(c.confidence+v*(v<0?(1-state.perks.confidenceRes):1));
     else if(k==='budget'&&c){ const amt=c.budget*v; c.budget+=amt; if(state.market) state.market.budgetLeft+=amt; out.push(`${amt>=0?'+':''}${$(amt)} de budget`); }
     else if(k==='form'&&state.seasonStats) state.seasonStats.form=clamp(state.seasonStats.form+v,-6,6);
@@ -284,9 +333,11 @@ function coachApplyEffects(effects,ctx={}){
   return out;
 }
 function coachChooseEvent(i){
+  /* voir plantSeed : un choix peut laisser une trace qui revient plus tard */
   const ce=state.currentEvent, ev=ce.event, ch=ev.choices[i]; if(!ch) return;
   const before=coachSnapshot();
   const extra=coachApplyEffects(ch.effects);
+  if(ch.seed){ plantSeed({...ch.seed,from:`${ev.title} → ${ch.label}`}); extra.push('une suite, un jour'); }
   log(`${ev.icon} <b>${ev.title}</b> → ${ch.label}. ${ch.result||''}`);
   state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:coachSnapshot(),extra,next:ce.kind==='incident'?'phase':'intersaison'};
   state.currentEvent=null; state.pendingChoice='choiceResult'; saveGame(); render();
@@ -296,8 +347,17 @@ function coachContinueChoiceResult(){
   const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null;
   if(state.ended){ render(); return; }
   if(r.next==='phase'){ coachSimulatePhase(); render(); return; }
+  if(r.next==='season'){ coachStartSeason(); render(); return; }
   if(r.next==='offers'){ coachOpenOffers(); render(); return; }
   coachIntersaison(); render();
+}
+/* ---------- Ce que tu as semé ----------
+   Certains choix n'ont pas de prix tout de suite : ils reviennent plus tard. */
+function plantSeed(seed){ if(!seed) return; (state.seeds=state.seeds||[]).push({...seed,year:state.year+(seed.in||2)}); }
+function coachRipeSeed(){
+  if(!state.seeds||!state.seeds.length) return null;
+  const i=state.seeds.findIndex(sd=>state.year>=sd.year); if(i<0) return null;
+  return state.seeds.splice(i,1)[0];
 }
 /* ---------- Une phase = une suite de journées jouées une par une ---------- */
 function coachSimulatePhase(){ coachBeginPhase(); }
@@ -494,6 +554,10 @@ function coachEndSeason(){
   const fx=state.rouletteFate;
   if(fx&&fx.kind==='exclusive'&&fx.installed){ state.pressure=clamp(state.pressure+(champion?4:10)); }
   if(fx&&fx.kind==='exile'&&(champion||cupWon)&&year-fx.year>=2){ log(`🕊️ ${champion?'Un titre':'Une coupe'} loin des projecteurs : l'affaire des archives est oubliée, les grands clubs recommencent à appeler.`); state.cote=clamp(state.cote+10); state.rouletteFate=null; unlockTrophy('r-redemption'); }
+  // Une saison de football coûte du temps à ceux qui t'attendent, d'autant plus qu'elle a été dure.
+  const wear=1+Math.round(state.pressure/40);
+  state.gauges.proches=clamp(state.gauges.proches-wear);
+  if(state.gauges.proches<=18) log(`🏡 Chez toi, on ne t'attend plus vraiment pour dîner. Proches ${Math.round(state.gauges.proches)}/100.`);
   if(state.rouletteEcho&&state.rouletteEcho.seasons>0){ state.rouletteEcho.seasons--; if(!state.rouletteEcho.seasons){ log(`${state.rouletteEcho.icon} ${state.rouletteEcho.label} : c'est fini, la saison prochaine repart sur tes seules forces.`); state.rouletteEcho=null; } }
   const s=state.stats; s.reputation=clamp(s.reputation+clamp(overperf*1,-5,5)+(champion?4:0)+(cupWon?2:0)+(euroWon?6:0)+(relegated?-6:0)+(c.tier==='superclub'?1:0)+(c.tier==='amateur'?-1:0)+(55-s.reputation)*.06);
   // cote : ce que cette saison vaut sur le marché des bancs
@@ -548,6 +612,13 @@ function coachIntersaison(){
   if(state.pressure>=85&&!(state.pressureCrisisCooldown>0)&&Math.random()<.5){ state.pendingChoice='pressureCrisis'; unlockTrophy('x-pressure'); return; }
   if(state.pressureCrisisCooldown>0) state.pressureCrisisCooldown--;
   state.pressure=clamp(state.pressure-6);
+  const ripe=coachRipeSeed();
+  if(ripe){
+    const before=coachSnapshot(); const extra=coachApplyEffects(ripe.effects||{});
+    log(`${ripe.icon||'🌱'} ${ripe.text}`);
+    state.pendingResult={title:`${ripe.icon||'🌱'} ${ripe.title||'Ce que tu avais semé'}`,subtitle:ripe.from||'',narrative:ripe.text,before,after:coachSnapshot(),extra,next:'intersaison'};
+    state.pendingChoice='choiceResult'; return;
+  }
   const n=state.history.length;
   if(n>=3&&n-state.lastRouletteSeason>=5&&state.rouletteCount<2&&Math.random()<.12){ state.currentRoulette={event:pickNoRepeat('c-roulette',COACH_ROULETTES),outcomes:shuffledCopy([Math.random()<.5?'end':'malus','jackpot','small','malus'])}; state.rouletteCount++; state.lastRouletteSeason=n; state.pendingChoice='roulette'; return; }
   const g=state.gauges; const low=Object.keys(g).filter(k=>g[k]<40);

@@ -10,6 +10,15 @@ const PLAYER_ORIGINS=[
 const PLAYER_TRAITS=[
  {id:'bosseur',name:"Bosseur·euse",desc:"Premier·ère arrivé·e, dernier·ère parti·e. Moins de fantaisie.",bonus:{physique:3,mental:2,technique:-2},growth:.2},{id:'genie',name:"Génie instinctif",desc:"Des gestes que personne n'apprend.",bonus:{technique:7,mental:-2},growth:0},{id:'leader',name:"Leader naturel",desc:"Le vestiaire t'écoute déjà à 18 ans. Tu parles plus que tu ne dribbles.",bonus:{mental:5,technique:-2},gauges:{vestiaire:10}},{id:'fragile',name:"Corps fragile",desc:"Talent immense, ischios en papier.",bonus:{technique:5,physique:-3},injury:.1},{id:'fetard',name:"Fêtard·e",desc:"La nuit, tu marques aussi beaucoup.",bonus:{technique:2,mental:-3},gauges:{supporters:5,entourage:-5},scandal:true},{id:'glace',name:"Sang froid",desc:"Un penalty à la 90e ne te fait rien. Le sprint de la 89e, si.",bonus:{mental:7,physique:-3}},
 ];
+/* ---------- Où passe ton année : deux chantiers, trois renoncements ---------- */
+const PFOCUS_AREAS={
+  technique:{icon:'⚽',label:"Le ballon",desc:"Les heures en plus après l'entraînement, la vidéo, les gammes.",gain:{technique:5},loss:{technique:-2}},
+  physique:{icon:'💪',label:"Le corps",desc:"Salle, kiné, sommeil, diététique.",gain:{physique:5,corps:6},loss:{physique:-2,corps:-4}},
+  tete:{icon:'🧠',label:"La tête",desc:"Préparateur mental, respiration, la gestion des grands soirs.",gain:{mental:5,pressure:-6},loss:{mental:-2,pressure:2}},
+  image:{icon:'📣',label:"Ton image",desc:"Sponsors, réseaux, journalistes, agent.",gain:{supporters:7,money:.12,entourage:3},loss:{supporters:-5}},
+  proches:{icon:'🏡',label:"Tes proches",desc:"Ceux qui étaient là avant les contrats.",gain:{entourage:13,pressure:-7},loss:{entourage:-9,pressure:2}},
+};
+const PFOCUS_PICKS=2;
 const PGAUGE={corps:{icon:'🩻',label:"Corps",help:"Santé : blessures, récupération, longévité. À zéro, la carrière s'arrête."},vestiaire:{icon:'✊',label:"Vestiaire",help:"Place dans le groupe : temps de jeu et soutien en cas de crise."},supporters:{icon:'📣',label:"Supporters",help:"Amour du public : pression et récompenses."},entourage:{icon:'👪',label:"Entourage",help:"Agent, famille, amis : qualité des offres et stabilité."}};
 const PSTAT={technique:"Technique",physique:"Physique",mental:"Mental"};
 const ROLES={titulaire:{name:"Titulaire",share:.9},rotation:{name:"Rotation",share:.55},remplacant:{name:"Remplaçant·e",share:.25}};
@@ -18,7 +27,7 @@ function playerFreshState(c){
   const st={technique:36,physique:36,mental:36}; [c.origin,c.trait].forEach(o=>Object.entries(o.bonus||{}).forEach(([k,v])=>st[k]=clamp(st[k]+v)));
   const g={corps:75,vestiaire:50,supporters:45,entourage:50}; [c.origin,c.trait].forEach(o=>Object.entries(o.gauges||{}).forEach(([k,v])=>g[k]=clamp(g[k]+v)));
   const nat=c.origin.nat==='AF'?pick(['SN','CI','ML','CM','DZ','MA']):'FR';
-  return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
+  return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, focus:[], lastFocus:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
     stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, ended:false, endingText:'', endingCause:null };
 }
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
@@ -93,7 +102,32 @@ function playerAcceptOffer(i){
     if(!state.clubs.includes(o.club)) state.clubs.push(o.club); if(o.tier==='superclub') unlockTrophy('p-superclub');
   }
   state.currentOffers=[]; log(`🖊️ ${o.stay?(o.underContract?'Tu poursuis à':'Tu prolonges à'):o.poach?'Transfert ! Tu signes à':'Tu signes à'} <b>${o.club}</b> (${o.leagueName}) : ${ROLES[o.role].name.toLowerCase()} promis·e, ${money(o.salary,state.year)} par saison, coach ${o.coach}${o.stay&&o.underContract?'':`, jusqu'en ${state.club.contractEnd}`}.`);
-  playerStartSeason();
+  state.focus=[]; state.pendingChoice='priorities'; saveGame();
+}
+/* Deux chantiers par saison : le reste attendra l'année prochaine. */
+function playerToggleFocus(k){
+  if(!PFOCUS_AREAS[k]) return;
+  const i=state.focus.indexOf(k);
+  if(i>=0) state.focus.splice(i,1);
+  else if(state.focus.length<PFOCUS_PICKS) state.focus.push(k);
+  else { state.focus.shift(); state.focus.push(k); }
+  render();
+}
+function playerConfirmFocus(){
+  if(state.focus.length<PFOCUS_PICKS) return;
+  const before=pSnapshot(), lines=[];
+  const read=k=>k in state.stats?state.stats[k]:k in state.gauges?state.gauges[k]:null;
+  Object.entries(PFOCUS_AREAS).forEach(([k,a])=>{
+    const on=state.focus.includes(k);
+    playerApplyEffects(focusScaled(on?a.gain:a.loss,read));
+    if(!on) lines.push(`${a.icon} ${a.label} : laissé de côté`);
+  });
+  state.lastFocus=[...state.focus];
+  log(`🕰️ Cette saison, tu travailles ${state.focus.map(k=>PFOCUS_AREAS[k].label.toLowerCase()).join(' et ')}. Le reste attendra.`);
+  state.pendingResult={title:'🕰️ Ton année',subtitle:state.focus.map(k=>`${PFOCUS_AREAS[k].icon} ${PFOCUS_AREAS[k].label}`).join(' · '),
+    narrative:"Une saison ne tient pas tout. Ce que tu travailles progresse, ce que tu laisses recule un peu.",
+    before,after:pSnapshot(),extra:lines,next:'season'};
+  state.pendingChoice='choiceResult'; render();
 }
 /* ---------- Saison ---------- */
 function playerMe(){ const corps=state.gauges.corps; return {id:'me',name:state.name,pos:state.pos,born:state.born,peak:pRating()/ageCurve(pAge()),dev:1,morale:70,form:0,injury:state.injury,real:true,isMe:true,trait:state.traitId==='leader'?'leader':state.traitId==='fetard'?'fetard':state.traitId==='fragile'?'fragile':'pro',traitId:state.traitId,fitness:state.fitness==null?100:state.fitness,yellows:state.yellows||0,suspended:state.suspended||0,injuryMod:(state.injuryMod||0)*.2+Math.max(0,50-corps)*.0004+(pAge()>=31?.006:0),selBonus:playerSelBonus()}; }
@@ -135,7 +169,7 @@ function playerChooseEvent(i){
   log(`${ev.icon} <b>${ev.title}</b> → ${ch.label}. ${ch.result||''}`);
   state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:pSnapshot(),extra,next:ce.kind==='incident'?'phase':'intersaison'}; state.currentEvent=null; state.pendingChoice='choiceResult'; saveGame(); render();
 }
-function playerContinueChoiceResult(){ const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null; if(state.ended){ render(); return; } if(r.next==='phase'){ playerSimulatePhase(); render(); return; } if(r.next==='offers'){ playerOpenOffers(); render(); return; } playerIntersaison(); render(); }
+function playerContinueChoiceResult(){ const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null; if(state.ended){ render(); return; } if(r.next==='phase'){ playerSimulatePhase(); render(); return; } if(r.next==='season'){ playerStartSeason(); render(); return; } if(r.next==='offers'){ playerOpenOffers(); render(); return; } playerIntersaison(); render(); }
 /* ---------- Une phase = des journées jouées une par une ---------- */
 function playerSimulatePhase(){ playerBeginPhase(); }
 function playerBeginPhase(){

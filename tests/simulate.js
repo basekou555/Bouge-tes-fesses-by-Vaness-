@@ -22,6 +22,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ coachBreakContract(); if(!state.currentOffers.length){ coachSkipYear(); render(); continue; } } coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
           else if(pc==='mercato'){ const m=state.market; let tries=0; while(tries<4){ tries++; const cand=m.targets.map((t,i)=>({t,i})).filter(x=>x.t.access!=='no'&&x.t.price<=m.budgetLeft*.6); if(!cand.length) break; const x=cand[rnd(cand.length)]; coachBuy(x.i); if(state.pendingChoice!=='mercato') break; } if(state.squad.length>25) coachSell(state.squad[state.squad.length-1].id); coachCloseMercato(); }
           else if(pc==='tactic'){ coachSetTactic(pick(Object.keys(FORMATIONS)),Math.random()<.6?state.club.styleWanted:state.favoriteStyleId); }
+          else if(pc==='priorities'){ const keys=shuffledCopy(Object.keys(FOCUS_AREAS)).slice(0,FOCUS_PICKS); keys.forEach(k=>coachToggleFocus(k)); coachConfirmFocus(); }
           else if(pc==='event'){ coachChooseEvent(rnd(state.currentEvent.event.choices.length)); }
           else if(pc==='choiceResult'){ coachContinueChoiceResult(); }
           else if(pc==='prematch'){ if(Math.random()<.6) coachSimPhase(); else { if(Math.random()<.5) coachAutoLineup(); else { const p=state.squad[rnd(state.squad.length)]; coachToggleLineup(p.id); } coachSetMatchOption('approach',pick(Object.keys(APPROACHES))); coachSetMatchOption('training',pick(Object.keys(TRAINING))); coachKickoff(); } }
@@ -52,6 +53,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='event'){ playerChooseEvent(rnd(state.currentEvent.event.choices.length)); }
           else if(pc==='choiceResult'){ playerContinueChoiceResult(); }
           else if(pc==='prematch'){ if(Math.random()<.6) playerSimPhase(); else playerKickoff(); }
+          else if(pc==='priorities'){ const keys=shuffledCopy(Object.keys(PFOCUS_AREAS)).slice(0,PFOCUS_PICKS); keys.forEach(k=>playerToggleFocus(k)); playerConfirmFocus(); }
           else if(pc==='penalty'){ pstat.pen++; playerPenaltyChoice(Math.random()<.7); }
           else if(pc==='matchResult'){ const m=state.lastMatch; pstat.n++; if(m.played) pstat.played++; if(m.start) pstat.start++; pstat.g+=m.gh+m.ga; if(m.inj) pstat.inj++; playerAfterMatch(); }
           else if(pc==='phaseResult'){ playerAfterPhase(); }
