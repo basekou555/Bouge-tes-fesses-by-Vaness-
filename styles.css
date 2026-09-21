@@ -500,3 +500,50 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,su
 .choice-btn .traits i b{ font-weight:700; font-variant-numeric:tabular-nums; }
 .choice-btn .cost+.traits{ margin-top:3px; opacity:.85; }
 @media(max-width:700px){ .st-row{ grid-template-columns:1fr 56px 28px; gap:8px; } }
+
+/* ---------- Le rendez-vous, et ce qu'il a produit ---------- */
+.meeting-card .choice-btn small{ display:block; color:var(--muted); font-size:11.5px; line-height:1.45; margin-top:2px; }
+.recap{ margin-bottom:12px; padding:10px 12px; border-left:3px solid var(--gold); border-radius:0 8px 8px 0;
+  background:rgba(201,162,75,.08); }
+.recap-head{ font-size:12px; color:var(--gold); }
+.recap-choice{ font-size:14px; font-weight:700; margin:2px 0 3px; }
+
+/* ---------- Le bilan de fin de saison ---------- */
+.bilan .bil-sections{ display:flex; flex-direction:column; gap:4px; margin-top:16px; }
+.bilan section{ padding:14px 0; border-top:1px solid var(--line); }
+.bilan section h3{ font-family:'Bebas Neue',Impact,sans-serif; letter-spacing:.04em; font-size:19px;
+  color:var(--gold); margin:0 0 10px; }
+.bilan .quote{ font-size:17px; font-style:italic; margin:0 0 6px; }
+.bil-note{ display:flex; flex-direction:column; gap:1px; padding:9px 12px; margin-bottom:8px;
+  border-left:3px solid var(--line); border-radius:0 8px 8px 0; background:rgba(0,0,0,.2); }
+.bil-note.good{ border-left-color:var(--sage); }
+.bil-note.bad{ border-left-color:#b4544c; }
+.bil-note b{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.bil-note span{ font-size:15px; font-variant-numeric:tabular-nums; }
+.bil-note small{ color:var(--muted); font-size:11.5px; line-height:1.5; }
+.bil-decisions{ display:flex; flex-direction:column; gap:5px; margin-top:10px; }
+.bil-decisions>b{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.bil-decisions span{ display:grid; grid-template-columns:20px 1fr; gap:2px 8px; align-items:baseline;
+  padding:6px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+.bil-decisions i{ font-style:normal; grid-row:span 2; font-size:14px; }
+.bil-decisions em{ font-style:normal; color:var(--muted); font-size:11px; line-height:1.4; }
+.bil-decisions u{ text-decoration:none; font-size:13px; }
+.bil-people{ display:flex; flex-direction:column; gap:3px; margin-bottom:10px; }
+.bil-people b{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:3px; }
+.bil-people span{ display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; font-size:13px; }
+.bil-people small{ color:var(--muted); font-size:11px; }
+.bil-people i{ font-style:normal; font-variant-numeric:tabular-nums; font-size:12px; }
+.bil-people i.up{ color:#5fbf7f; }
+.bil-people i.down{ color:#e07a6b; }
+.bil-people.warnbox{ padding:9px 12px; border-radius:8px; border:1px solid #6d3038; background:rgba(140,36,51,.1); }
+.bil-row{ display:grid; grid-template-columns:1fr 90px 30px 34px; align-items:center; gap:9px;
+  padding:5px 0; font-size:12.5px; }
+.bil-row b{ text-align:right; font-variant-numeric:tabular-nums; }
+.bil-row i{ font-style:normal; text-align:right; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.bil-row i.up{ color:#5fbf7f; } .bil-row i.down{ color:#e07a6b; }
+.bil-bar{ display:block; height:6px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
+.bil-bar i{ display:block; height:100%; background:var(--sage); border-radius:999px; }
+.bil-bar.hot i{ background:linear-gradient(90deg,var(--sage),var(--gold),#b4544c); }
+.bil-more{ margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+.bil-more summary{ cursor:pointer; color:var(--gold); font-size:12px; }
+@media(max-width:700px){ .bil-row{ grid-template-columns:1fr 58px 26px 30px; gap:7px; } }

@@ -104,7 +104,7 @@ function render(){
   if(!state){ renderStart(); return; }
   showGameBanner(); renderFilmstrip();
   if(state.ended){ state.kind==='player'?renderPlayerEnd():renderCoachEnd(); return; }
-  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
+  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,meeting:renderMeeting,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
   const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
   let fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
   if(dashOpen) fn=state.kind==='player'?renderPlayerDashboard:renderDashboard;
@@ -414,20 +414,65 @@ function renderPhaseResult(){
     <div class="btn-row"><button class="btn" onclick="coachAfterPhase()">${state.phase>=4?'Bilan de la saison →':state.phase===2&&eraHasWinterMercato(state.year)?'Mercato d\'hiver →':'Phase suivante →'}</button></div></div>`;
 }
 function cupPathHTML(path,label){ return `<div class="cup-path"><b>${label}</b><br>${path.map(r=>`Tour ${r.round} : ${r.gh}–${r.ga}${r.pen?' (t.a.b.)':''} contre ${escapeHtml(r.opp)} ${r.win?'✅':'❌'}`).join('<br>')}</div>`; }
+/* ---------- Le bilan : le temps où l'on souffle ----------
+   On ne décide plus, on lit ce que l'année a produit — sur le terrain,
+   dans le vestiaire, chez le président et chez soi. */
+function scoreLine(m,me){ const home=m.us==='home'; return `${escapeHtml(m.home)} ${m.gh} – ${m.ga} ${escapeHtml(m.away)}`; }
+function bilanGaugeRow(g){
+  const d=g.after-g.before;
+  return `<div class="bil-row"><span>${g.icon} ${escapeHtml(g.label)}</span>
+    <span class="bil-bar"><i style="width:${clamp(g.after)}%"></i></span>
+    <b>${g.after}</b><i class="${d>0?'up':d<0?'down':''}">${d>0?'+':''}${d||'='}</i></div>`;
+}
 function renderSeasonEnd(){
-  const f=state.lastSeason, c=state.club;
+  const f=state.lastSeason, c=state.club, b=f.bilan||{};
   const icon=f.champion?'🏆':f.euro&&f.euro.won?'⭐':f.relegated?'⬇️':f.objectiveMet?'✅':'❌';
   const verdict=f.champion?(f.promotion?'Montée !':'Champion·ne !'):f.relegated?'Relégation':f.objectiveMet?'Objectif atteint':'Objectif manqué';
-  const kept=c.confidence>=35;
-  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${icon}</span><h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2><div class="verdict">${verdict} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)} · objectif ${ordinal(f.objective)}</div></div>
+  const p=b.pressure||{before:0,after:0}, dp=p.after-p.before;
+  return `<div class="card no-sticky bilan">
+    <div class="result-hero"><span class="result-hero-icon">${icon}</span>
+      <h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2>
+      <div class="verdict">${verdict} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)} · objectif ${ordinal(f.objective)}</div></div>
+
     <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(f.pos)}</div><div class="k">Classement</div></div><div class="score-box"><div class="v">${f.goals} / ${f.conceded}</div><div class="k">Buts pour / contre</div></div><div class="score-box ${f.cupWon?'good':''}"><div class="v">${f.cupWon?'🥇':f.cupRounds}</div><div class="k">${f.cupWon?'Coupe gagnée':'Tour atteint en coupe'}</div></div><div class="score-box ${f.dConf>=0?'good':'bad'}"><div class="v">${f.dConf>=0?'+':''}${f.dConf}</div><div class="k">Confiance → ${f.confidence}</div></div></div>
-    ${f.award?`<div class="trophy-line">🎖️ ${f.award}</div>`:''}${f.euro?`<div class="trophy-line">${f.euro.won?'⭐ Vainqueur de la '+escapeHtml(f.euro.name):'🌍 '+escapeHtml(f.euro.name)+' : éliminé au tour '+f.euro.rounds}</div>`:''}${f.topScorer?`<div class="hint">Meilleur buteur : ${escapeHtml(f.topScorer)}${f.bestPlayer?` · Joueur de la saison : ${escapeHtml(f.bestPlayer)}`:''} · ${f.formation} · ${escapeHtml(f.style)}</div>`:''}
-    <div class="two-cols"><div><div class="section-label">Classement final</div>${tableHTML(f.table,f.club,false)}</div><div><div class="section-label">Parcours en coupe</div>${cupPathHTML(f.cupPath,'Coupe nationale')}${f.euro?cupPathHTML(f.euro.path,f.euro.name):''}</div></div>
-    ${f.devNotes.length?`<div class="section-label">Progressions</div><div class="hint">${f.devNotes.map(escapeHtml).join('<br>')}</div>`:''}
-    ${f.contracts.length?`<div class="section-label">Contrats</div><div class="hint">${f.contracts.map(escapeHtml).join(' · ')}</div>`:''}
-    <div class="punchline narr">${pick(f.champion?PUNCHLINES.champion:f.relegated?PUNCHLINES.relegated:f.objectiveMet?PUNCHLINES.hit:f.pos>f.teams*.7?PUNCHLINES.flop:PUNCHLINES.mid)}</div>
-    ${f.cote?`<div class="section-label">Ta cote</div><div class="hint"><b>${f.cote.before} → ${f.cote.after}</b> · ${f.cote.why.map(escapeHtml).join(' · ')||'saison neutre'}. Tu vaux désormais ${escapeHtml(f.cote.level)}.</div>`:''}
-    <div class="section-label">Le verdict du président</div><div class="${kept?'milestone':'warn'}">${kept?(c.contractEnd>state.year?`${capitalize(c.presidentName)} te garde (confiance ${Math.round(c.confidence)}/100) : ${c.contractEnd>=9999?'la clause te lie à ce club à vie':`ton contrat court jusqu'en ${c.contractEnd}`}. Seul un club plus ambitieux pourrait venir te chercher.`:`${capitalize(c.presidentName)} te renouvelle sa confiance (${Math.round(c.confidence)}/100) et propose de prolonger. D'autres bancs t'attendront aussi.`):`${capitalize(c.presidentName)} ne te renouvelle pas sa confiance (${Math.round(c.confidence)}/100). Il faudra trouver un autre banc.`}</div>
+    ${f.award?`<div class="trophy-line">🎖️ ${f.award}</div>`:''}${f.euro?`<div class="trophy-line">${f.euro.won?'⭐ Vainqueur de la '+escapeHtml(f.euro.name):'🌍 '+escapeHtml(f.euro.name)+' : éliminé au tour '+f.euro.rounds}</div>`:''}
+
+    <div class="bil-sections">
+      <section><h3>🎞️ Le film de l'année</h3>
+        ${b.best?`<div class="bil-note good"><b>Le grand soir</b><span>${scoreLine(b.best)}</span><small>${escapeHtml(b.best.story||'')}</small></div>`:''}
+        ${b.worst?`<div class="bil-note bad"><b>Le soir qu'on oublie</b><span>${scoreLine(b.worst)}</span><small>${escapeHtml(b.worst.story||'')}</small></div>`:''}
+        <div class="hint">${b.meetings||0} décision${(b.meetings||0)>1?'s':''} prise${(b.meetings||0)>1?'s':''} cette saison${b.effort?` · l'année a été portée sur ${b.effort==='coupe'?'la coupe d\'Europe':b.effort==='championnat'?'le championnat':'les deux fronts'}`:''}.${f.topScorer?` Meilleur buteur : ${escapeHtml(f.topScorer)}.`:''}${f.bestPlayer?` Joueur de la saison : ${escapeHtml(f.bestPlayer)}.`:''}</div>
+        ${b.decisions&&b.decisions.length?`<div class="bil-decisions"><b>Tes derniers arbitrages</b>${b.decisions.map(d=>`<span><i>${d.icon}</i><em>${escapeHtml(d.title)}</em><u>${escapeHtml(d.choice)}</u></span>`).join('')}</div>`:''}
+      </section>
+
+      <section><h3>✊ Le vestiaire</h3>
+        ${b.risen&&b.risen.length?`<div class="bil-people"><b>Ils ont grandi</b>${b.risen.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans</small> <i class="up">+${x.gain.toFixed(1)}</i> → ${x.rating}</span>`).join('')}</div>`:''}
+        ${b.wantOut&&b.wantOut.length?`<div class="bil-people warnbox"><b>Ils veulent partir</b>${b.wantOut.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans · niveau ${x.rating}</small> <i class="down">moral ${x.morale}</i></span>`).join('')}</div>`:'<div class="hint">Personne ne demande à partir.</div>'}
+        ${b.loyal&&b.loyal.length?`<div class="bil-people"><b>Ils resteraient pour toi</b>${b.loyal.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans · niveau ${x.rating}</small></span>`).join('')}</div>`:''}
+        ${f.contracts&&f.contracts.length?`<div class="hint">Contrats : ${f.contracts.map(escapeHtml).join(' · ')}</div>`:''}
+      </section>
+
+      <section><h3>🕴️ ${escapeHtml(capitalize(c.presidentName))}</h3>
+        <p class="narr quote">${escapeHtml(b.presLine||'')}</p>
+        <div class="hint">Confiance ${f.confidence - f.dConf} → <b>${f.confidence}</b> sur 100.${f.confidence<35?" Sous 35, il ne te prolongera pas.":f.confidence>=70?" Tu as les mains libres.":""}</div>
+      </section>
+
+      <section><h3>📈 Où en sont les jauges</h3>
+        ${(b.gauges||[]).map(bilanGaugeRow).join('')}
+        <div class="bil-row"><span>🌡️ Pression</span><span class="bil-bar hot"><i style="width:${clamp(p.after)}%"></i></span><b>${p.after}</b><i class="${dp<0?'up':dp>0?'down':''}">${dp>0?'+':''}${dp||'='}</i></div>
+      </section>
+
+      <section><h3>🏛️ Ce qu'il en reste</h3>
+        ${f.cote?`<div class="hint">Ta cote : <b>${f.cote.before} → ${f.cote.after}</b> · ${f.cote.why.map(escapeHtml).join(' · ')||'saison neutre'}. Tu vaux désormais ${escapeHtml(f.cote.level)}.</div>`:''}
+        <div class="hint">🏆 ${state.titles.league} · ⬆️ ${state.titles.promo} · 🥇 ${state.titles.cup} · ⭐ ${state.titles.euro} · 🎖️ ${state.awards} · 🪓 ${state.sackings}</div>
+        <div class="punchline narr">${pick(f.champion?PUNCHLINES.champion:f.relegated?PUNCHLINES.relegated:f.objectiveMet?PUNCHLINES.hit:f.pos>f.teams*.7?PUNCHLINES.flop:PUNCHLINES.mid)}</div>
+      </section>
+    </div>
+
+    <details class="bil-more"><summary>Le détail : classement, coupes, progressions</summary>
+      <div class="two-cols"><div><div class="section-label">Classement final</div>${tableHTML(f.table,f.club,false)}</div><div><div class="section-label">Parcours en coupe</div>${cupPathHTML(f.cupPath,'Coupe nationale')}${f.euro?cupPathHTML(f.euro.path,f.euro.name):''}</div></div>
+      ${f.devNotes.length?`<div class="section-label">Progressions</div><div class="hint">${f.devNotes.map(escapeHtml).join('<br>')}</div>`:''}
+    </details>
     <div class="btn-row"><button class="btn" onclick="coachAfterSeasonEnd()">Intersaison →</button></div></div>`;
 }
 function renderSacked(){ const h=state.history[state.history.length-1]; return `<div class="card"><div class="result-hero"><span class="result-hero-icon">🪓</span><h2 class="display">Licencié·e</h2><div class="verdict">${escapeHtml(h.club)} · après la phase ${h.phase} · ${ordinal(h.pos)} pour un objectif de ${ordinal(h.objective)}</div></div><p class="narr">La confiance du président est tombée à zéro. Le communiqué tient en trois lignes, ton bureau est vidé avant midi. Ta réputation en prend un coup, ton téléphone continuera de sonner… un peu moins fort.</p><div class="btn-row"><button class="btn" onclick="coachIntersaison();render()">Continuer →</button></div></div>`; }
@@ -549,41 +594,35 @@ function coteHTML(){ const cote=state.cote==null?30:state.cote; const s=coteToSt
 function matchdayLabel(){ const comp=state.comp; return `Journée ${Math.min((state.matchday||0)+1,comp.schedule.length)} / ${comp.schedule.length}`; }
 
 /* ---------- Entraîneur·euse : avant-match, mi-temps, résultat ---------- */
-function renderPrematch(){
-  const m=state.match, c=state.club, y=state.year, P=coachSquadMap(); const f=FORMATIONS[m.formation]; const need={G:1,D:f[0],M:f[1],A:f[2]};
-  const xi=m.xi.map(id=>P[id]).filter(Boolean); const slots=assignSlots(xi,f); const count={G:0,D:0,M:0,A:0}; xi.forEach(p=>count[p.pos]++);
-  const bmax=benchSize(y); matchFactors(m,P,{extra:coachBonusLines()});
-  const status=p=>m.xi.includes(p.id)?'xi':m.bench.includes(p.id)?'bench':'out';
-  const row=p=>{ const st=status(p), av=availableForMatch(p); const flags=`${p.injury>0?` <span class="flag bad">🩼 ${p.injury} sem.</span>`:''}${p.suspended>0?` <span class="flag bad">🟥 ${p.suspended} match${p.suspended>1?'s':''}</span>`:''}${p.promised?' ⭐':''}${p.fanFav?' ❤️':''}${m.captain===p.id?' ©':''}`; const slot=slots.find(s=>s.p===p);
-    return `<tr class="${st} ${av?'':'inj'}"><td>${av?`<button class="status-btn ${st}" onclick="coachToggleLineup(${p.id})">${st==='xi'?'Titulaire':st==='bench'?'Banc':'Tribune'}</button>`:'<span class="status-btn off">Indispo</span>'}</td><td><span class="pos-badge pos-${p.pos}">${p.pos}</span>${slot&&slot.pen?` <span class="flag bad" title="Hors poste">→${slot.slot} −${slot.pen}</span>`:''}</td><td class="${p.real?'real':''}">${natTag(p)} ${escapeHtml(p.name)}${flags}</td><td>${playerAge(p,y)}</td><td><b>${Math.round(effRating(p,y))}</b>${fitnessMalus(p)>=1?` <span class="flag bad">−${fitnessMalus(p).toFixed(0)}</span>`:''}</td><td>${fitBar(fit(p))}</td><td class="r">${p.rated?notePill(p.sumRating/p.rated):'<span class="hint">—</span>'}</td><td class="r hint">${p.goals||0} b · ${p.assists||0} p${p.yellows?` · 🟨${p.yellows}`:''}</td></tr>`; };
-  const okXI=xi.length===11; const missing=['G','D','M','A'].filter(k=>count[k]<need[k]).map(k=>`${need[k]-count[k]} ${POS_LABEL[k].toLowerCase()}${need[k]-count[k]>1?'s':''}`);
-  return `<div class="card"><h2 class="display">${matchdayLabel()} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}${whyHTML(m.why)}${sinceHTML(state.sinceLast)}
-    ${oppCardHTML(m)}
-    <div class="section-label">Formation</div><div class="formation-grid">${Object.keys(FORMATIONS).map(x=>`<button class="${m.formation===x?'on':''}" onclick="coachSetMatchOption('formation','${x}')"><b>${x}</b></button>`).join('')}</div>
-    <div class="two-cols"><div><div class="section-label">Approche du match</div><div class="opt-grid">${Object.entries(APPROACHES).map(([k,a])=>`<button class="${m.approach===k?'on':''}" onclick="coachSetMatchOption('approach','${k}')"><b>${a.icon} ${a.label}</b><small>${a.desc}</small></button>`).join('')}</div></div>
-    <div><div class="section-label">Semaine d'entraînement</div><div class="opt-grid">${Object.entries(TRAINING).map(([k,t])=>`<button class="${state.training===k?'on':''}" onclick="coachSetMatchOption('training','${k}')"><b>${t.icon} ${t.label}</b><small>${t.desc}</small></button>`).join('')}</div></div></div>
-    <div class="section-label">Composition · titulaires ${xi.length}/11 · banc ${m.bench.length}/${bmax}${bmax?'':' (pas de remplaçant à cette époque)'}</div>
-    <div class="hint">${m.formation} demande ${need.D} défenseurs, ${need.M} milieux, ${need.A} attaquants.${missing.length?` <b>Il manque ${missing.join(', ')}</b> : un joueur hors poste perd des points.`:' Compo cohérente.'} Clique sur le statut pour passer titulaire → banc → tribune.</div>
-    <div style="overflow-x:auto"><table class="squad-table lineup"><thead><tr><th>Statut</th><th></th><th>Joueur</th><th>Âge</th><th>Niveau</th><th>Fraîcheur</th><th class="r">Note</th><th class="r">Saison</th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(p=>p.pos===pos).sort((a,b)=>effRating(b,y)-effRating(a,y)).map(row).join('')).join('')}</tbody></table></div>
-    <div class="btn-row"><label class="hint">Capitaine <select class="select" onchange="coachSetMatchOption('captain',this.value)">${xi.map(p=>`<option value="${p.id}" ${m.captain===p.id?'selected':''}>${escapeHtml(p.name)} (${traitLabel(p.trait)})</option>`).join('')}</select></label><button class="btn secondary small" onclick="coachAutoLineup()">Onze automatique</button></div>
-    <div class="section-label">Ce qui pèse sur ce match</div>${factorsHTML(m.factors)}
-    <div class="btn-row"><button class="btn" onclick="coachKickoff();render()">${okXI?'Coup d\'envoi ⚽':'Compléter et lancer ⚽'}</button><button class="btn secondary" onclick="coachSimPhase()">Simuler la fin de la phase ⏩</button></div></div>`;
+/* Le rendez-vous : la seule chose qu'on fait, c'est trancher. Le match suit,
+   et on le lit. */
+function renderMeeting(){
+  const mt=state.meeting; if(!mt) return '<div class="card"><p class="narr">…</p></div>';
+  const keys=effectKeys(mt.choices.map(c=>c.effects));
+  return `<div class="card event-card meeting-card"><div class="hint">${matchdayLabel()} · ${escapeHtml(mt.opponent||'')}</div>
+    <div class="ico">${mt.icon}</div><h2 class="display">${escapeHtml(mt.title)}</h2>
+    <p class="narr">${escapeHtml(mt.text)}</p>
+    ${sinceHTML(state.sinceLast)}
+    <div class="section-label">Ta décision</div>
+    <div class="choice-list">${mt.choices.map((c,i)=>`<button class="choice-btn" onclick="coachChooseMeeting(${i})"><div class="body"><b>${escapeHtml(c.label)}</b>${c.sub?`<small>${escapeHtml(c.sub)}</small>`:''}${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>
+    ${stateTable(keys)}
+    <div class="hint">Tu ne composes pas l'équipe : ton adjoint s'en charge. Tu décides, et le match répond.</div></div>`;
 }
-function renderHalftime(){
-  const m=state.match, c=state.club; const ha=matchHomeAway(m);
-  const lead=m.gu>m.gt?'Tu mènes.':m.gu<m.gt?'Tu es mené·e.':'Tout reste à faire.';
-  return `<div class="card"><h2 class="display">Mi-temps · ${escapeHtml(ha.home)} ${ha.gh} – ${ha.ga} ${escapeHtml(ha.away)}</h2><p class="narr">${lead} ${m.subsLeft} remplacement${m.subsLeft>1?'s':''} encore possible${m.subsLeft>1?'s':''}. Approche actuelle : ${APPROACHES[m.approach].icon} ${APPROACHES[m.approach].label}.</p>
-    ${eventsHTML(m.events)}
-    <div class="section-label">Ta décision</div><div class="choice-list">${HALFTIME_CHOICES.map(ch=>`<button class="choice-btn" onclick="coachHalftime('${ch.id}')"><span class="ico">${ch.icon}</span><div class="body"><b>${ch.label}</b><small>${ch.sub}${ch.id==='talk'?` Management ${Math.round(state.stats.technique)}, vestiaire ${Math.round(state.gauges.vestiaire)}.`:''}</small></div></button>`).join('')}</div></div>`;
+/* Ce que ta décision a produit, en tête du résultat. */
+function recapHTML(){
+  const r=state.meetingRecap; if(!r) return '';
+  return `<div class="recap"><div class="recap-head">${r.icon} <b>${escapeHtml(r.title)}</b></div>
+    <div class="recap-choice">${escapeHtml(r.choice)}</div>
+    ${r.notes&&r.notes.length?`<div class="hint">${r.notes.map(escapeHtml).join(' · ')}</div>`:''}</div>`;
 }
 function renderMatchResult(){
   const rec=state.lastMatch, c=state.club, P=coachSquadMap(), comp=state.comp; const N=comp.teams.length; const last=state.matchday>=comp.phaseEnds[state.phase];
-  return `<div class="card">${scoreHero(rec,c.name)}<p class="narr story">${escapeHtml(rec.story)}${rec.htNote?` ${escapeHtml(rec.htNote)}`:''}</p>
+  return `<div class="card">${recapHTML()}${scoreHero(rec,c.name)}<p class="narr story">${escapeHtml(rec.story)}${rec.htNote?` ${escapeHtml(rec.htNote)}`:''}</p>
     <div class="two-cols"><div><div class="section-label">Le film du match</div>${eventsHTML(rec.events)}</div><div><div class="section-label">Les notes${rec.motm&&P[rec.motm]?` · homme du match ${escapeHtml(P[rec.motm].name)}`:''}</div>${ratingsHTML(rec,P)}</div></div>
     ${rec.suspensions&&rec.suspensions.length?`<div class="warn">🟥 Suspension : ${rec.suspensions.map(escapeHtml).join(', ')}</div>`:''}
     <div class="section-label">Pourquoi ce résultat</div>${factorsHTML(rec.factors)}
     <div class="section-label">Classement</div><div class="hint">${escapeHtml(c.name)} ${ordinal(rec.pos)} sur ${N} · objectif ${ordinal(c.objectivePos)} · forme ${formChips(comp.form&&comp.form[c.name])}</div>${tableHTML(sortTable(comp.table),c.name,false)}
-    <div class="btn-row"><button class="btn" onclick="coachAfterMatch()">${last?'Bilan de la phase →':'Continuer →'}</button>${last?'':'<button class="btn secondary" onclick="coachAfterMatch();coachSimPhase()">Simuler la fin de la phase ⏩</button>'}</div></div>`;
+    <div class="btn-row"><button class="btn" onclick="coachAfterMatch()">${last?'Bilan de la phase →':'Continuer →'}</button></div></div>`;
 }
 
 /* ---------- Joueur·euse : avant-match, penalty, résultat ---------- */

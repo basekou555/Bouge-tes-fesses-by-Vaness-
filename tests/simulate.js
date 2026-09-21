@@ -37,8 +37,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
                 if(pr&&Math.abs(pr.cur-want)>0.02) throw new Error(`projection fausse (${k}) : annoncé ${want.toFixed(2)}, appliqué ${pr.cur.toFixed(2)}`); });
               projChecks++; } }
           else if(pc==='choiceResult'){ coachContinueChoiceResult(); }
-          else if(pc==='prematch'){ if(Math.random()<.6) coachSimPhase(); else { if(Math.random()<.5) coachAutoLineup(); else { const p=state.squad[rnd(state.squad.length)]; coachToggleLineup(p.id); } coachSetMatchOption('approach',pick(Object.keys(APPROACHES))); coachSetMatchOption('training',pick(Object.keys(TRAINING))); coachKickoff(); } }
-          else if(pc==='halftime'){ mstat.ht++; coachHalftime(pick(HALFTIME_CHOICES).id); }
+          else if(pc==='meeting'){ const mt=state.meeting; mstat.ht++; (cstat[mt.kind]=(cstat[mt.kind]||0)+1);
+            if(!mt.choices.length) throw new Error('rendez-vous sans option : '+mt.title);
+            const h=renderMeeting(); if(!h||h.length<300) throw new Error('écran de rendez-vous vide');
+            coachChooseMeeting(rnd(mt.choices.length)); }
           else if(pc==='matchResult'){ const m=state.lastMatch; mstat.n++; mstat.g+=m.gh+m.ga; mstat.y+=m.events.filter(e=>e.kind==='yellow').length; mstat.r+=m.events.filter(e=>e.kind==='red'&&e.side==='us').length; mstat.inj+=m.events.filter(e=>e.kind==='injury').length; mstat.pen+=m.events.filter(e=>e.kind==='goal'&&/penalty/.test(e.text)||e.kind==='penmiss').length; mstat.sub+=m.events.filter(e=>e.kind==='sub').length; if(!m.ratings||!Object.keys(m.ratings).length) throw new Error('no ratings'); coachAfterMatch(); }
           else if(pc==='phaseResult'){ if(!dashSeen){ dashSeen=true; const h=renderDashboard(); if(!h||h.length<500) throw new Error('tableau de bord entraîneur vide'); } coachAfterPhase(); }
           else if(pc==='seasonEnd'){ gaps.push(Math.round((state.lastPhase.strength-state.club.strength)*10)/10); wagesR.push(Math.round(state.squad.reduce((n,p)=>n+p.wage,0)/state.club.wageCap*100)/100); coachAfterSeasonEnd();

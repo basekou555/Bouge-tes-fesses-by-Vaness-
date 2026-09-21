@@ -2,11 +2,46 @@
 
 Jeu de simulation de carrière football, 100 % statique (HTML, CSS, JavaScript sans build), en français, inspiré des mécaniques d'Absolut Director. Deux modes : entraîneur·euse et joueur·euse, à travers sept époques (1958 → aujourd'hui) avec clubs et joueurs réels.
 
+## Intention (dite par le propriétaire, 21/09/2026)
+
+**Vivre une carrière, dans un contexte de football.** L'équilibre entre les deux est le sujet,
+et il doit rester **impossible à trouver** : devoir sacrifier quelque chose est le plaisir du
+jeu, pas son défaut. Référence assumée : *Detroit: Become Human*.
+
+- **On ne fait rien, on choisit.** Le jeu est une suite de décisions face à des interlocuteurs
+  et à une situation qui évolue. Il n'exige aucune manipulation. *Composer une équipe,
+  remplacer soi-même un blessé : hors sujet.* Décider quoi faire d'un blessé (le remplaçant,
+  le jeune, le faire jouer quand même, déléguer à l'adjoint), où porter l'effort entre deux
+  compétitions, comment aborder un adversaire qui joue de telle manière : **c'est ça, le jeu.**
+- **Chaque décision a un effet court terme et un effet long terme**, et les deux doivent se
+  voir. Faire jouer le remplaçant, c'est priver le jeune d'une occasion ; ça se paiera.
+- **Après les décisions vient le temps où l'on souffle** et où l'on lit ce qu'elles ont produit.
+  Ce moment doit être beau et distinct — c'était la force d'Absolut Director. La fin de saison
+  est un **écran-bilan** (réussites, échecs, qui veut partir, qui veut rester, la famille, le
+  club, le président, les supporters), pas une liste de plus.
+- **Un écran ne doit pas ressembler au précédent.** La répétition visuelle tue le rythme.
+- Une session dure **30 min à 1 h par jour**. Environ **dix moments de décision par saison**
+  est le bon rythme (calibré et validé).
+- Le football est un terrain familier pour le propriétaire : **les chiffres ne le gênent pas**,
+  tant qu'ils servent une décision. (Un jeu de foot *sans aucune statistique*, rien que des
+  décisions, est une piste qui l'intrigue — à garder en tête, pas à appliquer.)
+- **Une carrière doit laisser une trace.** Aujourd'hui elle en laisse trop peu : « on ne
+  s'attache pas vraiment aux carrières, c'est un peu sans effet sauf quand c'est le jackpot. »
+  C'est le problème de fond à résoudre.
+- Le jeu est fait **pour le propriétaire seul** : pas de tutoriel, pas d'onboarding public.
+- Le **mercato est sa partie préférée** du mode entraîneur·euse. Le mode joueur·euse doit
+  atteindre le même niveau, **mais autrement** : il lui manque son équivalent du mercato.
+- Décisions tranchées : la **coupe doit devenir jouable** (comme suite de décisions, pas de
+  matchs à opérer).
+
 ## Fichiers
 - `index.html` charge dans l'ordre : `profile.js` (styles de jeu, nationalités), `players.js` (≈400 joueurs réels `[nom, poste, naissance, niveau, nationalité]`), `eras.js` (époques, clubs FR/Europe/monde avec force par décennie, entraîneurs réels), `content.js` (incidents, coups du sort, dilemmes, carrefours, roulettes, arnaques, présidents — vingt événements de vie et vingt dilemmes par mode), `core.js` (moteur partagé : joueurs, effectifs, marché, championnats, coupes, développement, badges, persistance), `match.js` (le match : familles de styles, approche, entraînement, fraîcheur, suspensions, compo automatique, moteur minute par minute avec buts, penaltys, cartons, blessures, remplacements, mi-temps, notes, récit), `coach.js` (carrière entraîneur·euse), `player.js` (carrière joueur·euse), `ui.js` (tous les écrans).
 - Tout l'état d'une carrière est dans l'objet global `state` (sérialisé dans localStorage). `state.pendingChoice` désigne l'écran courant ; `render()` dans `ui.js` dispatche.
-- Une saison se joue journée par journée : `state.matchday` avance dans `state.comp.schedule`, le match courant est `state.match` (identifiants de joueurs seulement, résolus via `coachSquadMap()` / `playerSquadMap()`). Écrans : `prematch` → `halftime` (entraîneur·euse) ou `penalty` (joueur·euse) → `matchResult`, puis `phaseResult` à la fin de chaque quart de saison.
-- Rythme : `state.tempo` (`complet`, `temps_forts`, `rapide`) ; `coachAdvance()` / `playerAdvance()` avancent dans le calendrier et ne s'arrêtent (`prematch`) que si `coachStopReasons()` / `playerStopReasons()` renvoient des raisons. Côté entraîneur·euse, `coachStopReasons()` combine un quota d'arrêts par phase (`STOP_QUOTA`, 2 hors reprise en temps forts, 0 en rapide, `state.phaseStops`), une note d'intérêt (`coachMatchInterest()`, 0-5) et une barre qui s'abaisse quand la phase s'achève ; seules les alertes sévères (`coachSevereAlerts()`) ajoutent du poids. Environ dix matchs joués par saison en temps forts. Les matchs joués en coulisses vont dans `state.skipped`, affichés via `state.sinceLast`.
+- Une saison se joue journée par journée : `state.matchday` avance dans `state.comp.schedule`, le match courant est `state.match` (identifiants de joueurs seulement, résolus via `coachSquadMap()` / `playerSquadMap()`). Écrans entraîneur·euse : `meeting` → `matchResult` → `phaseResult` à la fin de chaque quart de saison → `seasonEnd`. Le mode joueur·euse garde `prematch` → `penalty` → `matchResult` (son pivot reste à faire).
+- **Le bilan de fin de saison** (`renderSeasonEnd`) est le temps où l'on souffle : le film de l'année (le grand soir, le soir qu'on oublie, les derniers arbitrages), le vestiaire (qui a grandi, qui veut partir, qui resterait), le président et sa phrase, les jauges avant → après, ce qu'il en reste. Les données sont assemblées dans `season.bilan` par `coachEndSeason()`, à partir de `state.seasonStats.g0` (photo des jauges au coup d'envoi) et `state.seasonStats.decisions`. Le détail chiffré (classement, coupes, progressions) est replié dans un `<details>`.
+- **Les rendez-vous (mode entraîneur·euse)** : on ne compose plus et on ne joue plus les matchs. `coachAdvance()` déroule le calendrier, joue tout avec la compo de l'adjoint, et ne s'arrête que si `coachDrawMeeting()` renvoie un rendez-vous (`state.meeting`, écran `meeting`). Chaque rendez-vous est une décision ; `coachChooseMeeting()` applique ses effets puis **joue le match dans la foulée**, et l'écran `matchResult` est la réponse à la décision (rappelée en tête par `recapHTML()` depuis `state.meetingRecap`). Quota par phase : `MEETING_QUOTA` (3 / 2 / 1 selon `state.tempo`), soit ~7 à 8 rendez-vous par saison. Les matchs joués en coulisses vont dans `state.skipped`, affichés via `state.sinceLast`.
+- Six familles de rendez-vous, toutes dans `coach.js` : `coachMeetingInjured` (un cadre absent : le remplaçant, le jeune, le faire jouer quand même, déléguer à l'adjoint), `coachMeetingFronts` (championnat ou coupe d'Europe → `state.effort`, qui pèse sur `coachBonus()`), `coachMeetingCaptain` (le capitaine plaide pour un joueur au moral bas), `coachMeetingPresident` (le président veut voir jouer son gros salaire), `coachMeetingSquad` (un symptôme : fraîcheur sous 82 %, vestiaire sous 45), `coachMeetingOpponent` (leur style, et comment l'aborder). `coachDrawMeeting()` rassemble **tous** les candidats applicables puis écarte les genres vus dans les trois derniers (`state.recentMeetings`) : deux écrans de suite du même genre tuent le rythme.
+- `coachApplyPlan()` traduit une décision en effet sur le match qui suit : `forceIn` (titulariser quelqu'un, celui qu'on sort perd du moral), `playHurt` (`state.hurtGamble`, 45 % de rechute aggravée), `rotate`, `approach`, `style`, `training`, `bonus` ponctuel (`state.nextMatchBonus`), `effort`, `delegate` (l'adjoint tranche, d'autant mieux que la jauge Staff est haute).
 - Tableau de bord : `renderDashboard()` / `renderPlayerDashboard()` dans `ui.js`, ouverts par le bouton `#dashBtn` du bandeau (`openDashboard()` / `closeDashboard()`, état dans la variable `dashOpen` de `ui.js`, hors sauvegarde). `coachStrengthBreakdown()` (coach.js) décompose `coachBonus()` ligne par ligne avec son explication chiffrée ; `state.seasonStats.trainWeeks` compte les semaines de chaque entraînement et `p.lastDev` retient le gain appliqué à chaque joueur par `developSquad()` à l'intersaison. La carte porte la classe `dash-card`, qui la dispense du bouton collant.
 - Cohérence des clubs : `state.cote` (entraîneur·euse) et `playerTargetStrength()` (joueur·euse) fixent le niveau de club visé ; `generateCoachOffers()` / `playerGenerateOffers()` filtrent les offres autour de ce niveau et respectent les contrats (`club.contractEnd`, offres `poach`, rupture avec malus).
 - Nationalités : chaque joueur porte `p.nat` (code pays). `NAT_INFO` dans `profile.js` donne drapeau et nom ; `natTag(p)` dans `ui.js` l'affiche dans l'effectif, sur le marché et dans la composition, et `quotaHTML()` nomme les joueurs qui occupent le quota. `quotaActive()` : le quota ne concerne que les clubs français avant l'arrêt Bosman (`eraForeignersMax`).
