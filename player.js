@@ -18,7 +18,8 @@ const PFOCUS_AREAS={
   image:{icon:'📣',label:"Ton image",desc:"Sponsors, réseaux, journalistes, agent.",gain:{supporters:7,money:.12,entourage:3},loss:{supporters:-5}},
   proches:{icon:'🏡',label:"Tes proches",desc:"Ceux qui étaient là avant les contrats.",gain:{entourage:13,pressure:-7},loss:{entourage:-9,pressure:2}},
 };
-const PFOCUS_PICKS=2;
+/* Ces chantiers ne sont plus un écran de début de saison : ils forment le menu
+   des carrefours (PLAYER_CROSSROADS), un par phase, amenés par une situation. */
 const PGAUGE={corps:{icon:'🩻',label:"Corps",help:"Santé : blessures, récupération, longévité. À zéro, la carrière s'arrête."},vestiaire:{icon:'✊',label:"Vestiaire",help:"Place dans le groupe : temps de jeu et soutien en cas de crise."},supporters:{icon:'📣',label:"Supporters",help:"Amour du public : pression et récompenses."},entourage:{icon:'👪',label:"Entourage",help:"Agent, famille, amis : qualité des offres et stabilité."}};
 const PSTAT={technique:"Technique",physique:"Physique",mental:"Mental"};
 const ROLES={titulaire:{name:"Titulaire",share:.9},rotation:{name:"Rotation",share:.55},remplacant:{name:"Remplaçant·e",share:.25}};
@@ -102,31 +103,23 @@ function playerAcceptOffer(i){
     if(!state.clubs.includes(o.club)) state.clubs.push(o.club); if(o.tier==='superclub') unlockTrophy('p-superclub');
   }
   state.currentOffers=[]; log(`🖊️ ${o.stay?(o.underContract?'Tu poursuis à':'Tu prolonges à'):o.poach?'Transfert ! Tu signes à':'Tu signes à'} <b>${o.club}</b> (${o.leagueName}) : ${ROLES[o.role].name.toLowerCase()} promis·e, ${money(o.salary,state.year)} par saison, coach ${o.coach}${o.stay&&o.underContract?'':`, jusqu'en ${state.club.contractEnd}`}.`);
-  state.focus=[]; state.pendingChoice='priorities'; saveGame();
+  playerStartSeason();
 }
-/* Deux chantiers par saison : le reste attendra l'année prochaine. */
-function playerToggleFocus(k){
-  if(!PFOCUS_AREAS[k]) return;
-  const i=state.focus.indexOf(k);
-  if(i>=0) state.focus.splice(i,1);
-  else if(state.focus.length<PFOCUS_PICKS) state.focus.push(k);
-  else { state.focus.shift(); state.focus.push(k); }
-  render();
-}
-function playerConfirmFocus(){
-  if(state.focus.length<PFOCUS_PICKS) return;
+/* Un carrefour : trois chantiers, un seul reçoit tes heures. Les deux autres reculent. */
+function playerChooseCrossroad(i){
+  const x=state.currentEvent&&state.currentEvent.event; if(!x) return;
+  const key=x.menu[i], a=PFOCUS_AREAS[key]; if(!a) return;
   const before=pSnapshot(), lines=[];
   const read=k=>k in state.stats?state.stats[k]:k in state.gauges?state.gauges[k]:null;
-  Object.entries(PFOCUS_AREAS).forEach(([k,a])=>{
-    const on=state.focus.includes(k);
-    playerApplyEffects(focusScaled(on?a.gain:a.loss,read));
-    if(!on) lines.push(`${a.icon} ${a.label} : laissé de côté`);
-  });
-  state.lastFocus=[...state.focus];
-  log(`🕰️ Cette saison, tu travailles ${state.focus.map(k=>PFOCUS_AREAS[k].label.toLowerCase()).join(' et ')}. Le reste attendra.`);
-  state.pendingResult={title:'🕰️ Ton année',subtitle:state.focus.map(k=>`${PFOCUS_AREAS[k].icon} ${PFOCUS_AREAS[k].label}`).join(' · '),
-    narrative:"Une saison ne tient pas tout. Ce que tu travailles progresse, ce que tu laisses recule un peu.",
-    before,after:pSnapshot(),extra:lines,next:'season'};
+  playerApplyEffects(focusScaled(a.gain,read,.7));
+  x.menu.forEach(k=>{ if(k===key) return; const o=PFOCUS_AREAS[k];
+    playerApplyEffects(focusScaled(o.loss,read,.65)); lines.push(`${o.icon} ${o.label} : ça attendra`); });
+  state.lastFocus=key;
+  log(`${x.icon} <b>${x.title}</b> → ${a.label.toLowerCase()}. ${x.menu.filter(k=>k!==key).map(k=>PFOCUS_AREAS[k].label.toLowerCase()).join(' et ')} : ça attendra.`);
+  state.currentEvent=null;
+  state.pendingResult={title:`${x.icon} ${x.title}`,subtitle:`${a.icon} ${a.label}`,
+    narrative:a.desc+" Le reste du trimestre s'organisera autour de ça.",
+    before,after:pSnapshot(),extra:lines,next:'phase'};
   state.pendingChoice='choiceResult'; render();
 }
 /* ---------- Saison ---------- */
@@ -160,14 +153,29 @@ function playerStartSeason(){
   playerPlayPhase();
 }
 function playerPlayPhase(){
-  const chance=.6; if(Math.random()<chance){ const y=state.year, low=Object.keys(state.gauges).filter(k=>state.gauges[k]<35); const pool=PLAYER_INCIDENTS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)&&(!e.gauge||low.includes(e.gauge)||Math.random()<.35)); state.currentEvent={kind:'incident',event:pickNoRepeat('p-incidents',pool)}; state.pendingChoice='event'; saveGame(); return; }
+  const ev=playerDrawPhaseEvent();
+  if(ev){ state.currentEvent=ev; state.pendingChoice='event'; saveGame(); return; }
   playerSimulatePhase();
+}
+/* Une phase, un carrefour : dilemme de jauge, incident, vie hors du terrain ou
+   arbitrage de tes heures — tout sort du même sac. */
+function playerDrawPhaseEvent(){
+  const y=state.year, g=state.gauges, ph=state.phase, bag=[];
+  const low=Object.keys(g).filter(k=>g[k]<40);
+  // La reprise est toujours un carrefour : ce que tu travailles en juillet tient jusqu'en mai.
+  if(ph===0){ const pre=PLAYER_CROSSROADS.filter(x=>x.phase===0); return weightedDraw(pre.map(x=>({kind:'carrefour',event:x,w:1}))); }
+  PLAYER_DILEMMAS.filter(d=>low.includes(d.gauge)).forEach(d=>bag.push({kind:'dilemma',event:d,w:g[d.gauge]<25?8:5}));
+  PLAYER_CROSSROADS.filter(x=>x.phase==null||x.phase===ph).forEach(x=>bag.push({kind:'carrefour',event:x,w:x.phase===ph?9:4}));
+  PLAYER_INCIDENTS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)&&(!e.gauge||low.includes(e.gauge)))
+    .forEach(e=>bag.push({kind:'incident',event:e,w:1.8}));
+  PLAYER_HAPPENINGS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)).forEach(e=>bag.push({kind:'happening',event:e,w:2}));
+  return weightedDraw(bag);
 }
 function playerChooseEvent(i){
   const ce=state.currentEvent, ev=ce.event, ch=ev.choices[i]; if(!ch) return;
   const before=pSnapshot(); const extra=playerApplyEffects(ch.effects);
   log(`${ev.icon} <b>${ev.title}</b> → ${ch.label}. ${ch.result||''}`);
-  state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:pSnapshot(),extra,next:ce.kind==='incident'?'phase':'intersaison'}; state.currentEvent=null; state.pendingChoice='choiceResult'; saveGame(); render();
+  state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:pSnapshot(),extra,next:'phase'}; state.currentEvent=null; state.pendingChoice='choiceResult'; saveGame(); render();
 }
 function playerContinueChoiceResult(){ const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null; if(state.ended){ render(); return; } if(r.next==='phase'){ playerSimulatePhase(); render(); return; } if(r.next==='season'){ playerStartSeason(); render(); return; } if(r.next==='offers'){ playerOpenOffers(); render(); return; } playerIntersaison(); render(); }
 /* ---------- Une phase = des journées jouées une par une ---------- */
@@ -346,9 +354,7 @@ function playerIntersaison(){
   if(playerCheckEnd()){ render(); return; }
   const n=state.history.length;
   if(n>=3&&n-state.lastRouletteSeason>=5&&state.rouletteCount<2&&Math.random()<.12){ state.currentRoulette={event:pickNoRepeat('p-roulette',PLAYER_ROULETTES),outcomes:shuffledCopy([Math.random()<.5?'end':'malus','jackpot','small','malus'])}; state.rouletteCount++; state.lastRouletteSeason=n; state.pendingChoice='roulette'; return; }
-  const g=state.gauges; const low=Object.keys(g).filter(k=>g[k]<40);
-  if(low.length&&Math.random()<.5){ const pool=PLAYER_DILEMMAS.filter(d=>low.includes(d.gauge)); if(pool.length){ state.currentEvent={kind:'dilemma',event:pick(pool)}; state.pendingChoice='event'; return; } }
-  if(Math.random()<.5){ const pool=PLAYER_HAPPENINGS.filter(e=>(!e.minYear||state.year>=e.minYear)&&(!e.maxYear||state.year<=e.maxYear)); state.currentEvent={kind:'happening',event:pickNoRepeat('p-happenings',pool)}; state.pendingChoice='event'; return; }
+  // dilemmes et vie hors du terrain : désormais en cours de saison, une fois par phase
   playerOpenOffers();
 }
 function playerChooseRoulette(i){

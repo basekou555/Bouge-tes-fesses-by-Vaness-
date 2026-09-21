@@ -16,14 +16,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
         const era=ERAS[run%ERAS.length], mode=COACH_MODES[run%COACH_MODES.length];
         creation={kind:'coach',step:0,name:'C'+run,era,mode,origin:pick(COACH_ORIGINS),nationality:pick(NATIONALITIES),style:pick(STYLES),mentor:pick(COACHES_BY_ERA[era.id]),quality:pick(COACH_QUALITIES),flaw:pick(COACH_FLAWS)};
         launchCoach(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, screens={}, gaps=[], wagesR=[], mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0};
+        let steps=0, screens={}, gaps=[], wagesR=[], mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0};
         while(!state.ended&&steps<6000){
           steps++; const pc=state.pendingChoice; screens[pc]=(screens[pc]||0)+1; if(steps%100===0) await new Promise(r=>setTimeout(r,0)); // laisse respirer le moteur de rendu
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ coachBreakContract(); if(!state.currentOffers.length){ coachSkipYear(); render(); continue; } } coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
           else if(pc==='mercato'){ const m=state.market; let tries=0; while(tries<4){ tries++; const cand=m.targets.map((t,i)=>({t,i})).filter(x=>x.t.access!=='no'&&x.t.price<=m.budgetLeft*.6); if(!cand.length) break; const x=cand[rnd(cand.length)]; coachBuy(x.i); if(state.pendingChoice!=='mercato') break; } if(state.squad.length>25) coachSell(state.squad[state.squad.length-1].id); coachCloseMercato(); }
           else if(pc==='tactic'){ coachSetTactic(pick(Object.keys(FORMATIONS)),Math.random()<.6?state.club.styleWanted:state.favoriteStyleId); }
-          else if(pc==='priorities'){ const keys=shuffledCopy(Object.keys(FOCUS_AREAS)).slice(0,FOCUS_PICKS); keys.forEach(k=>coachToggleFocus(k)); coachConfirmFocus(); }
-          else if(pc==='event'){ coachChooseEvent(rnd(state.currentEvent.event.choices.length)); }
+          else if(pc==='event'){ const ce=state.currentEvent; if(ce.kind==='carrefour'){ cstat.carrefours++; coachChooseCrossroad(rnd(ce.event.menu.length)); } else { cstat[ce.kind]=(cstat[ce.kind]||0)+1; coachChooseEvent(rnd(ce.event.choices.length)); } }
           else if(pc==='choiceResult'){ coachContinueChoiceResult(); }
           else if(pc==='prematch'){ if(Math.random()<.6) coachSimPhase(); else { if(Math.random()<.5) coachAutoLineup(); else { const p=state.squad[rnd(state.squad.length)]; coachToggleLineup(p.id); } coachSetMatchOption('approach',pick(Object.keys(APPROACHES))); coachSetMatchOption('training',pick(Object.keys(TRAINING))); coachKickoff(); } }
           else if(pc==='halftime'){ mstat.ht++; coachHalftime(pick(HALFTIME_CHOICES).id); }
@@ -39,21 +38,20 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           render();
         }
         render();
-        res.coach.push({run,era:era.id,mode:mode.id,fate:(state.rouletteFate&&state.rouletteFate.kind)||'-',cause:state.endingCause,age:state.age,year:state.year,seasons:state.history.length,sackings:state.sackings,titles:state.titles,awards:state.awards,steps,screens,clubs:state.clubsCoached.length,rep:Math.round(state.stats.reputation),scams:state.scamsSuffered,gap:(gaps.reduce((a,b)=>a+b,0)/Math.max(1,gaps.length)).toFixed(1),gapMax:Math.max(...gaps,0),wr:(wagesR.reduce((a,b)=>a+b,0)/Math.max(1,wagesR.length)).toFixed(2),m:mstat});
+        res.coach.push({run,era:era.id,mode:mode.id,fate:(state.rouletteFate&&state.rouletteFate.kind)||'-',cause:state.endingCause,age:state.age,year:state.year,seasons:state.history.length,sackings:state.sackings,titles:state.titles,awards:state.awards,steps,screens,clubs:state.clubsCoached.length,rep:Math.round(state.stats.reputation),scams:state.scamsSuffered,gap:(gaps.reduce((a,b)=>a+b,0)/Math.max(1,gaps.length)).toFixed(1),gapMax:Math.max(...gaps,0),wr:(wagesR.reduce((a,b)=>a+b,0)/Math.max(1,wagesR.length)).toFixed(2),m:mstat,ev:cstat,proches:Math.round(state.gauges.proches)});
       }catch(e){ res.coach.push({run,error:e.message+' @ '+(e.stack||'').split('\n')[1],pc:state&&state.pendingChoice}); }
     }
     for(let run=0;run<8;run++){
       try{
         localStorage.clear(); const era=ERAS[run%ERAS.length];
         creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0};
+        let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0};
         while(!state.ended&&steps<5000){
           steps++; const pc=state.pendingChoice; if(steps%100===0) await new Promise(r=>setTimeout(r,0));
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ playerBreakContract(); if(!state.currentOffers.length){ playerSkipYear(); render(); continue; } } playerAcceptOffer(rnd(state.currentOffers.length)); } else playerSkipYear(); }
-          else if(pc==='event'){ playerChooseEvent(rnd(state.currentEvent.event.choices.length)); }
+          else if(pc==='event'){ const ce=state.currentEvent; if(ce.kind==='carrefour'){ pcar.carrefours++; playerChooseCrossroad(rnd(ce.event.menu.length)); } else { pcar[ce.kind]=(pcar[ce.kind]||0)+1; playerChooseEvent(rnd(ce.event.choices.length)); } }
           else if(pc==='choiceResult'){ playerContinueChoiceResult(); }
           else if(pc==='prematch'){ if(Math.random()<.6) playerSimPhase(); else playerKickoff(); }
-          else if(pc==='priorities'){ const keys=shuffledCopy(Object.keys(PFOCUS_AREAS)).slice(0,PFOCUS_PICKS); keys.forEach(k=>playerToggleFocus(k)); playerConfirmFocus(); }
           else if(pc==='penalty'){ pstat.pen++; playerPenaltyChoice(Math.random()<.7); }
           else if(pc==='matchResult'){ const m=state.lastMatch; pstat.n++; if(m.played) pstat.played++; if(m.start) pstat.start++; pstat.g+=m.gh+m.ga; if(m.inj) pstat.inj++; playerAfterMatch(); }
           else if(pc==='phaseResult'){ playerAfterPhase(); }
@@ -64,14 +62,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           render();
         }
         render();
-        res.player.push({run,era:era.id,pos:state.pos,cause:state.endingCause,age:pAge(),seasons:state.history.length,totals:state.totals,note:Math.round(pRating()),clubs:state.clubs.length,best:state.history.reduce((b,h)=>Math.max(b,h.note||0),0).toFixed(2),p:pstat});
+        res.player.push({run,era:era.id,pos:state.pos,cause:state.endingCause,age:pAge(),seasons:state.history.length,totals:state.totals,note:Math.round(pRating()),clubs:state.clubs.length,best:state.history.reduce((b,h)=>Math.max(b,h.note||0),0).toFixed(2),p:pstat,ev:pcar,entourage:Math.round(state.gauges.entourage)});
       }catch(e){ res.player.push({run,error:e.message+' @ '+(e.stack||'').split('\n')[1],pc:state&&state.pendingChoice}); }
     }
     try{ renderBadges(); renderHall(); renderRules(); state=null; renderStart(); startCoachCreation(); cPick('name','X'); cPickEra(2); render; startPlayerCreation(); cPick('name','Y'); cPickEra(5); cPick('pos',PLAYER_POS[3]); cPick('origin',PLAYER_ORIGINS[0]); cPick('trait',PLAYER_TRAITS[0]); }catch(e){ res.ui='UI error: '+e.message+' '+(e.stack||'').split('\n')[1]; }
     return res;
   });
-  console.log('COACH'); out.coach.forEach(c=>console.log(c.error?JSON.stringify(c):[c.run,c.era,c.mode,c.cause,'age'+c.age,c.year,'seasons'+c.seasons,'sack'+c.sackings,'L'+c.titles.league+'/P'+c.titles.promo+'/C'+c.titles.cup+'/E'+c.titles.euro,'aw'+c.awards,'clubs'+c.clubs,'rep'+c.rep,'scams'+c.scams,'gap'+c.gap,'gapMax'+c.gapMax,'wages'+c.wr,'matches'+c.m.n,'goals/m'+(c.m.g/Math.max(1,c.m.n)).toFixed(2),'yel/m'+(c.m.y/Math.max(1,c.m.n)).toFixed(2),'red/m'+(c.m.r/Math.max(1,c.m.n)).toFixed(3),'inj/m'+(c.m.inj/Math.max(1,c.m.n)).toFixed(3),'pen/m'+(c.m.pen/Math.max(1,c.m.n)).toFixed(3),'sub/m'+(c.m.sub/Math.max(1,c.m.n)).toFixed(2)].join(' ')));
-  console.log('PLAYER'); out.player.forEach(p=>console.log(p.error?JSON.stringify(p):[p.run,p.era,p.pos,p.cause,'age'+p.age,'seasons'+p.seasons,'apps'+p.totals.apps,'goals'+p.totals.goals,'titles'+p.totals.titles,'caps'+p.totals.caps,'ballons'+p.totals.ballons,'note'+p.note,'best'+p.best,'clubs'+p.clubs,'m'+p.p.n,'played'+p.p.played,'starts'+p.p.start,'pen'+p.p.pen,'inj'+p.p.inj].join(' ')));
+  console.log('COACH'); out.coach.forEach(c=>console.log(c.error?JSON.stringify(c):[c.run,c.era,c.mode,c.cause,'age'+c.age,c.year,'seasons'+c.seasons,'sack'+c.sackings,'L'+c.titles.league+'/P'+c.titles.promo+'/C'+c.titles.cup+'/E'+c.titles.euro,'aw'+c.awards,'clubs'+c.clubs,'rep'+c.rep,'scams'+c.scams,'gap'+c.gap,'gapMax'+c.gapMax,'wages'+c.wr,'matches'+c.m.n,'goals/m'+(c.m.g/Math.max(1,c.m.n)).toFixed(2),'yel/m'+(c.m.y/Math.max(1,c.m.n)).toFixed(2),'red/m'+(c.m.r/Math.max(1,c.m.n)).toFixed(3),'inj/m'+(c.m.inj/Math.max(1,c.m.n)).toFixed(3),'pen/m'+(c.m.pen/Math.max(1,c.m.n)).toFixed(3),'sub/m'+(c.m.sub/Math.max(1,c.m.n)).toFixed(2),'carrefours'+c.ev.carrefours,'dilemmes'+(c.ev.dilemma||0),'vie'+(c.ev.happening||0),'incidents'+(c.ev.incident||0),'proches'+c.proches].join(' ')));
+  console.log('PLAYER'); out.player.forEach(p=>console.log(p.error?JSON.stringify(p):[p.run,p.era,p.pos,p.cause,'age'+p.age,'seasons'+p.seasons,'apps'+p.totals.apps,'goals'+p.totals.goals,'titles'+p.totals.titles,'caps'+p.totals.caps,'ballons'+p.totals.ballons,'note'+p.note,'best'+p.best,'clubs'+p.clubs,'m'+p.p.n,'played'+p.p.played,'starts'+p.p.start,'pen'+p.p.pen,'inj'+p.p.inj,'carrefours'+p.ev.carrefours,'dilemmes'+(p.ev.dilemma||0),'vie'+(p.ev.happening||0),'incidents'+(p.ev.incident||0),'entourage'+p.entourage].join(' ')));
   console.log('UI',out.ui||'ok'); console.log('ERRORS:',errors.length?errors.slice(0,10).join('\n'):'none');
   await browser.close();
 })();

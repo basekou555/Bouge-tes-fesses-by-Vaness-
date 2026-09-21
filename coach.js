@@ -45,7 +45,8 @@ const FOCUS_AREAS={
   club:{icon:'📣',label:"Le club et les médias",desc:"Le président, la presse, les sponsors, le carnet d'adresses.",gain:{reseau:5,reputation:4,supporters:5,confidence:4},loss:{reseau:-2,supporters:-4,confidence:-3}},
   proches:{icon:'🏡',label:"Tes proches",desc:"Les dîners, les anniversaires, les gens qui t'attendent.",gain:{proches:16,pressure:-9},loss:{proches:-7,pressure:3}},
 };
-const FOCUS_PICKS=2;
+/* Plus d'écran de priorités en début de saison : ces chantiers sont désormais
+   le menu des « carrefours » (COACH_CROSSROADS), un par phase, amenés par une situation. */
 
 function coachFreshState(c){
   const mode=c.mode, era=c.era;
@@ -221,44 +222,37 @@ function coachCloseMercato(){
 function coachSetTactic(formation,styleId){
   state.formation=formation; state.styleId=styleId;
   if(state.tacticAfterWinter){ state.tacticAfterWinter=false; coachPlayPhase(); return; }
-  state.focus=[]; state.pendingChoice='priorities'; saveGame();
-}
-/* Deux priorités par saison, pas trois : ce qui n'est pas choisi recule. */
-function coachToggleFocus(k){
-  if(!FOCUS_AREAS[k]) return;
-  const i=state.focus.indexOf(k);
-  if(i>=0) state.focus.splice(i,1);
-  else if(state.focus.length<FOCUS_PICKS) state.focus.push(k);
-  else { state.focus.shift(); state.focus.push(k); }
-  render();
+  coachStartSeason();
 }
 /* Un chantier déjà au point progresse moins ; un chantier au fond ne tombe plus très bas.
    Les deux règles ensemble poussent chaque domaine vers l'équilibre que tes choix lui donnent,
    pas vers 0 ni vers 100. */
-function focusScaled(effects,read){
+function focusScaled(effects,read,mult=1){
   const out={};
   Object.entries(effects).forEach(([k,v])=>{
     const cur=read(k);
-    if(cur==null||!v){ out[k]=v; return; }
-    if(v>0) out[k]=Math.max(1,Math.round(v*(1-cur/150)*10)/10);
-    else out[k]=Math.min(-.5,Math.round(v*Math.max(.3,Math.min(1.3,.35+cur/110))*10)/10);
+    if(cur==null||!v){ out[k]=v*mult; return; }
+    if(v>0) out[k]=Math.max(.5,Math.round(v*mult*(1-cur/150)*10)/10);
+    else out[k]=Math.min(-.3,Math.round(v*mult*Math.max(.3,Math.min(1.3,.35+cur/110))*10)/10);
   });
   return out;
 }
-function coachConfirmFocus(){
-  if(state.focus.length<FOCUS_PICKS) return;
+/* Un carrefour : trois chantiers sur la table, un seul reçoit ton énergie.
+   Les deux autres reculent — c'est le prix affiché avant le clic. */
+function coachChooseCrossroad(i){
+  const x=state.currentEvent&&state.currentEvent.event; if(!x) return;
+  const key=x.menu[i], a=FOCUS_AREAS[key]; if(!a) return;
   const before=coachSnapshot(), lines=[];
   const read=k=>k in state.stats?state.stats[k]:k in state.gauges?state.gauges[k]:null;
-  Object.entries(FOCUS_AREAS).forEach(([k,a])=>{
-    const on=state.focus.includes(k);
-    coachApplyEffects(focusScaled(on?a.gain:a.loss,read));
-    if(!on) lines.push(`${a.icon} ${a.label} : laissé de côté`);
-  });
-  state.lastFocus=[...state.focus];
-  log(`🕰️ Cette saison, tu mets ton énergie sur ${state.focus.map(k=>FOCUS_AREAS[k].label.toLowerCase()).join(' et ')}. Le reste attendra.`);
-  state.pendingResult={title:'🕰️ Ton année',subtitle:state.focus.map(k=>`${FOCUS_AREAS[k].icon} ${FOCUS_AREAS[k].label}`).join(' · '),
-    narrative:"Une saison ne tient pas tout. Ce que tu as choisi avance, ce que tu as laissé recule un peu.",
-    before,after:coachSnapshot(),extra:lines,next:'season'};
+  coachApplyEffects(focusScaled(a.gain,read,.7));
+  x.menu.forEach(k=>{ if(k===key) return; const o=FOCUS_AREAS[k];
+    coachApplyEffects(focusScaled(o.loss,read,.65)); lines.push(`${o.icon} ${o.label} : ça attendra`); });
+  state.lastFocus=key;
+  log(`${x.icon} <b>${x.title}</b> → ${a.label.toLowerCase()}. ${x.menu.filter(k=>k!==key).map(k=>FOCUS_AREAS[k].label.toLowerCase()).join(' et ')} : ça attendra.`);
+  state.currentEvent=null;
+  state.pendingResult={title:`${x.icon} ${x.title}`,subtitle:`${a.icon} ${a.label}`,
+    narrative:a.desc+" Le reste du trimestre s'organisera autour de ça.",
+    before,after:coachSnapshot(),extra:lines,next:'phase'};
   state.pendingChoice='choiceResult'; render();
 }
 function coachStartSeason(){
@@ -300,18 +294,37 @@ function coachBonusLines(){
   const e=state.rouletteEcho; if(e&&e.seasons>0) lines.push({t:`${e.icon} ${e.label} : ${e.short} (encore ${e.seasons} saison${e.seasons>1?'s':''})`,d:e.delta});
   return lines;
 }
+/* Une phase, un carrefour. Dilemme de jauge, incident, événement de vie ou arbitrage
+   d'énergie : tout sort du même sac, pour qu'aucun écran n'arrive de nulle part. */
 function coachPlayPhase(){
-  // incident éventuel avant la phase
-  const inc=coachPickIncident();
-  if(inc){ state.currentEvent={kind:'incident',event:inc}; state.pendingChoice='event'; saveGame(); return; }
+  const ev=coachDrawPhaseEvent();
+  if(ev){ state.currentEvent=ev; state.pendingChoice='event'; saveGame(); return; }
   coachSimulatePhase();
 }
-function coachPickIncident(){
-  const chance=clamp(.55*state.mode.incidentMult,.2,.95); if(Math.random()>chance) return null;
-  const y=state.year, g=state.gauges;
-  const lowGauge=Object.keys(g).filter(k=>g[k]<35);
-  const pool=COACH_INCIDENTS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)&&(!e.tiers||e.tiers.includes(state.club.tier))&&(!e.gauge||lowGauge.includes(e.gauge)||Math.random()<.35));
-  return pickNoRepeat('coach-incidents',pool.length?pool:COACH_INCIDENTS);
+function eventKey(e){ return e.id||e.title; }
+function rememberEvent(e){ const m=(state.recentEvents=state.recentEvents||[]); m.push(eventKey(e)); while(m.length>10) m.shift(); }
+function weightedDraw(bag){
+  const recent=state.recentEvents||[];
+  let pool=bag.filter(b=>!recent.includes(eventKey(b.event)));
+  if(!pool.length) pool=bag;
+  if(!pool.length) return null;
+  const total=pool.reduce((n,b)=>n+b.w,0); let r=Math.random()*total;
+  for(const b of pool){ r-=b.w; if(r<=0){ rememberEvent(b.event); return {kind:b.kind,event:b.event}; } }
+  const last=pool[pool.length-1]; rememberEvent(last.event); return {kind:last.kind,event:last.event};
+}
+function coachDrawPhaseEvent(){
+  const y=state.year, g=state.gauges, ph=state.phase, bag=[];
+  const low=Object.keys(g).filter(k=>g[k]<40);
+  // La reprise est toujours un carrefour : c'est le moment où l'on décide de l'année,
+  // et il arrive par la préparation, pas par un écran de réglages.
+  if(ph===0){ const pre=COACH_CROSSROADS.filter(x=>x.phase===0); return weightedDraw(pre.map(x=>({kind:'carrefour',event:x,w:1}))); }
+  // une jauge au fond réclame une réponse : le dilemme passe devant
+  COACH_DILEMMAS.filter(d=>low.includes(d.gauge)).forEach(d=>bag.push({kind:'dilemma',event:d,w:g[d.gauge]<25?8:5}));
+  COACH_CROSSROADS.filter(x=>x.phase==null||x.phase===ph).forEach(x=>bag.push({kind:'carrefour',event:x,w:x.phase===ph?9:4}));
+  COACH_INCIDENTS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)&&(!e.tiers||e.tiers.includes(state.club.tier))&&(!e.gauge||low.includes(e.gauge)))
+    .forEach(e=>bag.push({kind:'incident',event:e,w:1.8*state.mode.incidentMult}));
+  COACH_HAPPENINGS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)).forEach(e=>bag.push({kind:'happening',event:e,w:2}));
+  return weightedDraw(bag);
 }
 function coachApplyEffects(effects,ctx={}){
   const s=state.stats, g=state.gauges, c=state.club, out=[];
@@ -339,10 +352,10 @@ function coachChooseEvent(i){
   const extra=coachApplyEffects(ch.effects);
   if(ch.seed){ plantSeed({...ch.seed,from:`${ev.title} → ${ch.label}`}); extra.push('une suite, un jour'); }
   log(`${ev.icon} <b>${ev.title}</b> → ${ch.label}. ${ch.result||''}`);
-  state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:coachSnapshot(),extra,next:ce.kind==='incident'?'phase':'intersaison'};
+  state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:coachSnapshot(),extra,next:'phase'};
   state.currentEvent=null; state.pendingChoice='choiceResult'; saveGame(); render();
 }
-function coachSnapshot(){ const s=state.stats, g=state.gauges; return {talent:s.talent,technique:s.technique,reseau:s.reseau,reputation:s.reputation,pressure:state.pressure,confidence:state.club?state.club.confidence:0,vestiaire:g.vestiaire,supporters:g.supporters,formation:g.formation,staff:g.staff}; }
+function coachSnapshot(){ const s=state.stats, g=state.gauges; return {talent:s.talent,technique:s.technique,reseau:s.reseau,reputation:s.reputation,pressure:state.pressure,confidence:state.club?state.club.confidence:0,vestiaire:g.vestiaire,supporters:g.supporters,formation:g.formation,staff:g.staff,proches:g.proches}; }
 function coachContinueChoiceResult(){
   const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null;
   if(state.ended){ render(); return; }
@@ -555,7 +568,7 @@ function coachEndSeason(){
   if(fx&&fx.kind==='exclusive'&&fx.installed){ state.pressure=clamp(state.pressure+(champion?4:10)); }
   if(fx&&fx.kind==='exile'&&(champion||cupWon)&&year-fx.year>=2){ log(`🕊️ ${champion?'Un titre':'Une coupe'} loin des projecteurs : l'affaire des archives est oubliée, les grands clubs recommencent à appeler.`); state.cote=clamp(state.cote+10); state.rouletteFate=null; unlockTrophy('r-redemption'); }
   // Une saison de football coûte du temps à ceux qui t'attendent, d'autant plus qu'elle a été dure.
-  const wear=1+Math.round(state.pressure/40);
+  const wear=(1+Math.round(state.pressure/40))*Math.max(.25,Math.min(1,state.gauges.proches/45));
   state.gauges.proches=clamp(state.gauges.proches-wear);
   if(state.gauges.proches<=18) log(`🏡 Chez toi, on ne t'attend plus vraiment pour dîner. Proches ${Math.round(state.gauges.proches)}/100.`);
   if(state.rouletteEcho&&state.rouletteEcho.seasons>0){ state.rouletteEcho.seasons--; if(!state.rouletteEcho.seasons){ log(`${state.rouletteEcho.icon} ${state.rouletteEcho.label} : c'est fini, la saison prochaine repart sur tes seules forces.`); state.rouletteEcho=null; } }
@@ -621,9 +634,8 @@ function coachIntersaison(){
   }
   const n=state.history.length;
   if(n>=3&&n-state.lastRouletteSeason>=5&&state.rouletteCount<2&&Math.random()<.12){ state.currentRoulette={event:pickNoRepeat('c-roulette',COACH_ROULETTES),outcomes:shuffledCopy([Math.random()<.5?'end':'malus','jackpot','small','malus'])}; state.rouletteCount++; state.lastRouletteSeason=n; state.pendingChoice='roulette'; return; }
-  const g=state.gauges; const low=Object.keys(g).filter(k=>g[k]<40);
-  if(low.length&&Math.random()<.5){ const pool=COACH_DILEMMAS.filter(d=>low.includes(d.gauge)); state.currentEvent={kind:'dilemma',event:pick(pool)}; state.pendingChoice='event'; return; }
-  if(Math.random()<.45){ const pool=COACH_HAPPENINGS.filter(e=>(!e.minYear||state.year>=e.minYear)&&(!e.maxYear||state.year<=e.maxYear)); state.currentEvent={kind:'happening',event:pickNoRepeat('c-happenings',pool)}; state.pendingChoice='event'; return; }
+  // Les dilemmes et les événements de vie se jouent désormais pendant la saison,
+  // une fois par phase, amenés par une situation. L'intersaison garde le destin et les offres.
   coachOpenOffers();
 }
 function coachChooseRoulette(i){

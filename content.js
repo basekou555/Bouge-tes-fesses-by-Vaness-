@@ -213,6 +213,32 @@ const COACH_HAPPENINGS=[
    seed:{in:3,icon:'🏫',title:"La première promotion",text:"Trois gamins de ton académie signent pro la même année. On associe ton nom à leur trajectoire.",effects:{formation:7,reputation:5,reseau:3}}},
   {label:"Prêter ton nom seulement",result:"Un chèque, une signature, et une académie que tu ne contrôles pas.",effects:{reseau:3,reputation:-4,formation:1}},
   {label:"Refuser",result:"Le terrain d'abord. L'offre ira à un autre.",effects:{talent:1,reseau:-3}}]},
+ {id:'h-docu',icon:'🎥',title:"Des caméras dans le vestiaire",text:"Une plateforme veut filmer ta saison de l'intérieur. Causeries comprises.",minYear:2000,choices:[
+  {label:"Tout ouvrir, sans droit de regard",result:"Un document rare, et un vestiaire qui ne parle plus librement.",effects:{reputation:7,supporters:5,reseau:3,vestiaire:-8,confidence:-3}},
+  {label:"Filmer, mais valider chaque image",result:"Un objet propre et sans âme. Les deux camps sont à moitié déçus.",effects:{reputation:2,supporters:2,vestiaire:-2,proches:-3}},
+  {label:"Refuser l'accès",result:"Le vestiaire respire. La plateforme ira filmer ton concurrent direct.",effects:{vestiaire:5,reputation:-3,reseau:-3}}]},
+ {id:'h-fils',icon:'👦',title:"Un enfant de la maison",text:"Un proche te demande de faire entrer son gamin au centre. Il est bon. Pas exceptionnel.",choices:[
+  {label:"Le prendre au centre",result:"Il progresse. Les éducateurs, eux, ont compris le message sur les critères.",effects:{proches:10,formation:-7,reputation:-3},
+   seed:{in:3,icon:'👦',title:"Le gamin qu'on avait fait entrer",text:"Il n'a pas percé, et tout le centre sait pourquoi il était là. Les formateurs recrutent désormais en te regardant.",effects:{formation:-6,reputation:-4}}},
+  {label:"Lui payer un essai ailleurs",result:"Un coup de fil, un club voisin, et une famille à moitié satisfaite.",effects:{reseau:-2,proches:2}},
+  {label:"Dire non, franchement",result:"Le centre te respecte davantage. Les repas de famille, moins.",effects:{formation:5,proches:-9}}]},
+ {id:'h-maladie',icon:'🏥',title:"Quelqu'un tombe malade",text:"Un proche entre à l'hôpital pour plusieurs mois. Personne d'autre ne peut y aller tous les jours.",choices:[
+  {label:"Y être tous les soirs",result:"Tu dors mal, tu arrives tard, tu es là où il faut.",effects:{proches:15,pressure:-4,talent:-3,confidence:-5,staff:-2}},
+  {label:"Payer ce qu'il faut et appeler",result:"Le meilleur service, la meilleure chambre, et une chaise vide à côté du lit.",effects:{budget:-.04,proches:-6,pressure:5}},
+  {label:"Continuer comme si de rien n'était",result:"Personne au club ne saura. Toi, tu sauras.",effects:{proches:-12,pressure:9,talent:1}}]},
+ {id:'h-dirigeant',icon:'💼',title:"On te propose le bureau",text:"Un club t'offre un poste de directeur sportif : plus de pouvoir, plus d'argent, plus jamais de banc.",choices:[
+  {label:"Refuser tout net",result:"Le terrain, ou rien. Le club te trouve borné.",effects:{talent:2,reseau:-4,budget:-.02}},
+  {label:"Demander à réfléchir un an",result:"Tu gardes la porte ouverte. Ton président l'apprend par la presse.",effects:{reseau:5,confidence:-7,pressure:3}},
+  {label:"Négocier un double rôle",result:"Entraîneur et décideur : deux métiers, une seule vie.",effects:{reseau:6,budget:.06,pressure:8,proches:-8,technique:-2}}]},
+ {id:'h-politique',icon:'🗳️',title:"Un parti veut ton nom",text:"On te propose une place éligible aux municipales. Ta notoriété vaut des voix.",choices:[
+  {label:"Accepter la tête de liste",result:"Des réunions publiques trois soirs par semaine, et la moitié de la ville contre toi.",effects:{reseau:8,reputation:-5,supporters:-6,proches:-8,pressure:5}},
+  {label:"Soutenir sans te présenter",result:"Une photo, une phrase, et des supporters partagés.",effects:{reseau:4,supporters:-3}},
+  {label:"Rester hors de tout ça",result:"Ni ami ni ennemi. La mairie s'en souviendra au moment du stade.",effects:{reputation:3,reseau:-5,budget:-.03}}]},
+ {id:'h-lanceur',icon:'📱',title:"Le dossier anonyme",text:"Une clé USB dans ton casier : des transferts de ton propre club, des commissions qui n'existent pas.",choices:[
+  {label:"Tout remettre à la justice",result:"Le club tremble, ton président aussi. Tu deviens intouchable et infréquentable.",effects:{reputation:8,confidence:-14,reseau:-7,pressure:6}},
+  {label:"En parler d'abord au président",result:"Le dossier disparaît. Ta position, elle, s'est renforcée.",effects:{confidence:8,reputation:-5,pressure:3},
+   seed:{in:3,icon:'🗃️',title:"La clé USB refait surface",text:"Un journaliste publie tout. On te demande pourquoi tu savais et pourquoi tu t'es tu.",effects:{reputation:-9,confidence:-6,pressure:10}}},
+  {label:"Tout effacer et oublier",result:"Tu n'as rien vu. Tu y penses au réveil.",effects:{pressure:7,proches:-4}}]},
 ];
 
 /* Dilemmes déclenchés par une jauge basse (entraîneur·euse) */
@@ -241,6 +267,42 @@ const COACH_DILEMMAS=[
   {label:"Refuser tout départ pendant deux ans",effects:{proches:13,reseau:-6,reputation:-3,stayLocal:true}},
   {label:"Partir seul·e, rentrer le week-end",effects:{proches:-10,pressure:6,reseau:3}},
   {label:"Faire suivre tout le monde, encore",effects:{proches:-6,pressure:4,reputation:2}}]},
+ {gauge:'vestiaire',icon:'🧊',title:"Le placard du vestiaire",text:"Tes cadres ont décidé qu'un jeune ne parlerait à personne pendant un mois. Ils appellent ça la hiérarchie.",choices:[
+  {label:"Convoquer les cadres et trancher",effects:{vestiaire:-5,formation:6,reputation:3,form:-1}},
+  {label:"Nommer le jeune vice-capitaine",effects:{vestiaire:-8,formation:8,confidence:-2}},
+  {label:"Laisser le groupe se réguler",effects:{vestiaire:6,formation:-7,proches:-2}}]},
+ {gauge:'supporters',icon:'🔥',title:"La banderole",text:"Une banderole insultante vise ton meilleur joueur. Le club peut porter plainte.",choices:[
+  {label:"Porter plainte avec le joueur",effects:{vestiaire:8,supporters:-9,reputation:4}},
+  {label:"Aller parler aux ultras dans leur local",effects:{supporters:7,vestiaire:-4,pressure:4,proches:-3}},
+  {label:"Ne pas commenter",effects:{supporters:-2,vestiaire:-5,pressure:2}}]},
+ {gauge:'formation',icon:'💰',title:"Vendre la pépite maintenant",text:"Un géant offre une somme indécente pour ton joyau de 17 ans. Le centre a mis dix ans à le produire.",choices:[
+  {label:"Vendre et réinvestir dans le centre",effects:{formation:9,budget:.14,supporters:-8,vestiaire:-4}},
+  {label:"Vendre et renforcer l'équipe première",effects:{budget:.18,formation:-9,confidence:5,supporters:-4}},
+  {label:"Refuser et le lancer cette saison",effects:{formation:7,supporters:6,budget:-.06,confidence:-6}}]},
+ {gauge:'staff',icon:'🩺',title:"Le médecin dit non",text:"Ton médecin interdit à ton meilleur joueur de jouer le match décisif. Le joueur, lui, veut jouer.",choices:[
+  {label:"Suivre le médecin",effects:{staff:9,form:-2,supporters:-4,confidence:-3}},
+  {label:"Le faire jouer quand même",effects:{staff:-10,form:3,injure:4,confidence:3}},
+  {label:"Le mettre sur le banc, au cas où",effects:{staff:2,vestiaire:-3,form:-1}}]},
+ {gauge:'proches',icon:'🎄',title:"Le stage de Noël",text:"La direction veut un stage au centre technique du 24 au 2. Tout le monde attend ton avis.",choices:[
+  {label:"Imposer le stage",effects:{talent:4,form:2,vestiaire:-7,proches:-12}},
+  {label:"Deux jours, puis chacun chez soi",effects:{proches:6,vestiaire:4,talent:-2,confidence:-3}},
+  {label:"Annuler tout et rentrer",effects:{proches:14,vestiaire:6,form:-3,confidence:-6}}]},
+];
+
+/* ---------- Les carrefours : l'arbitrage amené par une situation ----------
+   Un par phase. Trois chantiers sur la table, un seul reçoit ton énergie ;
+   les deux autres reculent. Les clés renvoient à FOCUS_AREAS (coach.js). */
+const COACH_CROSSROADS=[
+ {id:'x-reprise',icon:'📋',title:"La reprise",text:"Trois semaines de préparation, un tableau blanc vide, et tout le monde qui attend de savoir par quoi on commence.",phase:0,menu:['terrain','vestiaire','centre']},
+ {id:'x-juillet',icon:'☀️',title:"Les quatre semaines de juillet",text:"Pas de match, pas d'urgence, et quatre semaines qui ne reviendront pas.",phase:0,menu:['club','proches','terrain']},
+ {id:'x-stage',icon:'🏔️',title:"Le stage de présaison",text:"Dix jours en altitude, sans familles, sans téléphone, sans journalistes. Le club paie ; toi, tu choisis ce que tu en fais.",phase:0,menu:['vestiaire','proches','club']},
+ {id:'x-effectif',icon:'🧩',title:"Le groupe n'est pas bouclé",text:"Il manque un joueur, le mercato ferme dans trois semaines, et trois personnes attendent que tu tranches.",phase:0,menu:['centre','club','vestiaire']},
+ {id:'x-treve',icon:'❄️',title:"Quinze jours sans match",text:"La trêve. Le groupe part, le centre tourne, la maison est pleine. Tu ne peux être qu'à un endroit.",phase:2,menu:['terrain','proches','vestiaire']},
+ {id:'x-agenda',icon:'🗓️',title:"L'agenda du trimestre",text:"Ton assistante pose trois blocs sur le calendrier et te demande lequel elle garde.",menu:['club','proches','centre']},
+ {id:'x-apres',icon:'🌧️',title:"La semaine d'après",text:"Trois défaites. Le président veut un plan, le vestiaire une explication, la presse un coupable.",menu:['vestiaire','terrain','club']},
+ {id:'x-reserve',icon:'🌱',title:"La réserve joue le samedi",text:"Les matchs de la réserve sont le samedi après-midi. Comme le reste de ta vie.",menu:['centre','terrain','proches']},
+ {id:'x-telephone',icon:'📵',title:"Le téléphone ne s'arrête plus",text:"Quarante appels par jour : agents, journalistes, dirigeants, et deux numéros que tu ne rappelles jamais.",menu:['club','proches','vestiaire']},
+ {id:'x-sprint',icon:'🏁',title:"Le sprint final",text:"Dix journées, tout se joue. Ce que tu délaisses maintenant, tu le paieras l'an prochain.",phase:3,menu:['terrain','club','proches']},
 ];
 
 const COACH_ROULETTES=[
@@ -392,6 +454,48 @@ const PLAYER_HAPPENINGS=[
  {id:'ph-reconversion',icon:'🎓',title:"Préparer l'après",text:"La fédération propose une formation d'entraîneur en parallèle de ta carrière.",choices:[
   {label:"S'inscrire",result:"Tu regardes le jeu autrement. Tes soirées y passent.",effects:{mental:3,pressure:2,coachTrust:2,entourage:-5,physique:-1}},
   {label:"Plus tard",result:"Il reste du temps. C'est ce que disent tous ceux qui n'en ont plus.",effects:{mental:-2}}]},
+ {id:'ph-agent',icon:'🧾',title:"Ton agent te lâche",text:"Celui qui t'a trouvé à 15 ans préfère s'occuper d'un plus jeune. Trois agences t'appellent déjà.",choices:[
+  {label:"Signer avec la plus grosse agence",result:"Des portes s'ouvrent, un pourcentage aussi.",effects:{entourage:6,money:-.12,supporters:2}},
+  {label:"Confier ça à un proche",result:"Il apprend le métier sur ton dos. Vous y croyez tous les deux.",effects:{entourage:9,money:-.06,mental:-2,coachTrust:-2}},
+  {label:"Te débrouiller seul·e",result:"Tu négocies toi-même, entre deux séances.",effects:{money:.08,mental:-3,entourage:-6,forme:-2}}]},
+ {id:'ph-quartier',icon:'🏙️',title:"Le quartier t'attend",text:"Le club de ton enfance veut un tournoi à ton nom. Ta rue veut te voir. Tout le monde veut quelque chose.",choices:[
+  {label:"Financer et venir tout l'été",result:"Un été entier de photos, d'embrassades et zéro repos.",effects:{supporters:8,entourage:7,money:-.15,forme:-6}},
+  {label:"Envoyer un chèque",result:"Le tournoi a lieu. On note que tu n'es pas venu·e.",effects:{money:-.08,entourage:-4,supporters:2}},
+  {label:"Ne pas répondre",result:"On te trouve changé·e. Ce n'est peut-être pas faux.",effects:{entourage:-9,supporters:-4,mental:2,forme:3}}]},
+ {id:'ph-pari',icon:'🎰',title:"Le pari de l'ami d'enfance",text:"Un ami te demande juste « si tu joues dimanche ». Il a de l'argent en jeu.",choices:[
+  {label:"Lui dire et lui demander d'arrêter",result:"Il arrête. Ou il dit qu'il arrête.",effects:{entourage:3,mental:-2},
+   seed:{in:2,icon:'⚖️',title:"L'enquête sur les paris",text:"Ton nom apparaît dans les relevés d'un ami. Tu n'as rien touché ; tu passeras quand même devant la commission.",effects:{reputation:-7,mental:-4,coachTrust:-5}}},
+  {label:"Couper les ponts net",result:"Tu protèges ta carrière et tu perds vingt ans d'amitié.",effects:{entourage:-10,mental:3,reputation:2}},
+  {label:"Faire semblant de ne pas comprendre",result:"Tu changes de sujet. Il rappellera.",effects:{entourage:-2,mental:-3}}]},
+ {id:'ph-sponsor',icon:'👟',title:"L'équipementier veut l'exclusivité",text:"Un contrat à sept chiffres, à condition de ne plus jamais être vu avec une autre marque. Ni toi, ni ta famille.",minYear:1990,choices:[
+  {label:"Signer l'exclusivité totale",result:"Le chèque de ta vie, et une liste de choses que tu ne peux plus faire.",effects:{money:.4,supporters:4,entourage:-7,mental:-2}},
+  {label:"Négocier une clause souple",result:"Moins d'argent, plus d'air.",effects:{money:.15,entourage:2}},
+  {label:"Rester libre",result:"Tu portes ce que tu veux. Ton agent ne s'en remet pas.",effects:{entourage:-5,mental:3,money:-.05}}]},
+ {id:'ph-langue',icon:'🗣️',title:"La langue du pays",text:"Six mois à l'étranger, et tu commandes toujours ton café en montrant du doigt.",choices:[
+  {label:"Cours intensifs tous les soirs",result:"Le vestiaire te voit autrement. Tes soirées disparaissent.",effects:{vestiaire:9,mental:3,coachTrust:4,entourage:-6,forme:-2}},
+  {label:"Rester avec les autres expatriés",result:"Confortable, et une bulle dont tu ne sors plus.",effects:{entourage:5,vestiaire:-6,coachTrust:-3}},
+  {label:"Un interprète pour tout",result:"Pratique. On finit par te parler à travers quelqu'un d'autre.",effects:{money:-.04,vestiaire:-3,mental:-1}}]},
+ {id:'ph-enfant',icon:'👶',title:"Tu deviens parent",text:"Un premier enfant, en plein mois de mars, à quatre jours d'un match décisif.",choices:[
+  {label:"Tout arrêter deux semaines",result:"Le club comprend à moitié, le coach retient surtout ton absence.",effects:{entourage:14,coachTrust:-6,forme:-4,mental:3}},
+  {label:"Jouer le match, rentrer la nuit",result:"Le compromis de tous les pères du métier. Il coûte des deux côtés.",effects:{entourage:-3,forme:-2,mental:-2}},
+  {label:"Faire venir toute la famille près du club",result:"Tout le monde déménage pour toi. Personne ne dit rien.",effects:{entourage:6,money:-.1,mental:2}}]},
+ {id:'ph-reseaux',icon:'📱',title:"Ton compte explose",text:"Une vidéo de toi tourne partout. Deux millions d'abonnés en une semaine, et autant d'avis sur ta vie.",minYear:2012,choices:[
+  {label:"En faire un vrai métier parallèle",result:"Des revenus, une image, et une notification toutes les six secondes.",effects:{money:.25,supporters:9,mental:-5,forme:-3}},
+  {label:"Déléguer les comptes à un community manager",result:"Lisse, efficace, et plus tout à fait toi.",effects:{supporters:4,money:.06,entourage:-3}},
+  {label:"Tout couper",result:"Le silence fait du bien. Les sponsors trouvent ça dommage.",effects:{mental:6,supporters:-7,money:-.1}}]},
+ {id:'ph-fisc',icon:'⚖️',title:"Le contrôle fiscal",text:"Un montage que ton conseiller t'avait juré « parfaitement légal » intéresse beaucoup l'administration.",minYear:1996,choices:[
+  {label:"Tout régulariser immédiatement",result:"Une somme énorme, un dossier clos, un conseiller viré.",effects:{money:-.45,mental:4,reputation:2,entourage:-4}},
+  {label:"Te battre devant les tribunaux",result:"Des années de procédure et ton nom dans tous les journaux.",effects:{mental:-7,reputation:-6,supporters:-4,money:-.1}},
+  {label:"Laisser ton entourage gérer",result:"On te dit que c'est réglé. On te l'a déjà dit.",effects:{entourage:4,mental:-3},
+   seed:{in:3,icon:'📉',title:"Le redressement",text:"Ce n'était pas réglé. La note a triplé, et elle est publique.",effects:{money:-.6,reputation:-8,mental:-6}}}]},
+ {id:'ph-academie',icon:'🏫',title:"Une école à ton nom",text:"Des investisseurs veulent ouvrir une académie dans ton pays d'origine.",minYear:2000,choices:[
+  {label:"T'impliquer vraiment",result:"Des gamins formés pour de bon, et des allers-retours tout l'été.",effects:{supporters:6,entourage:5,money:-.2,forme:-4,mental:3}},
+  {label:"Prêter ton nom seulement",result:"Une signature, un chèque, une académie que tu ne contrôles pas.",effects:{money:.12,reputation:-4}},
+  {label:"Refuser tant que tu joues",result:"Plus tard. Les investisseurs trouveront un autre nom d'ici là.",effects:{forme:3,supporters:-3}}]},
+ {id:'ph-amical',icon:'✈️',title:"Le match amical à l'autre bout du monde",text:"La sélection t'appelle pour deux amicaux, 22 000 km et un retour la veille du choc.",choices:[
+  {label:"Y aller et tout jouer",result:"Deux sélections de plus, et des jambes en coton au retour.",effects:{caps:2,supporters:5,forme:-8,corps:-4,coachTrust:-3}},
+  {label:"Y aller et demander à jouer une mi-temps",result:"Le sélectionneur accepte sans enthousiasme.",effects:{caps:1,forme:-4,supporters:2}},
+  {label:"Te déclarer forfait",result:"Ton club respire. La sélection note ton nom quelque part.",effects:{coachTrust:6,forme:3,supporters:-5,selectionBoost:-15}}]},
 ];
 
 const PLAYER_DILEMMAS=[
@@ -403,6 +507,69 @@ const PLAYER_DILEMMAS=[
  {gauge:'supporters',icon:'🎤',title:"Le chant des ultras",text:"Les ultras ont composé un chant à ton nom, un peu vulgaire.",choices:[{label:"Le chanter avec eux",effects:{supporters:9,reputation:-2}},{label:"Remercier poliment",effects:{supporters:4}},{label:"Demander de l'arrêter",effects:{supporters:-6,reputation:2}}]},
  {gauge:'entourage',icon:'👪',title:"Les frères",text:"Tes frères veulent gérer tes affaires à la place de ton agent.",choices:[{label:"Leur faire confiance",effects:{entourage:6,money:-.1}},{label:"Un rôle limité",effects:{entourage:3}},{label:"Refuser",effects:{entourage:-5,mental:-1}}]},
  {gauge:'entourage',icon:'🚗',title:"La voiture de sport",text:"Ton entourage te pousse à acheter une voiture à 300 000 €.",choices:[{label:"L'acheter",effects:{entourage:4,money:-.3,reputation:-1}},{label:"Une voiture raisonnable",effects:{entourage:1}},{label:"Le bus",effects:{entourage:-3,supporters:3}}]},
+
+ {gauge:'corps',icon:'💉',title:"L'infiltration",text:"Le genou ne passe pas. Une piqûre et tu joues la finale ; sans elle, tu la regardes.",choices:[
+  {label:"Accepter l'infiltration",effects:{corps:-9,coachTrust:7,supporters:5,forme:2}},
+  {label:"Refuser et soigner",effects:{corps:8,coachTrust:-7,supporters:-4}},
+  {label:"Demander un deuxième avis",effects:{corps:3,coachTrust:-2,mental:-1}}]},
+ {gauge:'corps',icon:'😴',title:"Les nuits qui ne comptent pas",text:"Tu dors cinq heures depuis trois mois. Le club a un capteur de sommeil ; tu l'as débranché.",choices:[
+  {label:"Tout rebrancher et suivre le protocole",effects:{corps:9,physique:3,entourage:-6,mental:-1}},
+  {label:"Voir un spécialiste en secret",effects:{corps:5,money:-.04,coachTrust:-2}},
+  {label:"Tenir avec du café",effects:{corps:-7,forme:-3,mental:-3,technique:1}}]},
+ {gauge:'corps',icon:'🧊',title:"Le protocole de récupération",text:"Bains glacés, caisson, kiné : deux heures de plus chaque jour, tous les jours.",choices:[
+  {label:"Tout faire, sans exception",effects:{corps:11,physique:2,entourage:-7,mental:-2}},
+  {label:"Trois fois par semaine",effects:{corps:5,entourage:-2}},
+  {label:"Laisser tomber",effects:{corps:-6,entourage:4,mental:2}}]},
+ {gauge:'vestiaire',icon:'🎽',title:"Le brassard",text:"Le coach hésite entre toi et un ancien pour le brassard. Il te demande ton avis, sincèrement.",choices:[
+  {label:"Le réclamer",effects:{vestiaire:-6,mental:5,coachTrust:5,supporters:3}},
+  {label:"Le laisser à l'ancien",effects:{vestiaire:9,mental:-2,coachTrust:-2}},
+  {label:"Proposer un brassard tournant",effects:{vestiaire:4,coachTrust:-4,mental:1}}]},
+ {gauge:'vestiaire',icon:'🤐',title:"La fuite dans la presse",text:"Une causerie du coach s'est retrouvée mot pour mot dans le journal. Le groupe cherche qui a parlé.",choices:[
+  {label:"Dire ce que tu as vu",effects:{coachTrust:8,vestiaire:-11,reputation:2}},
+  {label:"Te taire",effects:{vestiaire:7,coachTrust:-6}},
+  {label:"Aller voir le coupable en privé",effects:{vestiaire:3,mental:-2,coachTrust:1}}]},
+ {gauge:'vestiaire',icon:'🧒',title:"Le bizutage du jeune",text:"Les anciens veulent humilier un gamin de 17 ans « comme on l'a tous été ».",choices:[
+  {label:"Y mettre fin devant tout le monde",effects:{vestiaire:-8,mental:5,reputation:4,coachTrust:3}},
+  {label:"Participer mollement",effects:{vestiaire:5,mental:-4}},
+  {label:"Aller rassurer le jeune après",effects:{vestiaire:-1,mental:2,coachTrust:1}}]},
+ {gauge:'supporters',icon:'📸',title:"Le selfie de trop",text:"Après une défaite, un supporter te coince au parking pour une photo. Tu es à bout.",choices:[
+  {label:"Prendre la photo et discuter dix minutes",effects:{supporters:8,mental:-4,entourage:-2}},
+  {label:"Refuser poliment",effects:{supporters:-5,mental:3}},
+  {label:"Passer sans répondre",effects:{supporters:-9,mental:1,reputation:-3}}]},
+ {gauge:'supporters',icon:'🧣',title:"Le maillot jeté",text:"Après une élimination, un supporter te rend ton maillot en pleine figure devant les caméras.",choices:[
+  {label:"Aller t'excuser devant le parcage",effects:{supporters:10,mental:-3,vestiaire:-4}},
+  {label:"Répondre sèchement",effects:{supporters:-9,vestiaire:5,reputation:-2}},
+  {label:"Ramasser le maillot et partir",effects:{supporters:-2,mental:-2}}]},
+ {gauge:'supporters',icon:'🎪',title:"L'animation d'avant-match",text:"Le club veut que tu animes la rencontre avec les abonnés, deux heures avant le coup d'envoi.",choices:[
+  {label:"Accepter à chaque match",effects:{supporters:9,forme:-4,coachTrust:-3}},
+  {label:"Une fois par mois",effects:{supporters:4,forme:-1}},
+  {label:"Refuser, c'est un jour de match",effects:{supporters:-6,forme:3,coachTrust:2}}]},
+ {gauge:'entourage',icon:'💸',title:"Le prêt qu'on ne te rendra pas",text:"Un cousin monte une affaire et te demande de quoi la lancer. Tu sais comment ça finit.",choices:[
+  {label:"Donner la somme sans condition",effects:{entourage:9,money:-.22}},
+  {label:"Proposer un vrai contrat",effects:{entourage:-4,money:-.08,mental:2}},
+  {label:"Refuser",effects:{entourage:-10,money:.02,mental:-2}}]},
+ {gauge:'entourage',icon:'🏠',title:"La maison pour tes parents",text:"Ils n'ont jamais rien demandé. C'est bien pour ça que tout le monde attend que tu le fasses.",choices:[
+  {label:"Acheter la maison comptant",effects:{entourage:12,money:-.5,mental:3}},
+  {label:"Les aider à emprunter",effects:{entourage:4,money:-.1}},
+  {label:"Attendre un plus gros contrat",effects:{entourage:-7,money:.05,mental:-3}}]},
+ {gauge:'entourage',icon:'📵',title:"Le groupe de la bande",text:"Trente messages par jour, des demandes, des reproches, et ton téléphone qui vibre jusqu'à 2 h du matin.",choices:[
+  {label:"Quitter le groupe",effects:{entourage:-9,mental:7,forme:3}},
+  {label:"Couper les notifications la nuit",effects:{entourage:-2,mental:4}},
+  {label:"Répondre à tout le monde",effects:{entourage:7,mental:-5,forme:-3}}]},
+];
+
+/* Carrefours du mode joueur·euse : les clés renvoient à PFOCUS_AREAS (player.js) */
+const PLAYER_CROSSROADS=[
+ {id:'px-reprise',icon:'📋',title:"La reprise",text:"Premier jour, tests physiques, et un coach qui note tout. Ce que tu travailles maintenant tiendra jusqu'en mai.",phase:0,menu:['technique','physique','tete']},
+ {id:'px-agent',icon:'🧾',title:"La réunion avec ton agent",text:"Il pose trois dossiers sur la table : un sponsor, un préparateur, et un billet d'avion pour rentrer chez toi.",menu:['image','proches','technique']},
+ {id:'px-concurrent',icon:'🥊',title:"Le recruté à ton poste",text:"Le club a signé quelqu'un dans ton couloir, plus cher que toi. La saison va se jouer entre vous deux.",phase:0,menu:['technique','physique','image']},
+ {id:'px-coach',icon:'🧢',title:"Le nouveau coach",text:"Il ne t'a jamais vu jouer et il a trois semaines pour se faire un avis.",phase:0,menu:['tete','technique','proches']},
+ {id:'px-treve',icon:'❄️',title:"La trêve",text:"Quinze jours. Le kiné a un programme, ta famille a des projets, et ta tête a besoin de silence.",phase:2,menu:['physique','proches','tete']},
+ {id:'px-banc',icon:'🪑',title:"Le banc",text:"Trois matchs sans entrer. Le coach dit qu'il attend « autre chose » de toi, sans préciser quoi.",menu:['technique','tete','physique']},
+ {id:'px-ete',icon:'☀️',title:"Les semaines de juillet",text:"Pas de match, pas d'excuse. Trois manières de passer l'été, une seule possible.",phase:0,menu:['proches','image','physique']},
+ {id:'px-retour',icon:'🩹',title:"Le retour de blessure",text:"Tu rejoues dans six semaines. Ce que tu fais de ces six semaines décide de la suite.",menu:['physique','tete','proches']},
+ {id:'px-sprint',icon:'🏁',title:"Les dix dernières journées",text:"Tout se joue maintenant : le classement, ton contrat, la sélection.",phase:3,menu:['physique','technique','image']},
+ {id:'px-soir',icon:'🌙',title:"Les soirs après l'entraînement",text:"Quatre heures libres chaque jour. À la fin de l'année, elles auront fait quelqu'un de toi.",menu:['tete','proches','image']},
 ];
 
 const PLAYER_ROULETTES=[

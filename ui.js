@@ -93,8 +93,8 @@ function render(){
   if(!state){ renderStart(); return; }
   showGameBanner(); renderFilmstrip();
   if(state.ended){ state.kind==='player'?renderPlayerEnd():renderCoachEnd(); return; }
-  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure,priorities:renderPriorities};
-  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure,priorities:renderPriorities};
+  const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
+  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
   const fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
   const side=state.kind==='player'?playerSidebar():coachSidebar();
   app.innerHTML=`<div class="layout fade-in"><div class="main">${eraBannerHTML()}${fn()}</div><div class="sidebar"><details class="side-fold" open><summary><span>📋 Ta fiche, le club et le journal</span></summary>${side}</details></div></div>`;
@@ -160,28 +160,33 @@ function effectChips(effects,seed){
   if(seed) out.push('<i>🌱 une suite, un jour</i>');
   return out.length?`<div class="traits">${out.join('')}</div>`:'';
 }
-function renderEvent(){ const ce=state.currentEvent, ev=ce.event; const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Intersaison'}[ce.kind]; const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent'; return `<div class="card event-card"><div class="hint">${kind}${ev.gauge?` · jauge ${(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge]?(state.kind==='player'?PGAUGE:GAUGE_INFO)[ev.gauge].label:''}`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div><div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`; }
+const PHASE_NAMES=['Automne','Hiver','Printemps','Sprint final'];
+/* Un seul écran d'événement : incident, dilemme, vie hors du terrain ou carrefour
+   d'énergie. Le carrefour est un événement comme un autre — il n'arrive plus de nulle part. */
+function renderEvent(){
+  const ce=state.currentEvent, ev=ce.event;
+  if(ce.kind==='carrefour') return renderCrossroad(ev);
+  const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Hors du terrain'}[ce.kind];
+  const G=state.kind==='player'?PGAUGE:GAUGE_INFO;
+  const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent';
+  return `<div class="card event-card"><div class="hint">${PHASE_NAMES[state.phase]||''} · ${kind}${ev.gauge?` · jauge ${G[ev.gauge]?G[ev.gauge].label:''} au plus bas`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div><div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`;
+}
+/* Le carrefour : trois chantiers sur la table, un seul reçoit ton énergie du trimestre.
+   Chaque option montre ce qu'elle fait avancer et ce qu'elle laisse reculer. */
+function renderCrossroad(x){
+  const player=state.kind==='player';
+  const AREAS=player?PFOCUS_AREAS:FOCUS_AREAS;
+  const fn=player?'playerChooseCrossroad':'coachChooseCrossroad';
+  const moment=x.phase===0?'Avant-saison':(PHASE_NAMES[state.phase]||'');
+  return `<div class="card event-card"><div class="hint">${moment} · Carrefour · où part ton énergie ce trimestre</div><div class="ico">${x.icon}</div><h2 class="display">${escapeHtml(x.title)}</h2><p class="narr">${escapeHtml(x.text)}</p>
+    <div class="choice-list">${x.menu.map((k,i)=>{ const a=AREAS[k]; if(!a) return '';
+      const others=x.menu.filter(o=>o!==k).map(o=>AREAS[o]);
+      return `<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${a.icon}</span><div class="body"><b>${escapeHtml(a.label)}</b><small>${escapeHtml(a.desc)}</small>${effectChips(a.gain)}<span class="cost">Ça attendra : ${others.map(o=>`${o.icon} ${escapeHtml(o.label.toLowerCase())}`).join(' · ')}</span></div></button>`; }).join('')}</div>
+    <div class="hint">Tu ne peux en prendre qu'un. Les deux autres reculeront, et tu le sentiras.</div></div>`;
+}
 function renderRoulette(){ const ev=state.currentRoulette.event; const fn=state.kind==='player'?'playerChooseRoulette':'coachChooseRoulette';
   const fk=(ev.fate&&ev.fate.kind)||'death'; const sealed=fk!=='death'&&fk!=='banned';
   return `<div class="card event-card"><div class="hint">🎲 Roulette du destin · une seule des quatre issues ${sealed?'scelle le reste de ta carrière':'met fin à la carrière'}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="roulette-grid">${ev.choices.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><div class="body"><b>${escapeHtml(c)}</b></div></button>`).join('')}</div><div class="hint" style="margin-top:10px">Issues cachées : ${sealed?`${ev.fate.icon} ${escapeHtml(ev.fate.label.toLowerCase())}`:'☠️ fin'} · 🌠 jackpot · 🍀 petit bonus · 🌧️ malus. Chaque issue laisse une trace sur les saisons suivantes.</div></div>`; }
-/* Deux priorités, trois renoncements : l'arbitrage de la saison. */
-function renderPriorities(){
-  const player=state.kind==='player';
-  const AREAS=player?PFOCUS_AREAS:FOCUS_AREAS, PICKS=player?PFOCUS_PICKS:FOCUS_PICKS;
-  const toggle=player?'playerToggleFocus':'coachToggleFocus', confirm=player?'playerConfirmFocus':'coachConfirmFocus';
-  const picked=state.focus||[]; const left=PICKS-picked.length;
-  return `<div class="card"><h2 class="display">Où passe ton année ?</h2>
-    <p class="narr">Une saison ne tient pas tout. Choisis ${PICKS} chantiers : ils avanceront. Les trois autres reculeront, et tu le sentiras.</p>
-    <div class="section-label">${picked.length} choisi${picked.length>1?'s':''} sur ${PICKS}${left>0?` · il en reste ${left}`:' · tu peux échanger'}</div>
-    <div class="focus-grid">${Object.entries(AREAS).map(([k,a])=>{ const on=picked.includes(k);
-      return `<button class="focus-card ${on?'on':''}" onclick="${toggle}('${k}')">
-        <span class="ico">${a.icon}</span>
-        <span class="body"><b>${escapeHtml(a.label)}</b><small>${escapeHtml(a.desc)}</small>
-        ${effectChips(a.gain)}
-        <span class="cost">Laissé de côté : ${Object.entries(a.loss).map(([ck,cv])=>`${(FX_LABEL[ck]||ck)} ${cv>0?'+':'−'}`).join(' · ')}</span></span>
-        <span class="mark">${on?'✓':''}</span></button>`; }).join('')}</div>
-    <div class="btn-row"><button class="btn" ${picked.length<PICKS?'disabled':''} onclick="${confirm}()">${picked.length<PICKS?`Choisis encore ${left} chantier${left>1?'s':''}`:'Lancer la saison →'}</button></div></div>`;
-}
 function renderPressure(){ const list=state.kind==='player'?PLAYER_PRESSURE_CHOICES:PRESSURE_CHOICES; const fn=state.kind==='player'?'playerChoosePressure':'coachChoosePressure'; return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">${state.kind==='player'?'Craquage':'Crise de pression'}</h2><p class="narr">La pression atteint ${Math.round(state.pressure)}/100. Insomnies, malaise, une famille inquiète. Il faut décider.</p><div class="choice-list">${list.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`; }
 function tableHTML(table,me,full){
   const N=table.length, meIdx=table.findIndex(r=>r.name===me);
