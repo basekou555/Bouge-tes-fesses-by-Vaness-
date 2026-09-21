@@ -22,10 +22,12 @@ Concept de jeu inspiré d'[Absolut Director](https://github.com/Feuille2Cedric/a
 
 Aucune installation et aucune connexion ne sont nécessaires : ouvre [`index.html`](./index.html) dans Chrome, Edge ou Firefox. Sauvegarde, badges et Panthéon restent dans le navigateur.
 
+**Au téléphone**, l'interface se replie : le bouton principal de l'écran (coup d'envoi, continuer, intersaison) reste collé en bas tant que la page défile, la fiche du club et le journal se dépliant d'une pression, et le tableau de composition ne garde que statut, poste, nom, niveau, fraîcheur et note.
+
 ```text
 absolut-coach/
 ├── index.html    coquille de la page
-├── styles.css    thème vert et or (bleu pour le mode joueur·euse)
+├── styles.css    thème vert et or (bleu pour le mode joueur·euse), mise en page téléphone
 ├── profile.js    styles de jeu et nationalités
 ├── players.js    près de 400 joueurs réels, des années 50 à aujourd'hui
 ├── eras.js       les sept époques et leurs règles, les clubs réels, les entraîneurs réels

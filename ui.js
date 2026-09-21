@@ -15,14 +15,18 @@ function renderStart(){
   app.innerHTML=`<div class="fade-in"><div class="home-hero"><h1 class="display">ABSOLUT <span>COACH</span></h1>
     <div class="tagline narr">Une vie de football, des années Kopa à l'ère Mbappé. Choisis ton époque, tes clubs, tes joueurs. Survis aux présidents.</div>
     <div class="home-pills"><span class="pill">7 époques</span><span class="pill">Vrais clubs, vrais joueurs</span><span class="pill">100 % local</span><span class="pill">Français</span></div></div>
+    ${cs&&!cs.ended||ps&&!ps.ended?`<div class="home-resume">
+      ${cs&&!cs.ended?`<button class="resume-card" onclick="continueGame('coach')"><span class="ico">💾</span><span class="body"><b>Reprendre ${escapeHtml(cs.name)}</b><small>${escapeHtml(cs.modeName)} · ${cs.year} · ${cs.club?escapeHtml(cs.club.name):'sans club'} · ${cs.history.length} saison${cs.history.length>1?'s':''}</small></span><span class="go">→</span></button>`:''}
+      ${ps&&!ps.ended?`<button class="resume-card" onclick="continueGame('player')"><span class="ico">💾</span><span class="body"><b>Reprendre ${escapeHtml(ps.name)}</b><small>Joueur·euse · ${ps.year} · ${ps.club?escapeHtml(ps.club.name):'sans club'} · ${ps.history.length} saison${ps.history.length>1?'s':''}</small></span><span class="go">→</span></button>`:''}
+    </div>`:''}
     <div class="home-grid">
-      <button class="home-card" onclick="startCoachCreation()"><div class="ico">🧢</div><b>Carrière d'entraîneur·euse</b><span>Offres de clubs réels, mercato libre, phases de championnat, coupes, présidents et licenciements.</span></button>
-      <button class="home-card" onclick="startPlayerCreation()"><div class="ico">👟</div><b>Carrière de joueur·euse</b><span>De 17 à 38 ans : agents, temps de jeu, blessures, sélection nationale, Ballon d'or.</span></button>
-      ${cs&&!cs.ended?`<button class="home-card" onclick="continueGame('coach')"><div class="ico">💾</div><b>Reprendre : ${escapeHtml(cs.name)}</b><span>${escapeHtml(cs.modeName)} · ${cs.year} · ${cs.club?escapeHtml(cs.club.name):'sans club'} · ${cs.history.length} saison${cs.history.length>1?'s':''}</span></button>`:''}
-      ${ps&&!ps.ended?`<button class="home-card" onclick="continueGame('player')"><div class="ico">💾</div><b>Reprendre : ${escapeHtml(ps.name)} (joueur·euse)</b><span>${ps.year} · ${ps.club?escapeHtml(ps.club.name):'sans club'} · ${ps.history.length} saison${ps.history.length>1?'s':''}</span></button>`:''}
-      <button class="home-card" onclick="renderBadges()"><div class="ico">🏅</div><b>Salle des badges</b><span>${unlockedTrophies.size} / ${TROPHIES.length} débloqués.</span></button>
-      <button class="home-card" onclick="renderHall()"><div class="ico">🏛️</div><b>Panthéon</b><span>Les carrières terminées sur ce navigateur.</span></button>
-      <button class="home-card" onclick="renderRules()"><div class="ico">📖</div><b>Comment ça marche</b><span>Époques, effectif, mercato, phases, confiance du président, pression.</span></button>
+      <button class="home-card lead" onclick="startCoachCreation()"><div class="ico">🧢</div><b>Carrière d'entraîneur·euse</b><span>Offres de clubs réels, mercato libre, phases de championnat, coupes, présidents et licenciements.</span></button>
+      <button class="home-card lead" onclick="startPlayerCreation()"><div class="ico">👟</div><b>Carrière de joueur·euse</b><span>De 17 à 38 ans : agents, temps de jeu, blessures, sélection nationale, Ballon d'or.</span></button>
+    </div>
+    <div class="home-links">
+      <button onclick="renderBadges()"><span>🏅 Salle des badges</span><small>${unlockedTrophies.size} / ${TROPHIES.length} débloqués</small></button>
+      <button onclick="renderHall()"><span>🏛️ Panthéon</span><small>Les carrières terminées ici</small></button>
+      <button onclick="renderRules()"><span>📖 Comment ça marche</span><small>Les règles en une page</small></button>
     </div></div>`; scrollTop();
 }
 function continueGame(kind){ const s=lsGet(kind==='player'?KEYS.player:KEYS.coach,null); if(s&&!s.ended){ state=s; render(); } else renderStart(); }
@@ -92,9 +96,19 @@ function render(){
   const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPrematch,halftime:renderHalftime,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
   const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
   const fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
-  app.innerHTML=`<div class="layout fade-in"><div class="main">${eraBannerHTML()}${fn()}</div><div class="sidebar">${state.kind==='player'?playerSidebar():coachSidebar()}</div></div>`; scrollTop();
+  const side=state.kind==='player'?playerSidebar():coachSidebar();
+  app.innerHTML=`<div class="layout fade-in"><div class="main">${eraBannerHTML()}${fn()}</div><div class="sidebar"><details class="side-fold" open><summary><span>📋 Ta fiche, le club et le journal</span></summary>${side}</details></div></div>`;
+  applySideFold(); scrollTop();
 }
-function eraBannerHTML(){ const e=eraForYear(state.year); return `<div class="era-banner">${e.icon} <b>${e.name}</b> · <span class="year-badge">${state.year}</span>${state.club?` · ${escapeHtml(state.club.name)} · <b>${escapeHtml(state.club.leagueName||'')}</b>`:''} · ${e.rules.slice(0,2).join(' · ')}</div>`; }
+/* Au téléphone, la fiche est repliée par défaut : l'écran de jeu passe en premier.
+   Le choix du joueur est retenu d'un écran à l'autre. */
+let sideFoldOpen=false;
+function applySideFold(){
+  const d=app.querySelector('.side-fold'); if(!d||!window.matchMedia) return;
+  if(!window.matchMedia('(max-width:900px)').matches) return;
+  d.open=sideFoldOpen; d.addEventListener('toggle',()=>{ sideFoldOpen=d.open; });
+}
+function eraBannerHTML(){ const e=eraForYear(state.year); return `<div class="era-banner">${e.icon} <b>${e.name}</b> · <span class="year-badge">${state.year}</span>${state.club?` · ${escapeHtml(state.club.name)} · <b>${escapeHtml(state.club.leagueName||'')}</b>`:''}<span class="era-rules"> · ${e.rules.slice(0,2).join(' · ')}</span></div>`; }
 function renderFilmstrip(){
   filmstripEl.style.display='';
   const h=state.history||[]; const frames=h.map(f=>{ const cls=f.sacked?'aborted':(f.champion?'success':f.relegated||f.bad?'flop':f.objectiveMet||f.note>=6.8?'success':'mid'); const label=f.sacked?'🪓':f.champion?'🏆':f.relegated?'⬇️':state.kind==='player'?(f.note?f.note.toFixed(1):'—'):(f.pos?ordinal(f.pos):'—'); return `<div class="frame ${cls}" title="${f.year} · ${escapeHtml(f.club)}">${f.year} ${label}</div>`; });
