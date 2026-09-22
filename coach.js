@@ -351,6 +351,7 @@ function coachStartSeason(){
   c.wageCap=clubWageCap(c);
   state.seasonStats.youthWeeks=0; state.seasonStats.injuries=[]; state.seasonStats.trainWeeks={}; state.phaseStops=0;
   state.effort=null; state.metFor=[]; state.matchBoost=null; state.meeting=null; state.meetingRecap=null; state.boostStreak=0;
+  state.metHome=0; state.metBoard=0;
   state.seasonStats.g0={...state.gauges,pressure:state.pressure,confidence:c.confidence,cote:state.cote==null?30:state.cote};
   state.seasonStats.meetings=0;
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
@@ -607,14 +608,26 @@ function coachDrawMeeting(fx){
   const left=comp.phaseEnds[state.phase]-state.matchday;
   const cands=[coachMeetingInjured,coachMeetingFronts,coachMeetingCaptain,coachMeetingPresident,coachMeetingReturn,
     coachMeetingBonus,coachMeetingTravel,coachMeetingPress,coachMeetingSquad,coachMeetingOpponent,
-    coachMeetingPrep,coachMeetingRecovery,coachMeetingShape,coachMeetingCards,coachMeetingPitch]
+    coachMeetingPrep,coachMeetingRecovery,coachMeetingShape,coachMeetingCards,coachMeetingPitch,
+    coachMeetingAgent,coachMeetingFans,coachMeetingHome,coachMeetingBoard]
     .map(b=>b(m,it,left)).filter(Boolean);
   if(!cands.length) return null;
   const seen=state.recentMeetings||[];
-  // Quinze familles : on écarte les cinq derniers genres, pas trois, sinon les
+  // Dix-neuf familles : on écarte les cinq derniers genres, pas trois, sinon les
   // rendez-vous toujours disponibles (la semaine, le symptôme) font le papier peint.
   const fresh=cands.filter(x=>!seen.includes(x.kind));
-  const mt=pick(fresh.length?fresh:cands);
+  let pool=fresh.length?fresh:cands;
+  // Le sujet du jeu, c'est l'équilibre entre une vie et un métier : un côté ne
+  // peut pas manger l'autre. Le sportif était monté à 84 % des rendez-vous parce
+  // que ses familles sont presque toujours applicables. On tire donc du côté qui
+  // est en retard sur la saison, quand il a quelque chose à proposer.
+  const sd=(state.seasonStats&&(state.seasonStats.sides=state.seasonStats.sides||{terrain:0,vie:0}))||{terrain:0,vie:0};
+  // Un écart de deux, pas de un : alterner strictement rendrait la suite
+  // prévisible, et deux rendez-vous de terrain d'affilée sont une saison normale.
+  const want=sd.terrain-sd.vie>=2?'vie':sd.vie-sd.terrain>=2?'terrain':null;
+  if(want){ const p2=pool.filter(x=>x.side===want); if(p2.length) pool=p2; }
+  const mt=pick(pool);
+  sd[mt.side==='vie'?'vie':'terrain']++;
   state.recentMeetings=[...seen,mt.kind].slice(-5);
   state.phaseStops=(state.phaseStops||0)+1;
   mt.opponent=`${m.themName} · ${m.home?'à domicile':'à l\'extérieur'}`;
@@ -644,7 +657,7 @@ function coachMeetingInjured(m){
     plan:{playHurt:out.id,bonus:1},effects:{staff:-5},
     seed:{in:1,icon:'🫀',title:"La rechute annoncée",text:`${out.name} n'a jamais vraiment récupéré de ce match-là. Le staff te l'avait dit.`,effects:{staff:-4,vestiaire:-4}}});
   choices.push({label:"Laisser l'adjoint trancher",sub:"Tu as d'autres soucis. Il décidera bien.",plan:{delegate:true},effects:{staff:3,technique:-1}});
-  return {kind:'homme',icon:'🩼',title:`${out.name} est ${why}`,
+  return {kind:'homme',side:'terrain',icon:'🩼',title:`${out.name} est ${why}`,
     text:`${out.name} (${POS_LABEL[out.pos].toLowerCase()}, niveau ${playerRating(out,y)}) ne jouera pas. Sa place est à prendre, et celui qui la prend prive quelqu'un d'autre.`,
     choices};
 }
@@ -654,7 +667,7 @@ function coachMeetingFronts(m,it,left){
   const c=state.club;
   if(!c.euroQualified||state.phase<1||state.effort) return null;
   const euro=eraForYear(state.year).euroCup;
-  return {kind:'fronts',icon:'⚖️',title:"Deux fronts",
+  return {kind:'fronts',side:'terrain',icon:'⚖️',title:"Deux fronts",
     text:`Tu joues le championnat et la ${euro}. Ton groupe ne tiendra pas les deux à plein régime. Où passe l'année ?`,
     choices:[
       {label:"Le championnat avant tout",sub:"La régularité, la place, la sécurité du club.",plan:{effort:'championnat'},effects:{confidence:4,supporters:-3}},
@@ -668,7 +681,7 @@ function coachMeetingSquad(m,it,left){
   const y=state.year, g=state.gauges;
   const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
   if(fitAvg<82&&state.training!=='recuperation'){
-    return {kind:'symptome',icon:'🥵',title:"Le groupe est à bout",
+    return {kind:'symptome',side:'terrain',icon:'🥵',title:"Le groupe est à bout",
       text:`Fraîcheur moyenne ${Math.round(fitAvg)} %. Les jambes sont lourdes, les blessures guettent, et il reste ${left} journée${left>1?'s':''} avant la trêve.`,
       choices:[
         {label:"Semaine de récupération",sub:"Les séances s'allègent. La tactique attendra.",plan:{training:'recuperation'},effects:{staff:2}},
@@ -677,7 +690,7 @@ function coachMeetingSquad(m,it,left){
       ]};
   }
   if(g.vestiaire<45){
-    return {kind:'symptome',icon:'🧊',title:"Le vestiaire s'est refroidi",
+    return {kind:'symptome',side:'terrain',icon:'🧊',title:"Le vestiaire s'est refroidi",
       text:`Vestiaire ${Math.round(g.vestiaire)}/100. Les séances sont silencieuses et personne ne se parle après les matchs.`,
       choices:[
         {label:"Une mise au point collective",sub:"Tout le monde parle, ça pique.",plan:{bonus:-.6},effects:{vestiaire:9,technique:1}},
@@ -703,7 +716,7 @@ function coachMeetingOpponent(m,it,left){
     plan:{style:counterStyle.id,bonus:.8},effects:{vestiaire:-4}});
   choices.push({label:"Fermer le jeu",sub:"Un point, c'est un point. Le parcage n'aimera pas.",plan:{approach:'defensif'},effects:{supporters:-3}});
   choices.push({label:"Tout devant",sub:"Les prendre à la gorge. Derrière, on verra.",plan:{approach:'offensif'},effects:{supporters:3,confidence:-1}});
-  return {kind:'adversaire',icon:ti.icon,title:`${m.themName} joue ${styleById(theirs).name.toLowerCase()}`,
+  return {kind:'adversaire',side:'terrain',icon:ti.icon,title:`${m.themName} joue ${styleById(theirs).name.toLowerCase()}`,
     text:`${it.why[0]||'Match important'}. ${ti.label} : ${ti.how}. Leur force est estimée à ${Math.round(m.themStrength)}, la tienne à ${Math.round(coachStrength())}.`,
     choices};
 }
@@ -716,7 +729,7 @@ function coachMeetingPresident(m,it,left){
   if(!costly) return null;
   const benched=!state.match.xi.includes(costly.id);
   if(!benched) return null;
-  return {kind:'president',icon:'🕴️',title:`${capitalize(c.presidentName)} veut voir ${costly.name} jouer`,
+  return {kind:'president',side:'vie',icon:'🕴️',title:`${capitalize(c.presidentName)} veut voir ${costly.name} jouer`,
     text:`« Je paie ${$(costly.wage)} par an pour qu'il regarde les matchs ? » ${costly.name} (niveau ${playerRating(costly,y)}) est le plus gros salaire du club, et il n'est pas dans ton onze.`,
     choices:[
       {label:"Le titulariser",sub:"Le président se tait. Le vestiaire comprend qui décide.",plan:{forceIn:costly.id},effects:{confidence:6,vestiaire:-5}},
@@ -731,7 +744,7 @@ function coachMeetingCaptain(m,it,left){
   const cap=state.captainId!=null?P[state.captainId]:null; if(!cap) return null;
   const sad=state.squad.filter(p=>p.morale<50&&p!==cap&&!state.match.xi.includes(p.id)).sort((a,b)=>a.morale-b.morale)[0];
   if(!sad) return null;
-  return {kind:'capitaine',icon:'🎽',title:`${cap.name} vient te parler de ${sad.name}`,
+  return {kind:'capitaine',side:'vie',icon:'🎽',title:`${cap.name} vient te parler de ${sad.name}`,
     text:`« Il ne dort plus, il ne parle plus à personne. Si tu ne fais rien, on va le perdre — et pas seulement lui. » ${sad.name} n'a plus joué depuis longtemps.`,
     choices:[
       {label:`Le remettre dans le onze`,sub:"Un geste, tout de suite, devant tout le monde.",plan:{forceIn:sad.id,bonus:-.5},effects:{vestiaire:7}},
@@ -746,7 +759,7 @@ function coachMeetingPress(m,it,left){
   if(it.score<2) return null;
   const c=state.club, f=(state.comp.form&&state.comp.form[c.name])||[];
   const bad=f.slice(-3).filter(r=>r==='L').length>=2;
-  return {kind:'presse',icon:'🎙️',title:bad?"La conférence d'avant-match":"Le micro tendu",
+  return {kind:'presse',side:'vie',icon:'🎙️',title:bad?"La conférence d'avant-match":"Le micro tendu",
     text:bad?`Trois questions sur ta série, une sur ton avenir. ${m.themName} arrive, et la salle attend que tu dises quelque chose.`
       :`Avant ${m.themName}, on te demande si ton équipe a le niveau. La réponse fera le titre de demain.`,
     choices:[
@@ -761,7 +774,7 @@ function coachMeetingPress(m,it,left){
 function coachMeetingBonus(m,it,left){
   if(it.score<4) return null;
   const c=state.club;
-  return {kind:'prime',icon:'💰',title:"Les joueurs demandent une prime",
+  return {kind:'prime',side:'vie',icon:'💰',title:"Les joueurs demandent une prime",
     text:`Le match contre ${m.themName} vaut cher, et le groupe le sait. Les cadres sont venus à deux, poliment.`,
     choices:[
       {label:"Payer la prime sur le budget",sub:"Ils l'auront, et ils le sauront.",plan:{bonus:.9},effects:{budget:-.06,vestiaire:5,confidence:-3}},
@@ -776,7 +789,7 @@ function coachMeetingReturn(m,it,left){
   const back=state.squad.filter(p=>p.injury===0&&p.fitness!=null&&p.fitness<62&&playerRating(p,y)>=state.club.strength-2&&!(state.metFor||[]).includes(-p.id))[0];
   if(!back) return null;
   (state.metFor=state.metFor||[]).push(-back.id);
-  return {kind:'retour',icon:'🧑‍⚕️',title:`${back.name} veut rejouer`,
+  return {kind:'retour',side:'terrain',icon:'🧑‍⚕️',title:`${back.name} veut rejouer`,
     text:`Il est remis, sur le papier. Fraîcheur ${Math.round(fit(back))} %, et il n'a pas joué depuis longtemps. Le staff propose de le ménager.`,
     choices:[
       {label:"Le titulariser tout de suite",sub:"Il en a besoin, l'équipe aussi.",plan:{forceIn:back.id,bonus:.5},effects:{staff:-4,vestiaire:2},
@@ -788,7 +801,7 @@ function coachMeetingReturn(m,it,left){
 /* Un déplacement lointain se prépare, ou se subit. */
 function coachMeetingTravel(m,it,left){
   if(m.home||it.score<3) return null;
-  return {kind:'voyage',icon:'🚌',title:`Le déplacement à ${m.themName}`,
+  return {kind:'voyage',side:'terrain',icon:'🚌',title:`Le déplacement à ${m.themName}`,
     text:"Six heures de route, ou un vol la veille et une nuit d'hôtel. Le club regarde la facture.",
     choices:[
       {label:"Partir la veille, en avion",sub:"Des jambes fraîches, une note salée.",plan:{bonus:.8},effects:{budget:-.03,confidence:-2}},
@@ -807,7 +820,7 @@ function coachMeetingPrep(m,it,left){
   if(left<2||it.score>=4||Math.random()<.45) return null;
   const tr=TRAINING[state.training]||TRAINING.tactique;
   const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
-  return {kind:'semaine',icon:'📋',title:"La semaine d'avant",
+  return {kind:'semaine',side:'terrain',icon:'📋',title:"La semaine d'avant",
     text:`Cinq séances avant ${m.themName}. Ton adjoint attend de savoir sur quoi on travaille. Pour l'instant la semaine type est « ${tr.label.toLowerCase()} », fraîcheur du groupe ${Math.round(fitAvg)} %.`,
     choices:[
       {label:"Tout sur le plan de jeu",sub:"Vidéo, placements, répétitions jusqu'à l'écœurement.",plan:{training:'tactique',bonus:.6},effects:{vestiaire:-2}},
@@ -824,7 +837,7 @@ function coachMeetingRecovery(m,it,left){
   const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
   if(fitAvg>=92||fitAvg<82) return null; // sous 82, c'est le rendez-vous « le groupe est à bout »
   const dur=(state.phaseMatches||[]).slice(-1)[0];
-  return {kind:'recup',icon:'🛁',title:"Soixante-douze heures",
+  return {kind:'recup',side:'terrain',icon:'🛁',title:"Soixante-douze heures",
     text:`${dur&&dur.res==='L'?'La défaite est encore dans les jambes.':'Le match a laissé des traces.'} Trois jours avant ${m.themName}, fraîcheur ${Math.round(fitAvg)} %. Le préparateur physique et ton adjoint ne sont pas d'accord.`,
     choices:[
       {label:"Récupération et rien d'autre",sub:"Bains froids, sommeil, aucune charge. On ne prépare pas ce match, on répare le groupe.",plan:{training:'recuperation',bonus:-.7},effects:{staff:5}},
@@ -839,7 +852,7 @@ function coachMeetingShape(m,it,left){
   const ss=state.seasonStats, played=(ss&&ss.phases?ss.phases.reduce((n,p)=>n+p.W+p.D+p.L,0):0)+(state.phaseMatches||[]).length;
   if(played<4) return null;
   const ga=(ss.conceded||0)/played, gf=(ss.goals||0)/played;
-  if(ga>=1.7) return {kind:'forme',icon:'🥅',title:"On prend l'eau",
+  if(ga>=1.7) return {kind:'forme',side:'terrain',icon:'🥅',title:"On prend l'eau",
     text:`${Math.round(ga*10)/10} but encaissé par match depuis le début de saison. Ce n'est plus une mauvaise passe, c'est une manière de jouer.`,
     choices:[
       {label:"Fermer la boutique",sub:"Bloc bas, deux lignes de quatre, et on verra devant.",plan:{approach:'defensif',bonus:.5},effects:{supporters:-5}},
@@ -848,7 +861,7 @@ function coachMeetingShape(m,it,left){
       {label:"Ne rien changer",sub:"Tu crois à ce que tu as construit. Ça se saura, dans un sens ou dans l'autre.",effects:{confidence:-2},
        seed:{in:1,icon:'🧱',title:"Tu n'avais rien changé",text:"La défense a fini par tenir, sans que tu touches à rien. Le vestiaire retient que tu n'as pas paniqué.",effects:{vestiaire:6,technique:3}}},
     ]};
-  if(gf<=.9) return {kind:'forme',icon:'🎯',title:"On ne marque plus",
+  if(gf<=.9) return {kind:'forme',side:'terrain',icon:'🎯',title:"On ne marque plus",
     text:`${Math.round(gf*10)/10} but marqué par match. Les occasions viennent, personne ne les met. Le vestiaire commence à jouer la peur au ventre devant le but.`,
     choices:[
       {label:"Libérer les attaquants",sub:"Plus de monde devant, tant pis pour l'équilibre.",plan:{approach:'offensif',bonus:.4},effects:{staff:-2}},
@@ -866,7 +879,7 @@ function coachMeetingCards(m,it,left){
     .sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
   if(!risk||it.score<2) return null;
   (state.metFor=state.metFor||[]).push(1000+risk.id);
-  return {kind:'cartons',icon:'🟨',title:`${risk.name} est à un carton de la suspension`,
+  return {kind:'cartons',side:'terrain',icon:'🟨',title:`${risk.name} est à un carton de la suspension`,
     text:`Deux avertissements au compteur, et il joue ${m.themName} ${m.home?'à domicile':'à l\'extérieur'}. Un troisième et il saute le prochain — qui peut compter plus que celui-ci.`,
     choices:[
       {label:"Le laisser au repos ce match",sub:"On purge le risque, on se prive de lui aujourd'hui.",plan:{bonus:-.9},effects:{staff:2}},
@@ -880,13 +893,101 @@ function coachMeetingCards(m,it,left){
 function coachMeetingPitch(m,it,left){
   if(m.home||state.phase!==1||it.score<2) return null;
   const froid=Math.random()<.5;
-  return {kind:'pelouse',icon:froid?'❄️':'🌧️',title:froid?`Il va geler à ${m.themName}`:`La pelouse de ${m.themName} est un champ`,
+  return {kind:'pelouse',side:'terrain',icon:froid?'❄️':'🌧️',title:froid?`Il va geler à ${m.themName}`:`La pelouse de ${m.themName} est un champ`,
     text:froid?"Moins quatre annoncé au coup d'envoi, terrain dur comme du béton. Le jeu au sol va être une loterie."
       :"Trois jours de pluie, un drainage d'avant-guerre. Le ballon s'arrête là où il tombe.",
     choices:[
       {label:"Jouer direct",sub:"Longs ballons, seconds ballons, duels. Ce n'est pas beau, c'est efficace ici.",plan:{style:'direct',bonus:.9},effects:{supporters:-4}},
       {label:"Garder ton jeu",sub:"Tes principes valent mieux qu'un terrain. On va voir.",plan:{bonus:-.6},effects:{supporters:3,vestiaire:2}},
       {label:"Crampons longs et échauffement rallongé",sub:"Le détail qui ne se voit pas, et qui évite trois blessures.",plan:{bonus:.2},effects:{staff:4,budget:-.01}},
+    ]};
+}
+
+/* ---------- L'autre moitié : les gens, la maison, la maison-club ----------
+   Retour du propriétaire (22/09/2026) : « réduis les parties footballistiques,
+   le reste compte aussi ». Le sportif était monté à 84 % des rendez-vous parce
+   que ses familles sont presque toujours applicables, quand l'humain restait
+   verrouillé derrière des conditions étroites. Quatre familles de plus de ce
+   côté-là, et un tirage qui alterne (voir coachDrawMeeting). */
+
+/* L'agent d'un joueur : le football est aussi un bureau. */
+function coachMeetingAgent(m,it,left){
+  const y=state.year, c=state.club;
+  const p=state.squad.filter(x=>x.contractEnd&&x.contractEnd<=y+1&&playerRating(x,y)>=c.strength-1&&!(state.metFor||[]).includes(2000+x.id))
+    .sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
+  if(!p) return null;
+  (state.metFor=state.metFor||[]).push(2000+p.id);
+  return {kind:'agent',side:'vie',icon:'💼',title:`L'agent de ${p.name} s'est invité`,
+    text:`Costume clair, café pris au bar du stade. « Mon joueur est bien ici, mais il a ${playerAge(p,y)} ans et son contrat finit en ${p.contractEnd}. Vous comprenez. » ${p.name} vaut ${$(playerValue(p,y))} et touche ${$(p.wage)}.`,
+    choices:[
+      {label:"Prolonger au prix qu'il demande",sub:"Le garder coûte, le perdre coûterait plus.",effects:{budget:-.04,vestiaire:4,confidence:-3}},
+      {label:"Lui promettre une revalorisation en fin de saison",sub:"Gagner six mois. Il faudra tenir parole.",effects:{vestiaire:2},
+       seed:{in:1,icon:'🤥',title:"La revalorisation promise",text:`L'agent de ${p.name} n'a rien oublié. Le vestiaire non plus.`,effects:{vestiaire:-7,reputation:-3}}},
+      {label:"Refuser et assumer",sub:"Il partira libre. C'est un choix, pas un oubli.",effects:{confidence:3,vestiaire:-5},
+       seed:{in:1,icon:'🕊️',title:"Parti pour rien",text:`${p.name} a signé ailleurs sans que le club touche un centime. On te l'a reproché tout l'été.`,effects:{confidence:-5,supporters:-4}}},
+      {label:"Le mettre sur le marché tout de suite",sub:"Vendre tant qu'il vaut quelque chose.",effects:{confidence:4,vestiaire:-4,supporters:-3}},
+    ]};
+}
+
+/* Les supporters ne sont pas un chiffre : ils sonnent à la porte. */
+function coachMeetingFans(m,it,left){
+  const g=state.gauges, c=state.club;
+  const f=(state.comp.form&&state.comp.form[c.name])||[];
+  const bad=f.slice(-4).filter(r=>r==='L').length>=2;
+  if(g.supporters>=48&&!bad) return null;
+  return {kind:'tribune',side:'vie',icon:'📣',title:g.supporters<35?"Une banderole au centre d'entraînement":"Une délégation demande à te voir",
+    text:g.supporters<35?`Ils sont venus à l'aube accrocher deux draps sur les grilles. Supporters ${Math.round(g.supporters)}/100, et le message ne parle pas que des joueurs.`
+      :`Trois représentants du kop attendent à l'accueil depuis une heure. Ils veulent « comprendre ». Supporters ${Math.round(g.supporters)}/100.`,
+    choices:[
+      {label:"Les recevoir, longuement",sub:"Leur ouvrir la porte, écouter, expliquer. Ça prend l'après-midi.",plan:{bonus:-.3},effects:{supporters:9,pressure:4}},
+      {label:"Leur donner raison en public",sub:"Dire tout haut ce qu'ils pensent. Le président lira.",effects:{supporters:12,confidence:-7,reputation:2}},
+      {label:"Renvoyer vers le service communication",sub:"Ce n'est pas ton métier. Ce n'est pas faux.",effects:{supporters:-6,pressure:-2}},
+      {label:"Leur demander de soutenir l'équipe",sub:"Retourner la conversation. Courageux, ou maladroit.",effects:{supporters:-3,vestiaire:5,pressure:2}},
+    ]};
+}
+
+/* Chez toi, on t'attend aussi. C'est la moitié du sujet. */
+function coachMeetingHome(m,it,left){
+  if((state.metHome||0)>=1+Math.floor(state.phase/2)) return null;
+  if(Math.random()<.55) return null;
+  state.metHome=(state.metHome||0)+1;
+  const g=state.gauges;
+  const scenes=[
+    {t:"L'anniversaire tombe le jour du match",x:`On souffle les bougies samedi. Le déplacement à ${m.themName} part vendredi soir.`,a:"Y aller, rejoindre le groupe au petit matin"},
+    {t:"Le spectacle de fin d'année",x:"Trois minutes sur une scène de gymnase, préparées depuis septembre. Même heure que la mise au vert.",a:"Y aller, arriver en retard à la mise au vert"},
+    {t:"Le rendez-vous qu'on a déjà repoussé deux fois",x:"« On en reparle après la saison » — tu as dit ça en août. On est en janvier.",a:"Le prendre, ce week-end, quoi qu'il arrive"},
+    {t:"Ton père au téléphone",x:"Il ne demande rien. Il rappelle juste qu'il n'a pas eu de nouvelles depuis six semaines.",a:"Partir le voir deux jours"},
+  ];
+  const sc=pick(scenes);
+  return {kind:'maison',side:'vie',icon:'🏡',title:sc.t,
+    text:`${sc.x} Proches ${Math.round(g.proches)}/100 — c'est ce qui reste quand le football s'arrête.`,
+    choices:[
+      {label:sc.a,sub:"Le groupe comprendra. Ou fera semblant.",plan:{bonus:-.6},effects:{proches:10,staff:-3,pressure:-4}},
+      {label:"Rester avec le groupe",sub:"C'est le métier. On te l'a assez dit.",plan:{bonus:.4},effects:{proches:-8,staff:2}},
+      {label:"Y passer une heure, puis filer",sub:"Ne satisfaire personne, à commencer par toi.",effects:{proches:3,pressure:3}},
+      {label:"Déléguer la mise au vert à ton adjoint",sub:"Il en a vu d'autres. Le président, lui, compte les absences.",effects:{proches:8,staff:4,confidence:-4}},
+    ]};
+}
+
+/* Le club n'est pas que le terrain : il y a un étage au-dessus. */
+function coachMeetingBoard(m,it,left){
+  if(state.phase<1||(state.metBoard||0)>=state.phase) return null;
+  if(Math.random()<.5) return null;
+  state.metBoard=(state.metBoard||0)+1;
+  const c=state.club;
+  const scenes=[
+    {t:"Le sponsor veut sa journée",x:"Une matinée de tournage, un maillot à tenir face caméra, des mains à serrer. La veille de l'entraînement du jeudi."},
+    {t:"Le directeur sportif t'apporte un dossier",x:"Un joueur qu'il adore, que tu n'as pas demandé, et qu'il aimerait « que tu valides »."},
+    {t:"Le conseil veut un plan à trois ans",x:"Une réunion de quatre heures pour un club qui ne sait pas de quoi sera fait le mois prochain."},
+  ];
+  const sc=pick(scenes);
+  return {kind:'direction',side:'vie',icon:'🏢',title:sc.t,
+    text:`${sc.x} ${capitalize(c.presidentName)} n'a pas posé la question, il a simplement transmis la date.`,
+    choices:[
+      {label:"Y aller et bien le faire",sub:"Une journée perdue pour le terrain, gagnée en haut.",plan:{bonus:-.5},effects:{confidence:6,reseau:4}},
+      {label:"Envoyer ton adjoint",sub:"Il représentera très bien le club. Ce n'est pas toi qu'ils voulaient.",effects:{confidence:-3,staff:3}},
+      {label:"Refuser, tu prépares un match",sub:"Défendable. Impopulaire.",plan:{bonus:.4},effects:{confidence:-6,vestiaire:3}},
+      {label:"Y aller et en profiter pour demander",sub:"Poser ta liste sur la table pendant qu'ils sourient.",plan:{bonus:-.5},effects:{budget:.04,confidence:-2,reseau:3}},
     ]};
 }
 

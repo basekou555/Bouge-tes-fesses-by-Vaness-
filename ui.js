@@ -679,7 +679,8 @@ function renderMeeting(){
     <div class="section-label">Ta décision</div>
     <div class="choice-list">${mt.choices.map((c,i)=>`<button class="choice-btn" onclick="coachChooseMeeting(${i})"><div class="body"><b>${escapeHtml(c.label)}</b>${c.sub?`<small>${escapeHtml(c.sub)}</small>`:''}${matchChip(c)}${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>
     ${stateTable(keys)}
-    <div class="hint">Tu ne composes pas l'équipe : ton adjoint s'en charge. Tu décides, et le match répond.</div></div>`;
+    <div class="hint">${mt.side==='vie'?"Ça ne se joue pas sur le terrain, et ça pèsera quand même sur ta saison."
+      :"Tu ne composes pas l'équipe : ton adjoint s'en charge. Tu décides, et le match répond."}</div></div>`;
 }
 /* Ce que ta décision a produit, en tête du résultat. */
 function recapHTML(){
