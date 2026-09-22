@@ -105,12 +105,20 @@ function makePlayer(o){
 }
 function playerAge(p,year){ return year-p.born; }
 function playerRating(p,year){ const age=playerAge(p,year); return clamp(Math.round(p.peak*ageCurve(age)*p.dev+(p.form||0)*.3),25,99); }
+function valueAgeFactor(age){
+  if(age<=22) return 1.30+Math.min(5,22-age)*.03;
+  const slow=Math.min(age,28)-22, mid=Math.max(0,Math.min(age,32)-28), late=Math.max(0,age-32);
+  return Math.max(.08,1.30*Math.pow(.93,slow)*Math.pow(.85,mid)*Math.pow(.75,late));
+}
 function valueForRating(r,age,year){
   const base=Math.pow(Math.max(0,r-40)/60,3)*120;
-  const ageF=age<=23?1.35:age<=28?1:age<=31?.7:age<=33?.45:.25;
-  return Math.max(.01,base*ageF*eraForYear(year).marketSize);
+  return Math.max(.01,base*valueAgeFactor(age)*eraForYear(year).marketSize);
 }
-function playerValue(p,year){ return valueForRating(playerRating(p,year),playerAge(p,year),year); }
+function playerValue(p,year){
+  let v=valueForRating(playerRating(p,year),playerAge(p,year),year);
+  if(p.rated>=4) v*=clamp(1+(p.sumRating/p.rated-6.2)*.12,.75,1.4);
+  return v;
+}
 /* Salaire annuel (millions de 2015) : niveau, âge (les jeunes gagnent peu), palier du club, époque.
    Niveau 50 → ≈ 0,05 M, 60 → ≈ 0,4 M, 70 → ≈ 1,3 M, 80 → ≈ 3 M, 90 → ≈ 6 M, avant multiplicateurs (âge, palier, époque). */
 const WAGE_TIER_MULT={superclub:1.5,europe:1.2,ligue1:1,etranger:.9,ligue2:.55,amateur:.3};
@@ -263,6 +271,8 @@ function developSquad(squad,year,ctx){
     let dev=0;
     if(age<=23) dev=(share-.35)*.03+(ctx.formation-50)*.0004+(p.trait==='travailleur'?.006:0)+(ctx.youthWeeks||0)*.0006;
     else if(age>=31) dev=-(.006+(age-30)*.004)+(ctx.staff-50)*.0002;
+    // Même en pleine force de l'âge, on progresse en jouant et on s'émousse sur le banc.
+    else dev=(share-.5)*.012+(ctx.staff-50)*.0002;
     p.dev=clamp(p.dev+dev,.8,1.14);
     if(age<=21&&share>=.5&&dev>.02) notes.push(`${p.name} a franchi un palier grâce au temps de jeu.`);
     p.seasonsAtClub++; p.form=0; p.morale=clamp(p.morale+(share>=.5?4:-6)+(ctx.vestiaire-50)*.1,20,100); p.yellows=0; p.suspended=0; p.fitness=100;
