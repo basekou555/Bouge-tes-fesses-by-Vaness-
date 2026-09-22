@@ -161,7 +161,7 @@ function coachSidebar(){
     <div class="section-label">Toi</div>${Object.keys(CSTAT).map(k=>bar(CSTAT[k],s[k])).join('')}${bar('Pression',state.pressure,'pressure')}
     ${c?tempoSelectHTML():''}
     <div class="section-label">Le club</div>${Object.keys(GAUGE_INFO).map(k=>gaugeRow(GAUGE_INFO[k],g[k])).join('')}
-    ${c?`<div class="section-label">Effectif</div><div class="hint">${state.squad.length} joueurs · onze type ${xiAvg.toFixed(1)} · ${state.formation} · ${styleById(state.styleId).icon} ${styleById(state.styleId).name}<br>Blessés : ${state.squad.filter(p=>p.injury>0).length} · Suspendus : ${state.squad.filter(p=>p.suspended>0).length} · Fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)}</div>`:''}
+    ${c?`<div class="section-label">Effectif</div><div class="hint">${state.squad.length} joueurs · niveau de l'effectif ${xiAvg.toFixed(1)} · ${state.formation} · ${styleById(state.styleId).icon} ${styleById(state.styleId).name}<br>Blessés : ${state.squad.filter(p=>p.injury>0).length} · Suspendus : ${state.squad.filter(p=>p.suspended>0).length} · Fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)}</div>`:''}
     <div class="section-label">Palmarès</div><div class="hint">🏆 ${state.titles.league} · ⬆️ ${state.titles.promo} · 🥇 ${state.titles.cup} · ⭐ ${state.titles.euro} · 🌍 ${state.titles.euro2} · 🎖️ ${state.awards} · 🪓 ${state.sackings}</div></div>
     <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,30).map(l=>`<div><span class="age">${l.year}</span>${l.msg}</div>`).join('')}</div></div>
     <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Prendre ta retraite ? La sauvegarde sera supprimée.')){coachEnd('Tu raccroches le survêtement de ton plein gré.','retire');render();}">Retraite</button></div></div>`;
@@ -310,7 +310,7 @@ function renderDashboard(){
     ${quotaActive()?`<div class="section-label">Le quota d'étrangers</div>${quotaHTML()}`:''}
 
     <div class="section-label">Le club</div>
-    <div class="hint">${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${pos?` · ${ordinal(pos)}`:''} · objectif ${ordinal(c.objectivePos)} · confiance ${Math.round(c.confidence)}/100<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)} · ${state.squad.length} joueurs · fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %</div>
+    <div class="hint">${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${pos?` · ${ordinal(pos)}`:''} · objectif ${ordinal(c.objectivePos)}${c.objectivePromised&&c.objectivePromised!==c.objectivePos?` <i>(${ordinal(c.objectivePromised)} promis à la signature, revu après le mercato)</i>`:''} · confiance ${Math.round(c.confidence)}/100<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)} · ${state.squad.length} joueurs · fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %</div>
 
     ${hist.length?`<div class="section-label">Tes dernières saisons</div><div class="kpi-hist">${hist.map(h=>`<div><span class="y">${h.year}</span><span class="cl">${escapeHtml(h.club)}</span><span class="r">${h.sacked?'🪓':h.pos?ordinal(h.pos):'—'}</span></div>`).join('')}</div>`:''}
 
@@ -383,7 +383,7 @@ function renderMercato(){
   const cur=marketCurrent();
   const head=`<div class="mk-head">
       <div><span>Budget transferts</span><b>${$(m.budgetLeft)}</b></div>
-      <div class="${wages>c.wageCap?'warn-box':''}"><span>Masse salariale</span><b>${$(wages)}</b><small>plafond ${$(c.wageCap)}</small>${moneyBar(wages,c.wageCap,wages>c.wageCap)}</div>
+      <div class="${wages>c.wageCap?'warn-box':''}"><span>Masse salariale</span><b>${$(wages)}</b><small>plafond ${$(c.wageCap)}</small>${moneyBar(wages,c.wageCap,wages>c.wageCap)}${wages>c.wageCap*1.1?`<small class="warn-note">${Math.round(wages/c.wageCap*100)} % : au-dessus de 110 %, le président retire 3 de confiance à chaque bilan de phase.</small>`:''}</div>
       <div><span>Effectif</span><b>${state.squad.length} / 27</b></div>
       ${quotaActive()?`<div class="${foreignCount()>=fmax?'warn-box':''}"><span>Étrangers</span><b>${foreignCount()} / ${fmax}</b></div>`:''}
     </div>`;
@@ -400,7 +400,7 @@ function renderMercato(){
       <div class="mk-kind">${t.label} · via ${escapeHtml(t.source)}</div>
       <div class="mk-name"><span class="pos-badge pos-${p.pos}">${p.pos}</span> <b class="${p.real?'real':''}">${escapeHtml(p.name)}</b> ${natTag(p,true)}</div>
       <div class="mk-line">${t.age} ans · niveau <b>${rating}</b> ${t.kind==='youth'?'<i>(potentiel inconnu)</i>':stars(t.shownRating)} · ${traitLabel(p.trait)}</div>
-      <div class="mk-deal"><div><span>Transfert</span><b>${t.price>0?$(t.price):'libre'}</b></div><div><span>Salaire / an</span><b>${$(t.wage)}</b></div><div><span>Ton budget après</span><b class="${t.price>m.budgetLeft?'bad':''}">${$(m.budgetLeft-t.price)}</b></div></div>
+      <div class="mk-deal"><div><span>Transfert</span><b>${t.price>0?$(t.price):'libre'}</b></div><div><span>Salaire / an</span><b>${$(t.wage)}</b></div><div><span>${t.price>m.budgetLeft?'Il te manquerait':'Ton budget après'}</span><b class="${t.price>m.budgetLeft?'bad':''}">${$(Math.abs(m.budgetLeft-t.price))}</b></div></div>
       ${t.access==='coup'?'<div class="mk-flag">⭐ Gros coup : il exige une place de titulaire.</div>':''}
       ${t.access==='no'?'<div class="mk-flag bad">Il ne répond pas. Ta crédibilité est trop basse.</div>':''}
 
@@ -439,31 +439,39 @@ function renderTactic(){
   if(!tacticSel||tacticSel.year!==state.year||tacticSel.club!==state.club.name) tacticSel={formation:state.formation,style:state.styleId,year:state.year,club:state.club.name};
   const c=state.club, notes=state.market&&state.market.closingNotes||[];
   const y=state.year; const xi=bestXI(state.squad,FORMATIONS[tacticSel.formation],y);
-  return `<div class="card">${notes.length?`<div class="section-label">Révélations du mercato</div>${notes.map(n=>`<div class="warn">${n}</div>`).join('')}`:''}<h2 class="display">Plan de jeu</h2><p class="hint">Le club demande <b>${styleById(c.styleWanted).icon} ${styleById(c.styleWanted).name}</b> (+2 de force si tu le suis). Ton style favori (${styleById(state.favoriteStyleId).icon} ${styleById(state.favoriteStyleId).name}) donne +1,5. Un style prestigieux exige de la tactique (${Math.round(state.stats.talent)}).</p>
+  return `<div class="card">${notes.length?`<div class="section-label">Révélations du mercato</div>${notes.map(n=>`<div class="warn">${n}</div>`).join('')}`:''}${c.objectiveNote?`<div class="warn">🎯 ${escapeHtml(c.objectiveNote)}</div>`:''}<h2 class="display">Plan de jeu</h2><p class="hint">Le club demande <b>${styleById(c.styleWanted).icon} ${styleById(c.styleWanted).name}</b> (+2 de force si tu le suis). Ton style favori (${styleById(state.favoriteStyleId).icon} ${styleById(state.favoriteStyleId).name}) donne +1,5. Un style prestigieux exige de la tactique (${Math.round(state.stats.talent)}).</p>
     <div class="section-label">Formation</div><div class="formation-grid">${Object.keys(FORMATIONS).map(f=>`<button class="${tacticSel.formation===f?'on':''}" onclick="tacticSel.formation='${f}';render()"><b>${f}</b></button>`).join('')}</div>
     <div class="section-label">Style</div><div class="style-grid">${STYLES.map(s=>`<button class="${tacticSel.style===s.id?'on':''}" onclick="tacticSel.style='${s.id}';render()"><b>${s.icon} ${s.name}</b><small>${s.desc}${s.id===c.styleWanted?' · <b>demandé par le club</b>':''}${s.id===state.favoriteStyleId?' · <b>ton style</b>':''}${s.prestige*60>state.stats.talent?` · exige tactique ${Math.round(s.prestige*60)}`:''}</small></button>`).join('')}</div>
     <div class="section-label">Onze type en ${tacticSel.formation}</div><div class="squad">${xi.map(p=>`<div><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)} <span>${playerRating(p,y)}</span></div>`).join('')}</div>
     <div class="btn-row"><button class="btn" onclick="coachSetTactic(tacticSel.formation,tacticSel.style);render()">${state.tacticAfterWinter?'Reprendre la saison →':'Lancer la saison →'}</button></div></div>`;
 }
+/* Le « pourquoi » d'une phase lit exactement la même décomposition que le
+   tableau de bord et que le match. Trois formules différentes donnaient trois
+   réponses différentes à la même question. */
 function impactLines(){
-  const c=state.club, g=state.gauges, lines=[]; const xi=bestXI(state.squad,FORMATIONS[state.formation],state.year); const xiAvg=xi.reduce((n,p)=>n+playerRating(p,state.year),0)/Math.max(1,xi.length);
-  lines.push({t:`Onze type à ${xiAvg.toFixed(1)} contre une force de club attendue de ${c.strength}`,d:xiAvg-c.strength});
-  lines.push({t:`Vestiaire ${Math.round(g.vestiaire)} : ${g.vestiaire>=60?'un groupe soudé qui tire tout le monde vers le haut':g.vestiaire<40?'un groupe fracturé qui coûte des points':'un groupe correct, sans plus'}`,d:(g.vestiaire-50)*.05});
-  lines.push({t:`Style ${styleById(state.styleId).name} : ${state.styleId===c.styleWanted?'exactement ce que le club voulait':'pas celui que le club demandait'}${state.styleId===state.favoriteStyleId?', et ton style favori':''}`,d:(state.styleId===c.styleWanted?2:0)+(state.styleId===state.favoriteStyleId?1.5:0)-(state.styleId!==c.styleWanted?.5:0)});
-  lines.push({t:`Tactique ${Math.round(state.stats.talent)} : ${state.stats.talent>=55?'tes idées font gagner des matchs':'tes idées sont encore un peu courtes'}`,d:(state.stats.talent-50)*.08});
-  const inj=state.squad.filter(p=>p.injury).length; if(inj) lines.push({t:`${inj} blessé${inj>1?'s':''} (staff ${Math.round(g.staff)})`,d:-inj*.6});
-  if(state.seasonStats&&Math.abs(state.seasonStats.form)>=1) lines.push({t:`Dynamique ${state.seasonStats.form>0?'positive':'négative'} (${state.seasonStats.form>0?'+':''}${state.seasonStats.form.toFixed(1)})`,d:state.seasonStats.form});
+  const c=state.club, bd=coachStrengthBreakdown(), lines=[];
+  lines.push({t:`Niveau de l'effectif ${bd.base.toFixed(1)} pour une force de club attendue de ${c.strength}`,d:bd.base-c.strength});
+  bd.rows.filter(r=>!r.abs&&Math.abs(r.v)>=.05).forEach(r=>lines.push({t:`${r.label} — ${r.help}`,d:r.v}));
+  const inj=state.squad.filter(p=>p.injury).length; if(inj) lines.push({t:`${inj} blessé${inj>1?'s':''} à soigner (staff ${Math.round(state.gauges.staff)})`,d:-inj*.6});
+  lines.push({t:`Force emmenée sur le terrain : ${bd.total.toFixed(1)}`,d:0});
   return `<div class="impact">${lines.map(l=>`<div class="${l.d>=.5?'up':l.d<=-.5?'down':''}">${l.d>=.5?'▲':l.d<=-.5?'▼':'•'} ${escapeHtml(l.t)}</div>`).join('')}</div>`;
+}
+/* Ce qui a bougé la confiance du président, ligne par ligne : c'est le chiffre
+   qui licencie, il ne peut pas rester sans explication. */
+function confWhyHTML(ph){
+  if(!ph.confWhy||!ph.confWhy.length) return '';
+  return `<div class="impact">${ph.confWhy.map(l=>`<div class="${l.d>=.5?'up':l.d<=-.5?'down':''}">${l.d>=.5?'▲':l.d<=-.5?'▼':'•'} ${escapeHtml(l.t)} <b>${l.d>0?'+':l.d<0?'':'±'}${String(l.d).replace('.',',')}</b></div>`).join('')}</div>`;
 }
 function renderPhaseResult(){
   const ph=state.lastPhase, c=state.club, N=state.comp.teams.length;
   const conf=c.confidence; const gap=c.objectivePos-ph.pos;
   return `<div class="card"><h2 class="display">Phase ${ph.n} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}
-    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(ph.pos)}</div><div class="k">sur ${N} · objectif ${ordinal(c.objectivePos)}</div></div><div class="score-box ${ph.W>ph.L?'good':ph.L>ph.W?'bad':''}"><div class="v">${ph.W}-${ph.D}-${ph.L}</div><div class="k">V-N-D · ${ph.gf} buts pour, ${ph.ga} contre</div></div><div class="score-box ${ph.dConf>=0?'good':'bad'}"><div class="v">${ph.dConf>=0?'+':''}${ph.dConf}</div><div class="k">Confiance du président → ${Math.round(conf)}</div></div><div class="score-box"><div class="v">${ph.strength}</div><div class="k">Force de l'équipe</div></div></div>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(ph.pos)}</div><div class="k">sur ${N} · objectif ${ordinal(c.objectivePos)}</div></div><div class="score-box ${ph.W>ph.L?'good':ph.L>ph.W?'bad':''}"><div class="v">${ph.W}-${ph.D}-${ph.L}</div><div class="k">V-N-D · ${ph.gf} buts pour, ${ph.ga} contre</div></div><div class="score-box ${ph.dConf>=0?'good':'bad'}"><div class="v">${ph.dConf>=0?'+':''}${ph.dConf}</div><div class="k">Confiance du président → ${Math.round(conf)}</div></div><div class="score-box"><div class="v">${ph.strength}</div><div class="k">Force en match${ph.base!=null?` · effectif seul ${ph.base}`:''}</div></div></div>
     <div class="section-label">Tes matchs</div>${matchesHTML(ph.matches,c.name)}
     ${ph.injuries.length?`<div class="warn">🩼 Blessures : ${ph.injuries.map(escapeHtml).join(', ')}</div>`:''}
     <div class="section-label">Pourquoi ce résultat</div>${impactLines()}
-    <div class="section-label">Le président</div><div class="hint">${gap>=2?`Tu es ${gap} place${gap>1?'s':''} au-dessus de l'objectif : ${c.presidentName} savoure.`:gap>=0?`Tu tiens l'objectif. ${capitalize(c.presidentName)} reste calme.`:gap>=-3?`Tu es ${-gap} place${gap<-1?'s':''} sous l'objectif. ${capitalize(c.presidentName)} s'impatiente.`:`Tu es loin de l'objectif (${-gap} places). ${capitalize(c.presidentName)} pense à ton successeur.`}${conf<=20?' <b>Le prochain faux pas sera le dernier.</b>':''}</div>
+    <div class="section-label">La confiance du président : ${ph.dConf>=0?'+':''}${ph.dConf}</div>${confWhyHTML(ph)}
+    <div class="hint">${gap>=2?`Tu es ${gap} place${gap>1?'s':''} au-dessus de l'objectif : ${c.presidentName} savoure.`:gap>=0?`Tu tiens l'objectif. ${capitalize(c.presidentName)} reste calme.`:gap>=-3?`Tu es ${-gap} place${gap<-1?'s':''} sous l'objectif. ${capitalize(c.presidentName)} s'impatiente.`:`Tu es loin de l'objectif (${-gap} places). ${capitalize(c.presidentName)} pense à ton successeur.`}${conf<=20?' <b>Le prochain faux pas sera le dernier.</b>':''}</div>
     <div class="section-label">Classement</div>${tableHTML(ph.table,c.name,true)}
     <div class="btn-row"><button class="btn" onclick="coachAfterPhase()">${state.phase>=4?'Bilan de la saison →':state.phase===2&&eraHasWinterMercato(state.year)?'Mercato d\'hiver →':'Phase suivante →'}</button></div></div>`;
 }

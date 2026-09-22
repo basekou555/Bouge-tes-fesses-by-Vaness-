@@ -338,7 +338,15 @@ function coachStartSeason(){
   const xi=bestXI(state.squad,FORMATIONS[state.formation],state.year); const xiAvg=xi.reduce((n,p)=>n+playerRating(p,state.year),0)/Math.max(1,xi.length);
   const rank=[...lg.teams.map(t=>t.strength),xiAvg].sort((a,b)=>b-a).indexOf(xiAvg)+1;
   const pres=PRESIDENTS.find(x=>x.id===c.president)||PRESIDENTS[0];
-  c.objectivePos=clamp(Math.min(c.objectivePos,Math.round(rank*pres.objMult*state.mode.objMult)),1,state.comp.teams.length-3); state.phaseMatches=[]; state.seasonStats={scorers:{},minutes:{},goals:0,conceded:0,form:0,phases:[]};
+  // Le président revoit son objectif en voyant l'effectif que tu lui as composé.
+  // Il ne peut que durcir — et il doit le dire : l'offre promettait 10e, la
+  // saison commençait 6e, et rien nulle part ne l'expliquait.
+  const promised=c.objectivePos;
+  c.objectivePos=clamp(Math.min(c.objectivePos,Math.round(rank*pres.objMult*state.mode.objMult)),1,state.comp.teams.length-3);
+  c.objectivePromised=promised;
+  c.objectiveNote=c.objectivePos<promised?`En signant, ${c.presidentName} demandait ${ordinal(promised)}. Ton effectif est jugé ${ordinal(rank)} du championnat : il attend maintenant ${ordinal(c.objectivePos)}.`:'';
+  if(c.objectiveNote) log(`🎯 ${capitalize(c.presidentName)} revoit son objectif : ${ordinal(promised)} → <b>${ordinal(c.objectivePos)}</b>. Ton effectif est jugé ${ordinal(rank)} du championnat.`);
+  state.phaseMatches=[]; state.seasonStats={scorers:{},minutes:{},goals:0,conceded:0,form:0,phases:[]};
   state.squad.forEach(p=>{ p.apps=0; p.goals=0; p.assists=0; p.sumRating=0; p.rated=0; p.yellows=0; p.suspended=0; p.fitness=100; p.r0=Math.round(playerRating(p,state.year)*10)/10; });
   c.wageCap=clubWageCap(c);
   state.seasonStats.youthWeeks=0; state.seasonStats.injuries=[]; state.seasonStats.trainWeeks={}; state.phaseStops=0;
@@ -350,9 +358,14 @@ function coachStartSeason(){
   coachPlayPhase();
 }
 /* Bonus de l'entraîneur·euse (tactique, vestiaire, staff, cohérence de style, entraînement, dynamique) */
+/* Les trois poids qui font la force de l'équipe. Une seule définition, lue par
+   le moteur ET par tous les écrans qui expliquent un résultat : sans ça, le
+   tableau de bord annonçait 0,05 / 0,03 / 0,015 pendant que le match jouait
+   0,055 / 0,042 / 0,022, et aucun des deux ne disait la vérité. */
+const STRENGTH_W={talent:.055,vestiaire:.042,staff:.022};
 function coachBonus(withNoise=true){
   const c=state.club, g=state.gauges; const style=styleById(state.styleId);
-  let bonus=(state.stats.talent-50)*.055+(g.vestiaire-50)*.042+(g.staff-50)*.022+(state.seasonStats?state.seasonStats.form:0);
+  let bonus=(state.stats.talent-50)*STRENGTH_W.talent+(g.vestiaire-50)*STRENGTH_W.vestiaire+(g.staff-50)*STRENGTH_W.staff+(state.seasonStats?state.seasonStats.form:0);
   if(state.styleId===c.styleWanted) bonus+=1.2; if(state.styleId===state.favoriteStyleId) bonus+=1; if(state.mentorStyles.includes(state.styleId)) bonus+=.3; if((state.nationalityStyles||[]).includes(state.styleId)) bonus+=.3;
   if(state.stats.talent<style.prestige*60) bonus-=(style.prestige*60-state.stats.talent)*.06;
   bonus+=(TRAINING[state.training]||TRAINING.tactique).strength;
@@ -378,9 +391,9 @@ function coachStrengthBreakdown(){
   const tr=TRAINING[state.training]||TRAINING.tactique;
   const rows=[
     {icon:'👥',label:"L'effectif",v:base,abs:true,help:"Onze type, banc et moral du groupe."},
-    {icon:'🧠',label:"Ta tactique",v:(st.talent-50)*.05,help:`Tactique ${Math.round(st.talent)} : chaque point au-dessus de 50 vaut 0,05.`},
-    {icon:'✊',label:"Le vestiaire",v:(g.vestiaire-50)*.03,help:`Vestiaire ${Math.round(g.vestiaire)} : 0,03 par point au-dessus de 50.`},
-    {icon:'🧑‍🤝‍🧑',label:"Le staff",v:(g.staff-50)*.015,help:`Staff ${Math.round(g.staff)} : 0,015 par point au-dessus de 50.`},
+    {icon:'🧠',label:"Ta tactique",v:(st.talent-50)*STRENGTH_W.talent,help:gaugeHelp('Tactique',st.talent,STRENGTH_W.talent)},
+    {icon:'✊',label:"Le vestiaire",v:(g.vestiaire-50)*STRENGTH_W.vestiaire,help:gaugeHelp('Vestiaire',g.vestiaire,STRENGTH_W.vestiaire)},
+    {icon:'🧑‍🤝‍🧑',label:"Le staff",v:(g.staff-50)*STRENGTH_W.staff,help:gaugeHelp('Staff',g.staff,STRENGTH_W.staff)},
     {icon:'🎨',label:"Le style",v:styleSum,help:styleWhy.length?styleWhy.join(' · '):"Aucun bonus de style : ni celui du club, ni le tien."},
     {icon:tr.icon,label:"L'entraînement",v:tr.strength,help:`${tr.label} : ${tr.desc}`},
     {icon:'📈',label:"La dynamique",v:(state.seasonStats?state.seasonStats.form:0)||0,help:"Les résultats récents."},
@@ -388,9 +401,25 @@ function coachStrengthBreakdown(){
   ];
   const e=state.rouletteEcho;
   if(e&&e.seasons>0) rows.push({icon:e.icon,label:e.label,v:e.delta,help:`${e.short} — encore ${e.seasons} saison${e.seasons>1?'s':''}.`});
+  // L'effort porté sur une compétition pèse sur l'autre : il manquait ici,
+  // et le total du tableau de bord se trompait de 0,8 sans le dire.
+  if(state.effort==='championnat') rows.push({icon:'⚖️',label:"Le championnat avant tout",v:.8,help:"Tu as choisi de porter l'année sur le championnat."});
+  else if(state.effort==='coupe') rows.push({icon:'⚖️',label:"La coupe avant tout",v:-.8,help:"Tu as choisi de porter l'année sur la coupe : le championnat le paie."});
   const total=rows.reduce((n,r)=>n+r.v,0);
   return {rows,total,base};
 }
+function fmtW(w){ return w.toFixed(3).replace(/0+$/,'').replace('.',','); }
+/* L'explication dit le calcul dans le sens où il se produit : « 10 points sous
+   50, à 0,055 le point » se vérifie à l'œil, « 0,055 par point au-dessus de
+   50 » pour une jauge à 40 ne veut rien dire. */
+function gaugeHelp(nom,v,w){
+  const d=Math.round(v)-50;
+  if(!d) return `${nom} ${Math.round(v)} : pile la moyenne, ni gain ni perte.`;
+  return `${nom} ${Math.round(v)} : ${Math.abs(d)} point${Math.abs(d)>1?'s':''} ${d>0?'au-dessus':'en dessous'} de 50, à ${fmtW(w)} le point.`;
+}
+/* La force réelle emmenée sur le terrain, sans l'aléa du jour : c'est ce
+   chiffre-là qu'on affiche, jamais un tirage au sort déguisé en mesure. */
+function coachStrengthShown(){ return coachStrengthBreakdown().total; }
 /* La force moyenne des adversaires, pour situer la tienne */
 function coachLeagueAverage(){
   const comp=state.comp; if(!comp) return null;
@@ -399,15 +428,10 @@ function coachLeagueAverage(){
 }
 /* Lignes explicables du bonus, pour l'écran d'avant-match */
 function coachBonusLines(){
-  const c=state.club, g=state.gauges, lines=[]; const style=styleById(state.styleId);
-  lines.push({t:`Tactique ${Math.round(state.stats.talent)} : ${state.stats.talent>=55?'tes idées font gagner des matchs':'tes idées sont encore un peu courtes'}`,d:(state.stats.talent-50)*.05});
-  lines.push({t:`Vestiaire ${Math.round(g.vestiaire)} : ${g.vestiaire>=60?'un groupe soudé':g.vestiaire<40?'un groupe fracturé':'un groupe correct'}`,d:(g.vestiaire-50)*.03});
-  const st=(state.styleId===c.styleWanted?1.2:0)+(state.styleId===state.favoriteStyleId?1:0)+(state.mentorStyles.includes(state.styleId)?.3:0)+((state.nationalityStyles||[]).includes(state.styleId)?.3:0)-(state.stats.talent<style.prestige*60?(style.prestige*60-state.stats.talent)*.06:0);
-  lines.push({t:`Style ${style.name} : ${state.styleId===c.styleWanted?'celui que le club demande':'pas celui que le club demandait'}${state.styleId===state.favoriteStyleId?', et ton style favori':''}${state.stats.talent<style.prestige*60?', trop ambitieux pour ta tactique actuelle':''}`,d:st});
-  const tr=TRAINING[state.training]||TRAINING.tactique; lines.push({t:`Entraînement ${tr.label.toLowerCase()} : ${tr.desc}`,d:tr.strength});
-  if(state.seasonStats&&Math.abs(state.seasonStats.form)>=.5) lines.push({t:`Dynamique ${state.seasonStats.form>0?'positive':'négative'}`,d:state.seasonStats.form});
-  const e=state.rouletteEcho; if(e&&e.seasons>0) lines.push({t:`${e.icon} ${e.label} : ${e.short} (encore ${e.seasons} saison${e.seasons>1?'s':''})`,d:e.delta});
-  return lines;
+  // Exactement les lignes du tableau de bord, moins l'effectif (le match le
+  // dit déjà à sa façon : « onze aligné à X contre Y »).
+  return coachStrengthBreakdown().rows.filter(r=>!r.abs&&Math.abs(r.v)>=.05)
+    .map(r=>({t:`${r.label} — ${r.help}`,d:r.v}));
 }
 /* Une phase, un carrefour. Dilemme de jauge, incident, événement de vie ou arbitrage
    d'énergie : tout sort du même sac, pour qu'aucun écran n'arrive de nulle part. */
@@ -619,7 +643,7 @@ function coachMeetingSquad(m,it,left){
       text:`Fraîcheur moyenne ${Math.round(fitAvg)} %. Les jambes sont lourdes, les blessures guettent, et il reste ${left} journée${left>1?'s':''} avant la trêve.`,
       choices:[
         {label:"Semaine de récupération",sub:"Les séances s'allègent. La tactique attendra.",plan:{training:'recuperation'},effects:{staff:2}},
-        {label:"Faire tourner sur ce match",sub:"Les cadres soufflent, les remplaçants jouent.",plan:{rotate:true,bonus:-1.4},effects:{vestiaire:3}},
+        {label:"Faire tourner",sub:"Les cadres soufflent, les remplaçants jouent — et le niveau baisse le temps que les jambes reviennent.",plan:{rotate:true,bonus:-1.4},effects:{vestiaire:3}},
         {label:"Serrer les dents",sub:"On verra en janvier.",plan:{bonus:.5},effects:{staff:-4,vestiaire:-3}},
       ]};
   }
@@ -681,7 +705,7 @@ function coachMeetingCaptain(m,it,left){
   return {kind:'capitaine',icon:'🎽',title:`${cap.name} vient te parler de ${sad.name}`,
     text:`« Il ne dort plus, il ne parle plus à personne. Si tu ne fais rien, on va le perdre — et pas seulement lui. » ${sad.name} n'a plus joué depuis longtemps.`,
     choices:[
-      {label:`Le titulariser ce match`,sub:"Un geste, tout de suite, devant tout le monde.",plan:{forceIn:sad.id,bonus:-.5},effects:{vestiaire:7}},
+      {label:`Le remettre dans le onze`,sub:"Un geste, tout de suite, devant tout le monde.",plan:{forceIn:sad.id,bonus:-.5},effects:{vestiaire:7}},
       {label:"Lui promettre du temps de jeu",sub:"Une promesse coûte peu. Tant qu'on la tient.",effects:{vestiaire:3,technique:1},
        seed:{in:1,icon:'🤥',title:"La promesse non tenue",text:`${sad.name} attend toujours. Le vestiaire a compris ce que valent tes promesses.`,effects:{vestiaire:-8,technique:-2}}},
       {label:"Dire au capitaine que ce n'est pas son rôle",sub:"Remettre la hiérarchie en place.",effects:{vestiaire:-7,confidence:2}},
@@ -891,15 +915,24 @@ function coachFinishPhase(){
   const goalsFor=mine.reduce((n,m)=>n+(m.us==='home'?m.gh:m.ga),0), goalsAg=mine.reduce((n,m)=>n+(m.us==='home'?m.ga:m.gh),0);
   const W=mine.filter(m=>m.res==='W').length, D=mine.filter(m=>m.res==='D').length, L=mine.filter(m=>m.res==='L').length;
   const pos=tablePos(comp.table,c.name), N=comp.teams.length;
-  const gap=c.objectivePos-pos; let dConf=clamp(gap*1.4,-9,9)+(W-L)*.8; if(pos<=3) dConf+=2; if(pos>N-3) dConf-=5;
-  if(squadWages()>c.wageCap*1.1) dConf-=3;
-  if(dConf<0){ dConf/=c.tolerance; dConf*=(1-state.perks.confidenceRes); }
+  // La confiance du président est le chiffre qui licencie : elle doit dire d'où
+  // elle vient, ligne par ligne, et le total affiché doit être celui qu'on applique.
+  const gap=c.objectivePos-pos; const why=[];
+  const place=clamp(gap*1.4,-9,9);
+  why.push({t:gap>0?`${ordinal(pos)} pour un objectif de ${ordinal(c.objectivePos)} : ${gap} place${gap>1?'s':''} d'avance`:gap===0?`${ordinal(pos)} : l'objectif est tenu`:`${ordinal(pos)} pour un objectif de ${ordinal(c.objectivePos)} : ${-gap} place${gap<-1?'s':''} de retard`,d:place});
+  if(W-L) why.push({t:`${W} victoire${W>1?'s':''} pour ${L} défaite${L>1?'s':''} sur la phase`,d:(W-L)*.8});
+  let dConf=place+(W-L)*.8;
+  if(pos<=3){ dConf+=2; why.push({t:"Sur le podium",d:2}); }
+  if(pos>N-3){ dConf-=5; why.push({t:"Dans la zone rouge",d:-5}); }
+  if(squadWages()>c.wageCap*1.1){ dConf-=3; why.push({t:`Masse salariale à ${Math.round(squadWages()/c.wageCap*100)} % du plafond : au-delà de 110 %, il le fait payer`,d:-3}); }
+  if(dConf<0){ const before=dConf; dConf/=c.tolerance; dConf*=(1-state.perks.confidenceRes);
+    if(Math.abs(dConf-before)>=.5) why.push({t:c.tolerance<1?`${capitalize(c.presidentName)} est plus dur que la moyenne : la sanction est amplifiée`:`${capitalize(c.presidentName)} est patient : la sanction est adoucie`,d:dConf-before}); }
   const confBefore=c.confidence; c.confidence=clamp(c.confidence+dConf);
   state.pressure=clamp(state.pressure+(L-W)*1.2*state.mode.pressureMult+(pos>c.objectivePos?3:-2)*state.mode.pressureMult-state.perks.pressureRes*.2+(state.gauges.supporters<35?2:0));
   state.gauges.supporters=clamp(state.gauges.supporters+(W-L)*1.5+(goalsFor>goalsAg*1.5?2:0));
   state.gauges.vestiaire=clamp(state.gauges.vestiaire+(W-L)*.8-(state.squad.filter(p=>p.morale<35).length)*1.5);
   const injuries=(ss.injuries||[]).splice(0);
-  const phaseRec={n:state.phase+1,matches:mine.map(m=>({home:m.home,away:m.away,gh:m.gh,ga:m.ga,us:m.us,res:m.res,story:m.story,scorers:m.scorers})),W,D,L,gf:goalsFor,ga:goalsAg,pos,dConf:Math.round(dConf),confBefore,injuries,table:sortTable(comp.table).map(t=>({...t})),strength:Math.round(coachStrength())};
+  const phaseRec={n:state.phase+1,matches:mine.map(m=>({home:m.home,away:m.away,gh:m.gh,ga:m.ga,us:m.us,res:m.res,story:m.story,scorers:m.scorers})),W,D,L,gf:goalsFor,ga:goalsAg,pos,dConf:Math.round(dConf),confBefore,injuries,table:sortTable(comp.table).map(t=>({...t})),strength:Math.round(coachStrengthShown()*10)/10,base:Math.round(coachStrengthBreakdown().base*10)/10,confWhy:why.map(x=>({t:x.t,d:Math.round(x.d*10)/10}))};
   ss.phases.push(phaseRec); state.lastPhase=phaseRec; state.match=null; state.skipped=[]; state.sinceLast=[]; state.alerts=[];
   log(`📊 Phase ${state.phase+1} : ${W} V · ${D} N · ${L} D. ${c.name} est ${ordinal(pos)} en ${c.leagueName}. Confiance du président ${Math.round(confBefore)} → ${Math.round(c.confidence)}.`);
   state.phase++;
@@ -962,12 +995,25 @@ function coachEndConf(){
   if(state.rouletteEcho&&state.rouletteEcho.seasons>0){ state.rouletteEcho.seasons--; if(!state.rouletteEcho.seasons){ log(`${state.rouletteEcho.icon} ${state.rouletteEcho.label} : c'est fini, la saison prochaine repart sur tes seules forces.`); state.rouletteEcho=null; } }
   const s=state.stats; s.reputation=clamp(s.reputation+clamp(overperf*1,-5,5)+(champion?4:0)+(cupWon?2:0)+(euroWon?6:0)+(relegated?-6:0)+(c.tier==='superclub'?1:0)+(c.tier==='amateur'?-1:0)+(55-s.reputation)*.06);
   // cote : ce que cette saison vaut sur le marché des bancs
-  const coteBefore=state.cote==null?30:state.cote; const coteWhy=[]; let dCote=0;
-  if(objectiveMet){ dCote+=5; coteWhy.push("objectif atteint +5"); } else { const m=-Math.min(4,pos-c.objectivePos); dCote+=m; coteWhy.push(`objectif manqué ${m}`); }
-  if(overperf>=2){ const b=Math.min(8,overperf*1.5); dCote+=b; coteWhy.push(`${overperf} places au-dessus de l'objectif +${b}`); }
-  if(champion){ dCote+=promotion?6:8; coteWhy.push(promotion?"montée +6":"titre +8"); } if(cupWon){ dCote+=3; coteWhy.push("coupe +3"); } if(euroWon){ dCote+=10; coteWhy.push("coupe d'Europe +10"); } if(relegated){ dCote-=6; coteWhy.push("relégation −6"); }
+  // La cote : on liste les mérites bruts, puis on affiche ce qu'ils valent
+  // une fois amortis. Avant, l'écran annonçait « −4 −6 +2 » pour une cote qui
+  // ne bougeait que d'un point : le détail ne faisait pas le total.
+  const coteBefore=state.cote==null?30:state.cote; const raw=[]; let dCote=0;
+  if(objectiveMet){ dCote+=5; raw.push({t:"objectif atteint",v:5}); } else { const m=-Math.min(4,pos-c.objectivePos); dCote+=m; raw.push({t:"objectif manqué",v:m}); }
+  if(overperf>=2){ const b=Math.min(8,overperf*1.5); dCote+=b; raw.push({t:`${overperf} places au-dessus de l'objectif`,v:b}); }
+  if(champion){ const v=promotion?6:8; dCote+=v; raw.push({t:promotion?"montée":"titre",v}); } if(cupWon){ dCote+=3; raw.push({t:"coupe",v:3}); } if(euroWon){ dCote+=10; raw.push({t:"coupe d'Europe",v:10}); } if(relegated){ dCote-=6; raw.push({t:"relégation",v:-6}); }
+  const rawSum=dCote;
   dCote*=(TIER_LEVEL[c.tier]||1); if(dCote>0) dCote=Math.min(12,dCote*(1-coteBefore/130)); else dCote*=(.3+coteBefore/100);
-  dCote+=2; coteWhy.push("une saison de plus au compteur +2"); dCote=Math.round(dCote*10)/10; state.cote=clamp(coteBefore+dCote); state.coteDelta=state.cote-coteBefore;
+  const scale=rawSum?dCote/rawSum:1;
+  const coteWhy=raw.map(r=>{ const v=Math.round(r.v*scale*10)/10; return `${r.t} ${v>0?'+':''}${String(v).replace('.',',')}`; });
+  if(rawSum&&Math.abs(scale-1)>=.08) coteWhy.push(rawSum>0?`amorti : à ${Math.round(coteBefore)} de cote et à ce niveau de club, un exploit rapporte moins`:`amorti : à ${Math.round(coteBefore)} de cote, tu n'as pas grand-chose à perdre`);
+  dCote+=2; coteWhy.push("une saison de plus au compteur +2"); dCote=Math.round(dCote*10)/10; state.cote=clamp(coteBefore+dCote);
+  // Une cote au sommet (ou au plancher) absorbe le reste : il faut le dire,
+  // sinon le bilan annonce « +9,5 mérités » pour une cote qui bouge d'un point.
+  const coteApplied=Math.round((state.cote-coteBefore)*10)/10;
+  if(Math.abs(coteApplied-dCote)>=.3){ const d=Math.round((coteApplied-dCote)*10)/10;
+    coteWhy.push(`${d<0?'plafond':'plancher'} de la cote (${Math.round(state.cote)}/100) ${d>0?'+':''}${String(d).replace('.',',')}`); }
+  state.coteDelta=state.cote-coteBefore;
   s.talent=clamp(s.talent+1+(overperf>0?1:0)); s.technique=clamp(s.technique+1.5+(state.squad.length>22?.5:0)); s.reseau=clamp(s.reseau+1+(c.tier!=='amateur'&&c.tier!=='ligue2'?1.5:0)+(c.nat!=='FR'?1.5:0));
   state.pressure=clamp(state.pressure+(objectiveMet?-8:6)*state.mode.pressureMult-4);
   state.gauges.supporters=clamp(state.gauges.supporters+(champion?12:objectiveMet?5:-4)+(relegated?-12:0));
@@ -1022,7 +1068,10 @@ function coachEndConf(){
 function coachAfterSeasonEnd(){
   const c=state.club;
   if(c.confidence<35&&coachFateProtects()){ c.confidence=Math.max(c.confidence,38); log(`${state.rouletteFate.icon} ${capitalize(c.presidentName)} ne veut plus de toi, mais la clause l'oblige : tu rempiles ici, qu'il le veuille ou non.`); }
-  else if(c.confidence<35){ log(`🪓 ${capitalize(c.presidentName)} ne te renouvelle pas sa confiance : tu quittes ${c.name}.`); state.sackings++; unlockTrophy('c-sacked'); c.sacked=true; state.stats.reputation=clamp(state.stats.reputation-3); state.cote=clamp(state.cote-4); state.coteDelta-=4; }
+  else if(c.confidence<35){ log(`🪓 ${capitalize(c.presidentName)} ne te renouvelle pas sa confiance : tu quittes ${c.name}.`); state.sackings++; unlockTrophy('c-sacked'); c.sacked=true; state.stats.reputation=clamp(state.stats.reputation-3); state.cote=clamp(state.cote-4); state.coteDelta-=4;
+    // Le non-renouvellement tombe après le calcul de la cote : sans ces deux
+    // lignes, le bilan annonçait un chiffre et en affichait un autre.
+    const sn=state.lastSeason; if(sn&&sn.cote){ sn.cote.why.push("non prolongé −4"); sn.cote.after=Math.round(state.cote); sn.cote.level=coteLabel(coteToStrength(state.cote)); } }
   coachIntersaison(); render();
 }
 /* ---------- Intersaison ---------- */

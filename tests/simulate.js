@@ -47,8 +47,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
             const h=renderMeeting(); if(!h||h.length<300) throw new Error('écran de rendez-vous vide');
             coachChooseMeeting(rnd(mt.choices.length)); }
           else if(pc==='matchResult'){ const m=state.lastMatch; mstat.n++; mstat.g+=m.gh+m.ga; mstat.y+=m.events.filter(e=>e.kind==='yellow').length; mstat.r+=m.events.filter(e=>e.kind==='red'&&e.side==='us').length; mstat.inj+=m.events.filter(e=>e.kind==='injury').length; mstat.pen+=m.events.filter(e=>e.kind==='goal'&&/penalty/.test(e.text)||e.kind==='penmiss').length; mstat.sub+=m.events.filter(e=>e.kind==='sub').length; if(!m.ratings||!Object.keys(m.ratings).length) throw new Error('no ratings'); coachAfterMatch(); }
-          else if(pc==='phaseResult'){ if(!dashSeen){ dashSeen=true; const h=renderDashboard(); if(!h||h.length<500) throw new Error('tableau de bord entraîneur vide'); } coachAfterPhase(); }
-          else if(pc==='seasonEnd'){ gaps.push(Math.round((state.lastPhase.strength-state.club.strength)*10)/10); wagesR.push(Math.round(state.squad.reduce((n,p)=>n+p.wage,0)/state.club.wageCap*100)/100); coachAfterSeasonEnd();
+          else if(pc==='phaseResult'){ if(!dashSeen){ dashSeen=true; const h=renderDashboard(); if(!h||h.length<500) throw new Error('tableau de bord entraîneur vide'); }
+            // Le tableau de bord, le « pourquoi » du match et le moteur doivent additionner la même chose.
+            { const bd=coachStrengthBreakdown(), moteur=teamStrength(state.squad,FORMATIONS[state.formation],state.year,{bonus:coachBonus(false)});
+              if(Math.abs(bd.total-moteur)>.02) throw new Error(`force affichée ${bd.total.toFixed(2)} pour une force jouée de ${moteur.toFixed(2)}`);
+              const somme=bd.rows.reduce((n,r)=>n+r.v,0); if(Math.abs(somme-bd.total)>.001) throw new Error('le détail de la force ne fait pas le total'); }
+            { const ph=state.lastPhase; if(ph&&ph.confWhy){ const somme=ph.confWhy.reduce((n,l)=>n+l.d,0);
+                if(Math.abs(somme-ph.dConf)>1.1) throw new Error(`confiance : le détail (${somme.toFixed(1)}) ne fait pas le total (${ph.dConf})`); } }
+            coachAfterPhase(); }
+          else if(pc==='seasonEnd'){ { const co=state.history[state.history.length-1].cote;
+              const somme=co.why.map(w=>parseFloat((w.match(/(-|−|\+)?\d+(,\d+)?$/)||['0'])[0].replace('−','-').replace(',','.'))).reduce((a,b)=>a+b,0);
+              if(Math.abs(somme-(co.after-co.before))>1.2) throw new Error(`cote : le détail (${somme.toFixed(1)}) ne fait pas le total (${co.after-co.before})`); }
+            gaps.push(Math.round((state.lastPhase.strength-state.club.strength)*10)/10); wagesR.push(Math.round(state.squad.reduce((n,p)=>n+p.wage,0)/state.club.wageCap*100)/100); coachAfterSeasonEnd();
             // une carrière sur trois force un destin de roulette, pour couvrir les suites (exclusivité, bannissement)
             if(run%3===0&&!state.ended&&!state.rouletteFate&&state.history.length===3){ state.currentRoulette={event:pick(COACH_ROULETTES.filter(r=>r.fate&&r.fate.kind!=='death'&&r.fate.kind!=='banned')),outcomes:['end','jackpot','small','malus']}; state.pendingChoice='roulette'; } }
           else if(pc==='sacked'){ coachIntersaison(); }
