@@ -350,7 +350,7 @@ function coachStartSeason(){
   state.squad.forEach(p=>{ p.apps=0; p.goals=0; p.assists=0; p.sumRating=0; p.rated=0; p.yellows=0; p.suspended=0; p.fitness=100; p.r0=Math.round(playerRating(p,state.year)*10)/10; });
   c.wageCap=clubWageCap(c);
   state.seasonStats.youthWeeks=0; state.seasonStats.injuries=[]; state.seasonStats.trainWeeks={}; state.phaseStops=0;
-  state.effort=null; state.metFor=[]; state.matchBoost=null; state.meeting=null; state.meetingRecap=null;
+  state.effort=null; state.metFor=[]; state.matchBoost=null; state.meeting=null; state.meetingRecap=null; state.boostStreak=0;
   state.seasonStats.g0={...state.gauges,pressure:state.pressure,confidence:c.confidence,cote:state.cote==null?30:state.cote};
   state.seasonStats.meetings=0;
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
@@ -568,25 +568,54 @@ function coachMatchInterest(m){
    Intention : on ne compose pas, on tranche. Le calendrier tourne seul et ne
    s'arrête que quand une décision se présente ; le match qui suit est le
    résultat de cette décision, et on le lit. */
-const MEETING_QUOTA={complet:8,temps_forts:6,rapide:3};
+const MEETING_QUOTA={complet:10,temps_forts:8,rapide:4};
 const MEETING_WEIGHT=2.2;
+/* Combien de temps une décision porte, et comment elle s'éteint. Une phase
+   entière rendait la saison trop facile (retour du propriétaire, 22/09/2026 :
+   « c'était trop facile au niveau des choix, 1/2 phase ou 1/4 de phase
+   suffisent »). Mesuré avant de trancher : raccourcir la portée ne changeait
+   presque rien (88 % des matchs portés par une décision à une phase, 92 % à
+   une demi-phase), parce que les rendez-vous s'enchaînent assez vite pour
+   qu'une décision écrase la précédente avant qu'elle n'expire. Ce qui rendait
+   la saison facile, c'est qu'un bonus était presque toujours allumé. Une
+   décision frappe donc à plein sur le match qui suit, puis **s'estompe
+   linéairement** sur une demi-phase. */
+const MEETING_SPAN=.5;
+/* Et surtout : le même levier ne paie pas deux fois pareil. Mesuré — avec huit
+   rendez-vous par phase, un rendez-vous tombe avant presque chaque match, donc
+   un joueur qui prend toujours l'option qui aide le match gardait un bonus
+   allumé sur 95 % des matchs, à plein. Raccourcir la portée n'y changeait rien.
+   Ce qui rend la saison facile, c'est de pouvoir tirer sur la même corde chaque
+   semaine. Chaque gain immédiat consécutif vaut donc moins que le précédent ;
+   accepter un choix qui ne sert pas le match suivant fait remonter la corde. */
+const MEETING_FATIGUE=.35;
+function boostFactor(){ return 1/(1+MEETING_FATIGUE*(state.boostStreak||0)); }
+function boostSpan(){
+  const comp=state.comp; if(!comp) return 1;
+  const start=state.phase===0?0:comp.phaseEnds[state.phase-1];
+  const len=Math.max(1,comp.phaseEnds[state.phase]-start);
+  return Math.max(1,Math.round(len*MEETING_SPAN));
+}
 
 function coachDrawMeeting(fx){
   const comp=state.comp, tempo=TEMPOS[state.tempo]?state.tempo:'temps_forts';
   const start=state.phase===0?0:comp.phaseEnds[state.phase-1];
-  if(state.matchday===start) state.phaseStops=0;
+  if(state.matchday===start){ state.phaseStops=0; state.boostStreak=0; }
   const quota=MEETING_QUOTA[tempo]==null?2:MEETING_QUOTA[tempo];
   if((state.phaseStops||0)>=quota) return null;
   const m=state.match, it=coachMatchInterest(m);
   const left=comp.phaseEnds[state.phase]-state.matchday;
   const cands=[coachMeetingInjured,coachMeetingFronts,coachMeetingCaptain,coachMeetingPresident,coachMeetingReturn,
-    coachMeetingBonus,coachMeetingTravel,coachMeetingPress,coachMeetingSquad,coachMeetingOpponent]
+    coachMeetingBonus,coachMeetingTravel,coachMeetingPress,coachMeetingSquad,coachMeetingOpponent,
+    coachMeetingPrep,coachMeetingRecovery,coachMeetingShape,coachMeetingCards,coachMeetingPitch]
     .map(b=>b(m,it,left)).filter(Boolean);
   if(!cands.length) return null;
   const seen=state.recentMeetings||[];
+  // Quinze familles : on écarte les cinq derniers genres, pas trois, sinon les
+  // rendez-vous toujours disponibles (la semaine, le symptôme) font le papier peint.
   const fresh=cands.filter(x=>!seen.includes(x.kind));
   const mt=pick(fresh.length?fresh:cands);
-  state.recentMeetings=[...seen,mt.kind].slice(-3);
+  state.recentMeetings=[...seen,mt.kind].slice(-5);
   state.phaseStops=(state.phaseStops||0)+1;
   mt.opponent=`${m.themName} · ${m.home?'à domicile':'à l\'extérieur'}`;
   return mt;
@@ -768,10 +797,104 @@ function coachMeetingTravel(m,it,left){
     ]};
 }
 
+/* ---------- Le terrain, la semaine, les jambes ----------
+   Demande du propriétaire (22/09/2026) : « pas assez de problèmes liés au
+   football et au sportif, surtout dans la préparation des matchs, la
+   récupération ». Cinq familles de plus, toutes sur le métier lui-même. */
+
+/* La semaine d'entraînement : quatre façons d'occuper cinq jours. */
+function coachMeetingPrep(m,it,left){
+  if(left<2||it.score>=4||Math.random()<.45) return null;
+  const tr=TRAINING[state.training]||TRAINING.tactique;
+  const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
+  return {kind:'semaine',icon:'📋',title:"La semaine d'avant",
+    text:`Cinq séances avant ${m.themName}. Ton adjoint attend de savoir sur quoi on travaille. Pour l'instant la semaine type est « ${tr.label.toLowerCase()} », fraîcheur du groupe ${Math.round(fitAvg)} %.`,
+    choices:[
+      {label:"Tout sur le plan de jeu",sub:"Vidéo, placements, répétitions jusqu'à l'écœurement.",plan:{training:'tactique',bonus:.6},effects:{vestiaire:-2}},
+      {label:"Une semaine athlétique",sub:"Du foncier. Ça fait mal maintenant, ça paie en mars.",plan:{training:'physique',bonus:-.3},effects:{staff:3}},
+      {label:"Les coups de pied arrêtés",sub:"Trente corners de suite. Personne n'aime ça, tout le monde en vit.",plan:{bonus:.8},effects:{vestiaire:-4,supporters:1}},
+      {label:"Deux jours de repos",sub:"Ils rentrent chez eux. On reprend jeudi.",plan:{training:'recuperation',bonus:-.5},effects:{vestiaire:5,proches:3}},
+    ]};
+}
+
+/* Le calendrier serre : ce qu'on fait des 72 heures entre deux matchs. */
+function coachMeetingRecovery(m,it,left){
+  const played=(state.phaseMatches||[]).length;
+  if(played<2) return null;
+  const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
+  if(fitAvg>=92||fitAvg<82) return null; // sous 82, c'est le rendez-vous « le groupe est à bout »
+  const dur=(state.phaseMatches||[]).slice(-1)[0];
+  return {kind:'recup',icon:'🛁',title:"Soixante-douze heures",
+    text:`${dur&&dur.res==='L'?'La défaite est encore dans les jambes.':'Le match a laissé des traces.'} Trois jours avant ${m.themName}, fraîcheur ${Math.round(fitAvg)} %. Le préparateur physique et ton adjoint ne sont pas d'accord.`,
+    choices:[
+      {label:"Récupération et rien d'autre",sub:"Bains froids, sommeil, aucune charge. On ne prépare pas ce match, on répare le groupe.",plan:{training:'recuperation',bonus:-.7},effects:{staff:5}},
+      {label:"Décrassage et vidéo",sub:"Une heure de vélo, deux heures de salle de réunion.",effects:{staff:1}},
+      {label:"On s'entraîne normalement",sub:"« Ils sont professionnels. » Le préparateur note la phrase.",plan:{bonus:.7},effects:{staff:-5},
+       seed:{in:1,icon:'🦵',title:"La blessure qu'on avait vue venir",text:"Le préparateur physique avait prévenu. Deux ischios en quinze jours, et il n'a même pas eu besoin de le dire.",effects:{staff:-5,vestiaire:-3}}},
+    ]};
+}
+
+/* Un problème de jeu, pas un problème d'humeur : on prend l'eau, ou on ne marque plus. */
+function coachMeetingShape(m,it,left){
+  const ss=state.seasonStats, played=(ss&&ss.phases?ss.phases.reduce((n,p)=>n+p.W+p.D+p.L,0):0)+(state.phaseMatches||[]).length;
+  if(played<4) return null;
+  const ga=(ss.conceded||0)/played, gf=(ss.goals||0)/played;
+  if(ga>=1.7) return {kind:'forme',icon:'🥅',title:"On prend l'eau",
+    text:`${Math.round(ga*10)/10} but encaissé par match depuis le début de saison. Ce n'est plus une mauvaise passe, c'est une manière de jouer.`,
+    choices:[
+      {label:"Fermer la boutique",sub:"Bloc bas, deux lignes de quatre, et on verra devant.",plan:{approach:'defensif',bonus:.5},effects:{supporters:-5}},
+      {label:"Retravailler la ligne défensive",sub:"Une semaine entière sur le hors-jeu et les couvertures.",plan:{training:'tactique',bonus:.4},effects:{vestiaire:-2,staff:2}},
+      {label:"Le problème vient de devant",sub:"« On défend à onze ou on ne défend pas. » Les attaquants vont adorer.",effects:{vestiaire:-6,technique:2}},
+      {label:"Ne rien changer",sub:"Tu crois à ce que tu as construit. Ça se saura, dans un sens ou dans l'autre.",effects:{confidence:-2},
+       seed:{in:1,icon:'🧱',title:"Tu n'avais rien changé",text:"La défense a fini par tenir, sans que tu touches à rien. Le vestiaire retient que tu n'as pas paniqué.",effects:{vestiaire:6,technique:3}}},
+    ]};
+  if(gf<=.9) return {kind:'forme',icon:'🎯',title:"On ne marque plus",
+    text:`${Math.round(gf*10)/10} but marqué par match. Les occasions viennent, personne ne les met. Le vestiaire commence à jouer la peur au ventre devant le but.`,
+    choices:[
+      {label:"Libérer les attaquants",sub:"Plus de monde devant, tant pis pour l'équilibre.",plan:{approach:'offensif',bonus:.4},effects:{staff:-2}},
+      {label:"Travailler la finition",sub:"Des frappes, encore des frappes, jusqu'à ce que ça rentre.",plan:{training:'tactique',bonus:.5},effects:{vestiaire:-2}},
+      {label:"Lancer un jeune devant",sub:"Il n'a peur de rien parce qu'il n'a rien à perdre.",plan:{training:'jeunes',bonus:-.4},effects:{formation:5,supporters:3}},
+      {label:"Dédramatiser publiquement",sub:"« Ça va rentrer. » Le dire, et y croire assez pour qu'ils y croient.",effects:{vestiaire:4,reputation:-2}},
+    ]};
+  return null;
+}
+
+/* Un carton de trop, juste avant le match qu'il ne faut pas manquer. */
+function coachMeetingCards(m,it,left){
+  const y=state.year;
+  const risk=state.squad.filter(p=>(p.yellows||0)>=2&&availableForMatch(p)&&playerRating(p,y)>=state.club.strength-1&&!(state.metFor||[]).includes(1000+p.id))
+    .sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
+  if(!risk||it.score<2) return null;
+  (state.metFor=state.metFor||[]).push(1000+risk.id);
+  return {kind:'cartons',icon:'🟨',title:`${risk.name} est à un carton de la suspension`,
+    text:`Deux avertissements au compteur, et il joue ${m.themName} ${m.home?'à domicile':'à l\'extérieur'}. Un troisième et il saute le prochain — qui peut compter plus que celui-ci.`,
+    choices:[
+      {label:"Le laisser au repos ce match",sub:"On purge le risque, on se prive de lui aujourd'hui.",plan:{bonus:-.9},effects:{staff:2}},
+      {label:"Lui demander de se contenir",sub:"Un défenseur qui n'ose plus tacler est un défenseur à moitié.",plan:{bonus:-.4},effects:{vestiaire:1}},
+      {label:"Le faire jouer normalement",sub:"On joue le match qu'on a, pas celui d'après.",effects:{},
+       seed:{in:1,icon:'🟥',title:"Le carton qu'il ne fallait pas",text:`${risk.name} l'a pris, évidemment, et a regardé le match suivant depuis la tribune.`,effects:{vestiaire:-3,confidence:-3}}},
+    ]};
+}
+
+/* Le terrain et le ciel : le football se joue dehors. */
+function coachMeetingPitch(m,it,left){
+  if(m.home||state.phase!==1||it.score<2) return null;
+  const froid=Math.random()<.5;
+  return {kind:'pelouse',icon:froid?'❄️':'🌧️',title:froid?`Il va geler à ${m.themName}`:`La pelouse de ${m.themName} est un champ`,
+    text:froid?"Moins quatre annoncé au coup d'envoi, terrain dur comme du béton. Le jeu au sol va être une loterie."
+      :"Trois jours de pluie, un drainage d'avant-guerre. Le ballon s'arrête là où il tombe.",
+    choices:[
+      {label:"Jouer direct",sub:"Longs ballons, seconds ballons, duels. Ce n'est pas beau, c'est efficace ici.",plan:{style:'direct',bonus:.9},effects:{supporters:-4}},
+      {label:"Garder ton jeu",sub:"Tes principes valent mieux qu'un terrain. On va voir.",plan:{bonus:-.6},effects:{supporters:3,vestiaire:2}},
+      {label:"Crampons longs et échauffement rallongé",sub:"Le détail qui ne se voit pas, et qui évite trois blessures.",plan:{bonus:.2},effects:{staff:4,budget:-.01}},
+    ]};
+}
+
 /* Ce que la décision fait au match qui suit. */
 function coachApplyPlan(plan){
   const m=state.match, P=coachSquadMap(), y=state.year, notes=[];
   if(!plan) return notes;
+  const fac=boostFactor();
   let pl={...plan};
   if(pl.delegate){
     // L'adjoint choisit à ta place, d'autant mieux que ton staff est bon.
@@ -808,17 +931,26 @@ function coachApplyPlan(plan){
   if(pl.approach){ state.approach=pl.approach; m.approach=pl.approach; notes.push(`Approche : ${APPROACHES[pl.approach].label.toLowerCase()}.`); }
   if(pl.style){ state.styleId=pl.style; m.ourStyle=pl.style; notes.push(`Style : ${styleById(pl.style).name.toLowerCase()}.`); }
   if(pl.training){ state.training=pl.training; notes.push(`Semaine : ${TRAINING[pl.training].label.toLowerCase()}.`); }
-  if(pl.bonus){ const b=pl.bonus*MEETING_WEIGHT;
-    state.matchBoost={v:b,until:state.comp?state.comp.phaseEnds[state.phase]:state.matchday+1};
-    notes.push(`${b>0?'Ton choix porte l\'équipe':'Ton choix coûte à l\'équipe'} : ${b>0?'+':''}${b.toFixed(1)} de force ${boostLabel()}.`); }
+  if(pl.bonus>0){ state.boostStreak=(state.boostStreak||0)+1; }
+  else if(pl.bonus<0||!pl.bonus){ state.boostStreak=Math.max(0,(state.boostStreak||0)-1); }
+  if(pl.bonus){ const b=pl.bonus*MEETING_WEIGHT*(pl.bonus>0?fac:1);
+    state.matchBoost={v:b,from:state.matchday,until:state.comp?Math.min(state.comp.phaseEnds[state.phase],state.matchday+boostSpan()):state.matchday+1};
+    notes.push(`${b>0?'Ton choix porte l\'équipe':'Ton choix coûte à l\'équipe'} : ${b>0?'+':''}${b.toFixed(1)} de force ${boostLabel()}.`);
+    if(b>0&&fac<.95) notes.push(`Amorti à ${Math.round(fac*100)} % : tu tires sur la même corde depuis ${state.boostStreak-1} rendez-vous.`); }
   if(pl.effort){ state.effort=pl.effort; }
   return notes;
 }
 
 /* Combien de journées il reste à courir sur la décision en cours */
 function boostLeft(){ const b=state.matchBoost; if(!b||!state.comp) return 0; return Math.max(0,b.until-state.matchday); }
-function boostLabel(){ const n=boostLeft(); return n<=1?'sur ce match':`sur les ${n} prochaines journées`; }
-function activeBoost(){ return boostLeft()>0?state.matchBoost.v:0; }
+function boostLabel(){ const n=boostLeft(); return n<=1?'sur ce match':`à plein sur ce match, puis en s'estompant sur ${n} journées`; }
+/* Une décision vaut tout son poids sur le match qui suit, puis s'éteint. */
+function activeBoost(){
+  const b=state.matchBoost; if(!b||!state.comp) return 0;
+  const left=b.until-state.matchday; if(left<=0) return 0;
+  const span=Math.max(1,b.until-(b.from==null?b.until-1:b.from));
+  return b.v*(left/span);
+}
 function coachChooseMeeting(i){
   const mt=state.meeting, ch=mt&&mt.choices[i]; if(!ch) return;
   const before=coachSnapshot();
