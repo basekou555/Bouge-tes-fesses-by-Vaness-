@@ -429,9 +429,9 @@ function renderMercato(){
     ${card}
     ${quotaHTML()}
     ${m.bought.length||m.sold.length?`<div class="section-label">Ce que tu as fait</div><div class="hint">${m.bought.map(b=>`➕ ${escapeHtml(b.name)} (${$(b.price)})`).join(' · ')}${m.bought.length&&m.sold.length?' · ':''}${m.sold.map(x=>`➖ ${escapeHtml(x.name)} (${$(x.price)})`).join(' · ')}</div>`:''}
-    <details class="bil-more"><summary>Ton effectif complet (${state.squad.length} joueurs)</summary>
-      <div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niv.</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(x=>x.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(squadRow).join('')).join('')}</tbody></table></div>
-    </details>
+    <div class="section-label">Ton effectif · ${state.squad.length} joueurs · masse salariale ${$(wages)}</div>
+    <div class="hint">Vends ici pour libérer du budget ou de la place. La valeur suit le niveau et l'âge : elle monte tant qu'un joueur progresse, puis décroche après 28 ans.</div>
+    <div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niv.</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(x=>x.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(squadRow).join('')).join('')}</tbody></table></div>
     <div class="btn-row"><button class="btn" onclick="coachCloseMercato()">Clore le mercato →</button></div></div>`;
 }
 function renderTactic(){
