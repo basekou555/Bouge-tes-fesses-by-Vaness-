@@ -116,7 +116,7 @@ function valueForRating(r,age,year){
 }
 function playerValue(p,year){
   let v=valueForRating(playerRating(p,year),playerAge(p,year),year);
-  if(p.rated>=4) v*=clamp(1+(p.sumRating/p.rated-6.2)*.12,.75,1.4);
+  if(p.rated>=4) v*=clamp(1+(p.sumRating/p.rated-6.1)*.14,.75,1.4);
   return v;
 }
 /* Salaire annuel (millions de 2015) : niveau, âge (les jeunes gagnent peu), palier du club, époque.
@@ -268,13 +268,16 @@ function developSquad(squad,year,ctx){
   const notes=[];
   squad.forEach(p=>{
     const age=playerAge(p,year); const share=ctx.minutes?clamp((ctx.minutes[p.id]||0)/4,0,1):.5;
+    const perf=p.rated>=5?clamp((p.sumRating/p.rated-6.1)*Math.min(1,p.rated/12),-.6,.6):0;
     let dev=0;
-    if(age<=23) dev=(share-.35)*.03+(ctx.formation-50)*.0004+(p.trait==='travailleur'?.006:0)+(ctx.youthWeeks||0)*.0006;
-    else if(age>=31) dev=-(.006+(age-30)*.004)+(ctx.staff-50)*.0002;
+    if(age<=23) dev=(share-.35)*.03+perf*.025+(ctx.formation-50)*.0004+(p.trait==='travailleur'?.006:0)+(ctx.youthWeeks||0)*.0006;
+    else if(age>=31) dev=-(.006+(age-30)*.004)+perf*.018+(ctx.staff-50)*.0002;
     // Même en pleine force de l'âge, on progresse en jouant et on s'émousse sur le banc.
-    else dev=(share-.5)*.012+(ctx.staff-50)*.0002;
+    else dev=(share-.5)*.012+perf*.022+(ctx.staff-50)*.0002;
     p.dev=clamp(p.dev+dev,.8,1.14);
     if(age<=21&&share>=.5&&dev>.02) notes.push(`${p.name} a franchi un palier grâce au temps de jeu.`);
+    else if(perf>=.3&&dev>.012) notes.push(`${p.name} progresse : ${(p.sumRating/p.rated).toFixed(2)} de moyenne sur ${p.rated} matchs.`);
+    else if(perf<=-.3&&age<=30&&dev<0) notes.push(`${p.name} régresse : ${(p.sumRating/p.rated).toFixed(2)} de moyenne, il a déçu.`);
     p.seasonsAtClub++; p.form=0; p.morale=clamp(p.morale+(share>=.5?4:-6)+(ctx.vestiaire-50)*.1,20,100); p.yellows=0; p.suspended=0; p.fitness=100;
     if(p.seasonsAtClub>=3&&p.apps>=40&&Math.random()<.35) p.fanFav=true;
     p.injury=Math.max(0,p.injury-30);
