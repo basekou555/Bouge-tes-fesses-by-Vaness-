@@ -662,10 +662,12 @@ function matchdayLabel(){ const comp=state.comp; return `Journée ${Math.min((st
    et on le lit. */
 /* Le poids d'une décision sur le match qui suit, annoncé avant le clic. */
 function matchChip(c){
-  const b=c.plan&&c.plan.bonus?c.plan.bonus*MEETING_WEIGHT:0;
+  const raw=c.plan&&c.plan.bonus?c.plan.bonus:0;
+  const b=raw>0?raw*MEETING_WEIGHT*boostFactor():raw*MEETING_WEIGHT;
   if(Math.abs(b)<.3) return '';
-  const n=state.comp?Math.max(1,state.comp.phaseEnds[state.phase]-state.matchday):1;
-  return `<div class="traits"><i class="${b>0?'plus':'minus'}">⚽ <b>${b>0?'+':''}${b.toFixed(1)}</b> de force ${n<=1?'sur ce match':`sur ${n} journées`}</i></div>`;
+  const worn=raw>0&&boostFactor()<.95?` <small>(amorti à ${Math.round(boostFactor()*100)} % : tu tires sur la même corde)</small>`:'';
+  const n=state.comp?Math.max(1,Math.min(state.comp.phaseEnds[state.phase]-state.matchday,boostSpan())):1;
+  return `<div class="traits"><i class="${b>0?'plus':'minus'}">⚽ <b>${b>0?'+':''}${b.toFixed(1)}</b> de force sur ce match${n>1?`, puis en s'estompant sur ${n} journées`:''}${worn}</i></div>`;
 }
 function renderMeeting(){
   const mt=state.meeting; if(!mt) return '<div class="card"><p class="narr">…</p></div>';
