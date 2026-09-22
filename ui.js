@@ -421,7 +421,8 @@ function renderMercato(){
       <div class="mk-count">Dossier ${cur.pos} sur ${cur.total}</div>
     </div>`;
   }
-  const squadRow=p2=>`<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}</td><td>${playerAge(p2,y)}</td><td><b>${playerRating(p2,y)}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">Vendre</button></td></tr>`;
+  const squadRow=p2=>{ const undo=p2.joinedWindow===marketWindow()&&p2.paid!=null;
+    return `<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}${undo?' <i class="tag-undo" title="Recruté dans ce mercato : le revendre annule le transfert au prix payé.">recrue</i>':''}</td><td>${playerAge(p2,y)}</td><td><b>${playerRating(p2,y)}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${undo?$(p2.paid):$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">${undo?'Annuler':'Vendre'}</button></td></tr>`; };
   return `<div class="card no-sticky"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2>
     ${head}
     ${m.message?`<div class="msg">${escapeHtml(m.message)}</div>`:''}
@@ -430,7 +431,7 @@ function renderMercato(){
     ${quotaHTML()}
     ${m.bought.length||m.sold.length?`<div class="section-label">Ce que tu as fait</div><div class="hint">${m.bought.map(b=>`➕ ${escapeHtml(b.name)} (${$(b.price)})`).join(' · ')}${m.bought.length&&m.sold.length?' · ':''}${m.sold.map(x=>`➖ ${escapeHtml(x.name)} (${$(x.price)})`).join(' · ')}</div>`:''}
     <div class="section-label">Ton effectif · ${state.squad.length} joueurs · masse salariale ${$(wages)}</div>
-    <div class="hint">Vends ici pour libérer du budget ou de la place. La valeur suit le niveau et l'âge : elle monte tant qu'un joueur progresse, puis décroche après 28 ans.</div>
+    <div class="hint">Vends ici pour libérer du budget ou de la place. La valeur suit le niveau, l'âge et les notes de la saison en cours. Un joueur marqué <i class="tag-undo">recrue</i> a été recruté dans ce mercato-ci : le rendre annule simplement le transfert. Recruté en été, il se vendra normalement dès le mercato d'hiver.${wages>c.wageCap?` <b>Ta masse salariale dépasse le plafond de ${$(wages-c.wageCap)} : tu ne peux plus recruter sans vendre.</b>`:''}</div>
     <div style="overflow-x:auto"><table class="squad-table"><thead><tr><th></th><th>Joueur</th><th>Âge</th><th>Niv.</th><th class="r">Salaire</th><th class="r">Valeur</th><th></th></tr></thead><tbody>${['G','D','M','A'].map(pos=>state.squad.filter(x=>x.pos===pos).sort((a,b)=>playerRating(b,y)-playerRating(a,y)).map(squadRow).join('')).join('')}</tbody></table></div>
     <div class="btn-row"><button class="btn" onclick="coachCloseMercato()">Clore le mercato →</button></div></div>`;
 }
@@ -651,6 +652,13 @@ function matchdayLabel(){ const comp=state.comp; return `Journée ${Math.min((st
 /* ---------- Entraîneur·euse : avant-match, mi-temps, résultat ---------- */
 /* Le rendez-vous : la seule chose qu'on fait, c'est trancher. Le match suit,
    et on le lit. */
+/* Le poids d'une décision sur le match qui suit, annoncé avant le clic. */
+function matchChip(c){
+  const b=c.plan&&c.plan.bonus?c.plan.bonus*MEETING_WEIGHT:0;
+  if(Math.abs(b)<.3) return '';
+  const n=state.comp?Math.max(1,state.comp.phaseEnds[state.phase]-state.matchday):1;
+  return `<div class="traits"><i class="${b>0?'plus':'minus'}">⚽ <b>${b>0?'+':''}${b.toFixed(1)}</b> de force ${n<=1?'sur ce match':`sur ${n} journées`}</i></div>`;
+}
 function renderMeeting(){
   const mt=state.meeting; if(!mt) return '<div class="card"><p class="narr">…</p></div>';
   const keys=effectKeys(mt.choices.map(c=>c.effects));
@@ -659,7 +667,7 @@ function renderMeeting(){
     <p class="narr">${escapeHtml(mt.text)}</p>
     ${sinceHTML(state.sinceLast)}
     <div class="section-label">Ta décision</div>
-    <div class="choice-list">${mt.choices.map((c,i)=>`<button class="choice-btn" onclick="coachChooseMeeting(${i})"><div class="body"><b>${escapeHtml(c.label)}</b>${c.sub?`<small>${escapeHtml(c.sub)}</small>`:''}${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>
+    <div class="choice-list">${mt.choices.map((c,i)=>`<button class="choice-btn" onclick="coachChooseMeeting(${i})"><div class="body"><b>${escapeHtml(c.label)}</b>${c.sub?`<small>${escapeHtml(c.sub)}</small>`:''}${matchChip(c)}${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>
     ${stateTable(keys)}
     <div class="hint">Tu ne composes pas l'équipe : ton adjoint s'en charge. Tu décides, et le match répond.</div></div>`;
 }

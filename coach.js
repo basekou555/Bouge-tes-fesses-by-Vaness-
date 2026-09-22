@@ -170,6 +170,7 @@ function capitalize(s){ return s?s.charAt(0).toUpperCase()+s.slice(1):s; }
 
 /* ---------- Mercato ---------- */
 function coachCredibility(){ return credibilityFor(state.club,state.stats.reputation,state.stats.reseau); }
+function marketWindow(){ return state.year+(state.market&&state.market.winter?'-H':'-E'); }
 function coachOpenMercato(winter){
   const c=state.club;
   // L'hiver rouvre une enveloppe : les restes de l'été plus un quart du budget du club.
@@ -183,7 +184,12 @@ function coachOpenMercato(winter){
 }
 function squadWages(){ return state.squad.reduce((n,p)=>n+p.wage,0); }
 /* Plafond salarial : ce qu'un club de cette force paie à un groupe de 23 joueurs de son niveau, plus un quart de marge (et le mode de jeu) */
-function clubWageCap(c){ const ref={born:state.year-27,peak:(c.strength-1)/ageCurve(27),dev:1,form:0}; const nominal=23*playerWage(ref,state.year,c.tier); return Math.max(squadWages()*1.05,nominal*1.25*Math.sqrt(state.mode.budgetMult||1)); }
+function clubWageCap(c){
+  const xi=bestXI(state.squad,FORMATIONS[state.formation]||FORMATIONS['4-4-2'],state.year);
+  const xiAvg=xi.length?xi.reduce((n,p)=>n+playerRating(p,state.year),0)/xi.length:c.strength;
+  const lvl=Math.max(c.strength,xiAvg-2);
+  const ref={born:state.year-27,peak:(lvl-1)/ageCurve(27),dev:1,form:0};
+  return 23*playerWage(ref,state.year,c.tier)*1.25*Math.sqrt(state.mode.budgetMult||1); }
 function foreignCount(){ return state.squad.filter(p=>isForeign(p,state.club.nat)).length; }
 /* Ce qui manque pour boucler un dossier : prix, salaire, place, quota. */
 function coachBlockers(t){
@@ -224,7 +230,7 @@ function coachSaleOptions(t){
 }
 function coachSell(pid){
   const p=state.squad.find(x=>x.id===pid); if(!p) return;
-  const justSigned=p.joinedYear===state.year&&p.paid!=null;
+  const justSigned=p.joinedWindow===marketWindow()&&p.paid!=null;
   const price=justSigned?p.paid:playerValue(p,state.year)*rand(.8,1.05);
   state.squad=state.squad.filter(x=>x!==p); state.market.budgetLeft+=price; state.market.sold.push({name:p.name,price});
   if(justSigned){ state.market.bought=state.market.bought.filter(b=>b.p!==p); log(`↩️ ${p.name} repart aussitôt : le transfert est annulé.`); render(); return; }
@@ -243,6 +249,7 @@ function coachBuy(idx){
   m.budgetLeft-=t.price; const p=t.p; p.wage=t.wage; p.contractEnd=state.year+randInt(2,4); p.joinedYear=state.year; p.seasonsAtClub=0; p.morale=70; p.paid=t.price;
   if(t.access==='coup'){ p.promised=true; if(t.price>=state.club.budget*.6) unlockTrophy('m-coup'); }
   if(p.real) addUsed(p.name); if(playerRating(p,state.year)>=90) unlockTrophy('m-star');
+  p.joinedWindow=marketWindow();
   state.squad.push(p); m.bought.push({name:p.name,price:t.price,kind:t.kind,p}); if(t.kind==='youth') m.youthBought++;
   m.targets.splice(idx,1); m.message=null;
   log(`🖊️ ${p.name} (${POS_LABEL[p.pos].toLowerCase()}, ${t.age} ans) rejoint le club pour ${$(t.price)}${t.access==='coup'?' — un gros coup, avec une place de titulaire promise':''}.`);
@@ -335,7 +342,7 @@ function coachStartSeason(){
   state.squad.forEach(p=>{ p.apps=0; p.goals=0; p.assists=0; p.sumRating=0; p.rated=0; p.yellows=0; p.suspended=0; p.fitness=100; p.r0=Math.round(playerRating(p,state.year)*10)/10; });
   c.wageCap=clubWageCap(c);
   state.seasonStats.youthWeeks=0; state.seasonStats.injuries=[]; state.seasonStats.trainWeeks={}; state.phaseStops=0;
-  state.effort=null; state.metFor=[]; state.nextMatchBonus=0; state.meeting=null; state.meetingRecap=null;
+  state.effort=null; state.metFor=[]; state.matchBoost=null; state.meeting=null; state.meetingRecap=null;
   state.seasonStats.g0={...state.gauges,pressure:state.pressure,confidence:c.confidence,cote:state.cote==null?30:state.cote};
   state.seasonStats.meetings=0;
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
@@ -345,7 +352,7 @@ function coachStartSeason(){
 /* Bonus de l'entraîneur·euse (tactique, vestiaire, staff, cohérence de style, entraînement, dynamique) */
 function coachBonus(withNoise=true){
   const c=state.club, g=state.gauges; const style=styleById(state.styleId);
-  let bonus=(state.stats.talent-50)*.05+(g.vestiaire-50)*.03+(g.staff-50)*.015+(state.seasonStats?state.seasonStats.form:0);
+  let bonus=(state.stats.talent-50)*.055+(g.vestiaire-50)*.042+(g.staff-50)*.022+(state.seasonStats?state.seasonStats.form:0);
   if(state.styleId===c.styleWanted) bonus+=1.2; if(state.styleId===state.favoriteStyleId) bonus+=1; if(state.mentorStyles.includes(state.styleId)) bonus+=.3; if((state.nationalityStyles||[]).includes(state.styleId)) bonus+=.3;
   if(state.stats.talent<style.prestige*60) bonus-=(style.prestige*60-state.stats.talent)*.06;
   bonus+=(TRAINING[state.training]||TRAINING.tactique).strength;
@@ -377,6 +384,7 @@ function coachStrengthBreakdown(){
     {icon:'🎨',label:"Le style",v:styleSum,help:styleWhy.length?styleWhy.join(' · '):"Aucun bonus de style : ni celui du club, ni le tien."},
     {icon:tr.icon,label:"L'entraînement",v:tr.strength,help:`${tr.label} : ${tr.desc}`},
     {icon:'📈',label:"La dynamique",v:(state.seasonStats?state.seasonStats.form:0)||0,help:"Les résultats récents."},
+    ...(Math.abs(activeBoost())>=.3?[{icon:'🗣️',label:"Ta dernière décision",v:activeBoost(),help:`Elle porte encore ${boostLeft()} journée${boostLeft()>1?'s':''}.`}]:[]),
   ];
   const e=state.rouletteEcho;
   if(e&&e.seasons>0) rows.push({icon:e.icon,label:e.label,v:e.delta,help:`${e.short} — encore ${e.seasons} saison${e.seasons>1?'s':''}.`});
@@ -537,6 +545,7 @@ function coachMatchInterest(m){
    s'arrête que quand une décision se présente ; le match qui suit est le
    résultat de cette décision, et on le lit. */
 const MEETING_QUOTA={complet:8,temps_forts:6,rapide:3};
+const MEETING_WEIGHT=2.2;
 
 function coachDrawMeeting(fx){
   const comp=state.comp, tempo=TEMPOS[state.tempo]?state.tempo:'temps_forts';
@@ -775,11 +784,17 @@ function coachApplyPlan(plan){
   if(pl.approach){ state.approach=pl.approach; m.approach=pl.approach; notes.push(`Approche : ${APPROACHES[pl.approach].label.toLowerCase()}.`); }
   if(pl.style){ state.styleId=pl.style; m.ourStyle=pl.style; notes.push(`Style : ${styleById(pl.style).name.toLowerCase()}.`); }
   if(pl.training){ state.training=pl.training; notes.push(`Semaine : ${TRAINING[pl.training].label.toLowerCase()}.`); }
-  if(pl.bonus) state.nextMatchBonus=(state.nextMatchBonus||0)+pl.bonus;
+  if(pl.bonus){ const b=pl.bonus*MEETING_WEIGHT;
+    state.matchBoost={v:b,until:state.comp?state.comp.phaseEnds[state.phase]:state.matchday+1};
+    notes.push(`${b>0?'Ton choix porte l\'équipe':'Ton choix coûte à l\'équipe'} : ${b>0?'+':''}${b.toFixed(1)} de force ${boostLabel()}.`); }
   if(pl.effort){ state.effort=pl.effort; }
   return notes;
 }
 
+/* Combien de journées il reste à courir sur la décision en cours */
+function boostLeft(){ const b=state.matchBoost; if(!b||!state.comp) return 0; return Math.max(0,b.until-state.matchday); }
+function boostLabel(){ const n=boostLeft(); return n<=1?'sur ce match':`sur les ${n} prochaines journées`; }
+function activeBoost(){ return boostLeft()>0?state.matchBoost.v:0; }
 function coachChooseMeeting(i){
   const mt=state.meeting, ch=mt&&mt.choices[i]; if(!ch) return;
   const before=coachSnapshot();
@@ -835,7 +850,11 @@ function coachKickoff(auto=false){
   if(m.captain==null||!m.xi.includes(m.captain)){ const c=defaultCaptain(m.xi.map(id=>P[id])); m.captain=c?c.id:null; }
   state.captainId=m.captain; m.onPitch=[...m.xi]; m.played={}; m.xi.forEach(id=>{ m.played[id]={min:0,start:true,goals:0,assists:0,yellow:0,red:0,inj:0,sub:false}; });
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
-  m.bonus=coachBonus()+(state.nextMatchBonus||0); state.nextMatchBonus=0; m.approach=state.approach; matchFactors(m,P,{extra:coachBonusLines()});
+  const decided=activeBoost();
+  m.bonus=coachBonus()+decided; m.approach=state.approach;
+  const extra=coachBonusLines();
+  if(Math.abs(decided)>=.3) extra.push({t:`Ta décision : ${decided>0?'+':''}${decided.toFixed(1)} de force, ${boostLabel()}`,d:decided});
+  matchFactors(m,P,{extra});
   const ctx={injuryMult:1-(state.gauges.staff-50)*.006};
   matchPlayHalf(m,P,ctx);
   if(auto){ matchApplyHalftime(m,P,'keep',{}); matchPlayHalf(m,P,ctx); coachAfterMatchSim(); return; }
