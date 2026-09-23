@@ -44,9 +44,9 @@ function recoverSquad(squad,year,ctx={}){
   const tr=TRAINING[ctx.training]||TRAINING.tactique; const era=eraForYear(year); const notes=[];
   const base=9+((ctx.staff||50)-50)*.06+tr.recovery;
   squad.forEach(p=>{
-    p.fitness=clamp(fit(p)+base+(p.trait==='travailleur'?1:0),0,100);
+    p.fitness=clamp(fit(p)+base+(playerProfil(p).recovery||0),0,100);
     if(p.injury>0){ p.injury=Math.max(0,p.injury-1); return; }
-    const chance=.004*era.injuryMult*tr.injury*(p.trait==='fragile'?1.6:1)*(fit(p)<60?1.5:1);
+    const chance=.004*era.injuryMult*tr.injury*(playerProfil(p).injury||1)*(fit(p)<60?1.5:1);
     if(Math.random()<chance){ p.injury=randInt(1,4); notes.push(`${p.name} se blesse à l'entraînement (${p.injury} sem.)`); }
   });
   return notes;
@@ -69,8 +69,9 @@ function autoLineup(squad,formation,year,opts={}){
   if(n>0){ const g=rest.find(p=>p.pos==='G'); if(g) bench.push(g); rest.forEach(p=>{ if(bench.length<n&&!bench.includes(p)) bench.push(p); }); }
   return {xi,bench};
 }
-function defaultCaptain(xi){ return [...xi].sort((a,b)=>((b.trait==='leader')-(a.trait==='leader'))||((b.trait==='pro')-(a.trait==='pro'))||(b.seasonsAtClub-a.seasonsAtClub))[0]||null; }
-function captainBonus(c){ if(!c) return 0; return c.trait==='leader'?.8:c.trait==='pro'?.4:c.trait==='ego'?-.4:.2; }
+/* Le brassard va à celui qui tient le jeu, puis à l'ancienneté. */
+function defaultCaptain(xi){ return [...xi].sort((a,b)=>((playerProfil(b).lead||0)-(playerProfil(a).lead||0))||(b.seasonsAtClub-a.seasonsAtClub))[0]||null; }
+function captainBonus(c){ if(!c) return 0; return .2+(playerProfil(c).lead||0)*.75; }
 /* Force d'un onze réellement aligné (cases, fraîcheur, banc, moral, capitaine, bonus externes) */
 function lineupStrength(xi,bench,formation,year,opts={}){
   if(!xi.length) return 40;
@@ -110,7 +111,7 @@ function matchLambdas(m){
 function pickWeighted(list,wfn){ const ws=list.map(wfn); const tot=ws.reduce((n,x)=>n+x,0); if(tot<=0) return list[0]; let r=Math.random()*tot; for(let i=0;i<list.length;i++){ r-=ws[i]; if(r<=0) return list[i]; } return list[list.length-1]; }
 function mEvent(m,min,icon,text,kind,side,pid){ m.events.push({min,icon,text,kind,side,pid:pid==null?null:pid}); }
 function minLabel(min,m){ const base=m.half===0?45:90; return min>base?`${base}+${min-base}'`:`${min}'`; }
-function penaltyTaker(m,P){ const cands=m.onPitch.map(id=>P[id]).filter(p=>p&&p.pos!=='G'); return pickWeighted(cands,p=>(p.pos==='A'?4:p.pos==='M'?2:.3)*(p.trait==='pro'||p.traitId==='glace'?1.5:1)*Math.pow(playerRating(p,m.year)/70,3)); }
+function penaltyTaker(m,P){ const cands=m.onPitch.map(id=>P[id]).filter(p=>p&&p.pos!=='G'); return pickWeighted(cands,p=>(p.pos==='A'?4:p.pos==='M'?2:.3)*(p.traitId==='glace'?1.5:1)*(playerProfil(p).loves.includes('verticalite')||playerProfil(p).fans?1.3:1)*Math.pow(playerRating(p,m.year)/70,3)); }
 function goalFor(m,P,min,opts={}){
   const cands=m.onPitch.map(id=>P[id]).filter(Boolean); if(!cands.length) return;
   const scorer=opts.scorer||pickWeighted(cands,p=>(p.pos==='A'?6:p.pos==='M'?2.5:p.pos==='D'?.6:.03)*Math.pow(playerRating(p,m.year)/70,2));
@@ -160,13 +161,13 @@ function matchMinute(m,P,ctx){
   if(Math.random()<xT){ goalAgainst(m,min); return; }
   if(cards){
     const aggr=styleFamily(m.ourStyle)==='pression'?1.3:1;
-    if(Math.random()<1.6*aggr/90){ const cands=m.onPitch.map(id=>P[id]).filter(Boolean); const p=pickWeighted(cands,x=>(x.pos==='D'?1.3:x.pos==='M'?1.1:x.pos==='A'?.8:.25)*(x.trait==='ego'?1.4:1)*(m.played[x.id]&&m.played[x.id].yellow?.22:1)); const s=m.played[p.id]; if(s){ s.yellow++; if(s.yellow>=2){ s.red=1; m.redUs++; mEvent(m,min,'🟥',`${minLabel(min,m)} ${escapeHtml(p.name)} expulsé·e (deuxième avertissement)`,'red','us',p.id); m.onPitch=m.onPitch.filter(id=>id!==p.id); matchRecompute(m,P); } else mEvent(m,min,'🟨',`${minLabel(min,m)} ${escapeHtml(p.name)} averti·e`,'yellow','us',p.id); } return; }
-    if(Math.random()<.02/90){ const cands=m.onPitch.map(id=>P[id]).filter(Boolean); const p=pickWeighted(cands,x=>(x.pos==='D'?1.4:1)*(x.trait==='ego'?1.5:1)); const s=m.played[p.id]; if(s){ s.red=1; m.redUs++; mEvent(m,min,'🟥',`${minLabel(min,m)} ${escapeHtml(p.name)} expulsé·e — carton rouge direct`,'red','us',p.id); m.onPitch=m.onPitch.filter(id=>id!==p.id); matchRecompute(m,P); } return; }
+    if(Math.random()<1.6*aggr/90){ const cands=m.onPitch.map(id=>P[id]).filter(Boolean); const p=pickWeighted(cands,x=>(x.pos==='D'?1.3:x.pos==='M'?1.1:x.pos==='A'?.8:.25)*(playerProfil(x).aggr||1)*(m.played[x.id]&&m.played[x.id].yellow?.22:1)); const s=m.played[p.id]; if(s){ s.yellow++; if(s.yellow>=2){ s.red=1; m.redUs++; mEvent(m,min,'🟥',`${minLabel(min,m)} ${escapeHtml(p.name)} expulsé·e (deuxième avertissement)`,'red','us',p.id); m.onPitch=m.onPitch.filter(id=>id!==p.id); matchRecompute(m,P); } else mEvent(m,min,'🟨',`${minLabel(min,m)} ${escapeHtml(p.name)} averti·e`,'yellow','us',p.id); } return; }
+    if(Math.random()<.02/90){ const cands=m.onPitch.map(id=>P[id]).filter(Boolean); const p=pickWeighted(cands,x=>(x.pos==='D'?1.4:1)*(playerProfil(x).aggr||1)); const s=m.played[p.id]; if(s){ s.red=1; m.redUs++; mEvent(m,min,'🟥',`${minLabel(min,m)} ${escapeHtml(p.name)} expulsé·e — carton rouge direct`,'red','us',p.id); m.onPitch=m.onPitch.filter(id=>id!==p.id); matchRecompute(m,P); } return; }
     if(Math.random()<.045/90){ m.redThem++; mEvent(m,min,'🟥',`${minLabel(min,m)} ${escapeHtml(pick(m.oppNames))} (${escapeHtml(m.themName)}) expulsé`,'red','them'); return; }
   }
   // blessure
   const injF=(ctx.injuryMult||1);
-  for(const id of m.onPitch){ const p=P[id]; if(!p) continue; const chance=(.015+(p.injuryMod||0))*era.injuryMult*injF*(p.trait==='fragile'?1.6:1)*(fit(p)<60?1.8:fit(p)<75?1.25:1)/90; if(Math.random()<chance){ const weeks=Math.random()<.6?randInt(1,3):randInt(3,9); p.injury=weeks; if(m.played[id]) m.played[id].inj=weeks; mEvent(m,min,'🩼',`${minLabel(min,m)} ${escapeHtml(p.name)} sort sur blessure (${weeks} sem.)`,'injury','us',p.id); forceSubOrShort(m,P,min,id,'blessure'); return; } }
+  for(const id of m.onPitch){ const p=P[id]; if(!p) continue; const chance=(.015+(p.injuryMod||0))*era.injuryMult*injF*(playerProfil(p).injury||1)*(fit(p)<60?1.8:fit(p)<75?1.25:1)/90; if(Math.random()<chance){ const weeks=Math.random()<.6?randInt(1,3):randInt(3,9); p.injury=weeks; if(m.played[id]) m.played[id].inj=weeks; mEvent(m,min,'🩼',`${minLabel(min,m)} ${escapeHtml(p.name)} sort sur blessure (${weeks} sem.)`,'injury','us',p.id); forceSubOrShort(m,P,min,id,'blessure'); return; } }
   autoSubs(m,P,min);
 }
 /* Joue la mi-temps en cours jusqu'à son terme ; s'arrête si une décision est attendue (m.pending) */
@@ -244,7 +245,7 @@ function matchFactors(m,P,ctx={}){
   const slots=assignSlots(xi,FORMATIONS[m.formation]||[4,4,2]); const off=slots.filter(s=>s.pen>0); if(off.length) f.push({t:`Hors poste : ${off.map(s=>`${s.p.name} en ${POS_LABEL[s.slot].toLowerCase()}`).join(', ')}`,d:-off.reduce((n,s)=>n+s.pen,0)/11});
   const tired=xi.filter(p=>fit(p)<70); if(tired.length) f.push({t:`Fatigue : ${tired.map(p=>`${p.name} (${Math.round(fit(p))}%)`).join(', ')}`,d:-tired.reduce((n,p)=>n+fitnessMalus(p),0)/11});
   if(xi.length<11) f.push({t:`Seulement ${xi.length} joueurs disponibles`,d:-(11-xi.length)*4});
-  const cap=m.captain!=null?P[m.captain]:null; if(cap){ const b=captainBonus(cap); f.push({t:`Capitaine ${cap.name} (${traitLabel(cap.trait)})`,d:b}); }
+  const cap=m.captain!=null?P[m.captain]:null; if(cap){ const b=captainBonus(cap); f.push({t:`Capitaine ${cap.name} (${playerProfil(cap).label})`,d:b}); }
   (ctx.extra||[]).forEach(x=>f.push(x));
   m.factors=f; return f;
 }

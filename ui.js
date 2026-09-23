@@ -372,6 +372,23 @@ function renderOffers(){
    quelque chose. Plus de liste à fouiller. */
 const POS_PLURAL={G:'gardiens',D:'défenseurs',M:'milieux',A:'attaquants'};
 function posPlural(pos){ return POS_PLURAL[pos]||POS_LABEL[pos].toLowerCase(); }
+/* Un joueur se lit par sa manière de jouer : ce qu'il aime, ce qui le gêne,
+   et comment ça tombe dans le style que tu fais jouer aujourd'hui. */
+function profilCardHTML(p){
+  const pr=playerProfil(p), mine=state.styleId, f=styleFit(p,mine), st=styleById(mine);
+  const list=ids=>ids.map(id=>`${styleById(id).icon} ${styleById(id).name}`).join(', ');
+  return `<div class="profil ${f>0?'good':f<0?'bad':''}">
+    <div class="pf-head"><span class="pf-ico">${pr.icon}</span><b>${pr.label}</b>
+      <i class="pf-fit">${f>0?`✅ taillé pour ton ${st.name.toLowerCase()}`:f<0?`⚠️ mal à l'aise dans ton ${st.name.toLowerCase()}`:`➖ s'accommode de ton ${st.name.toLowerCase()}`}</i></div>
+    <small>${escapeHtml(pr.desc)}</small>
+    ${pr.loves.length?`<small class="pf-line">Il s'épanouit en ${list(pr.loves)}.</small>`:'<small class="pf-line">Aucun style ne le gêne, aucun ne le transcende.</small>'}
+    ${pr.hates.length?`<small class="pf-line bad">Il souffre en ${list(pr.hates)}.</small>`:''}</div>`;
+}
+/* Sur une ligne d'effectif, une pastille suffit. */
+function fitTag(p){
+  const f=styleFit(p,state.styleId), pr=playerProfil(p);
+  return `<span class="fit-tag ${f>0?'good':f<0?'bad':''}" title="${escapeHtml(`${pr.label} — ${fitWord(f)} en ${styleById(state.styleId).name.toLowerCase()}`)}">${pr.icon}${f>0?'✅':f<0?'⚠️':''}</span>`;
+}
 function moneyBar(cur,cap,warn){
   const pct=Math.max(0,Math.min(100,cap>0?cur/cap*100:0));
   return `<span class="mbar ${warn?'over':''}"><i style="width:${pct}%"></i></span>`;
@@ -387,7 +404,9 @@ function renderMercato(){
       <div><span>Effectif</span><b>${state.squad.length} / 27</b></div>
       ${quotaActive()?`<div class="${foreignCount()>=fmax?'warn-box':''}"><span>Étrangers</span><b>${foreignCount()} / ${fmax}</b></div>`:''}
     </div>`;
-  const tabs=`<div class="market-tabs">${Object.entries(kinds).map(([k,l])=>`<button class="${marketFilter===k?'on':''}" onclick="coachMarketFilter('${k}')">${l} (${k==='all'?m.targets.length:m.targets.filter(t=>t.kind===k).length})</button>`).join('')}</div>`;
+  const live=m.targets.filter(t=>!t.dropped);
+  const tabs=`<div class="market-tabs">${Object.entries(kinds).map(([k,l])=>`<button class="${marketFilter===k?'on':''}" onclick="coachMarketFilter('${k}')">${l} (${k==='all'?live.length:live.filter(t=>t.kind===k).length})</button>`).join('')}</div>`
+    +(m.dropped?`<div class="hint">${m.dropped} dossier${m.dropped>1?'s':''} écarté${m.dropped>1?'s':''}. <button class="btn secondary small" onclick="coachUndropAll()">Tout remettre sur la table</button></div>`:'');
   let card;
   if(!cur){
     card=`<div class="mk-empty"><div class="ico">📭</div><b>Plus aucun dossier dans cette catégorie.</b><span>Change de catégorie, ou clos le mercato.</span></div>`;
@@ -399,7 +418,8 @@ function renderMercato(){
     card=`<div class="mk-card ${t.access}">
       <div class="mk-kind">${t.label} · via ${escapeHtml(t.source)}</div>
       <div class="mk-name"><span class="pos-badge pos-${p.pos}">${p.pos}</span> <b class="${p.real?'real':''}">${escapeHtml(p.name)}</b> ${natTag(p,true)}</div>
-      <div class="mk-line">${t.age} ans · niveau <b>${rating}</b> ${t.kind==='youth'?'<i>(potentiel inconnu)</i>':stars(t.shownRating)} · ${traitLabel(p.trait)}</div>
+      <div class="mk-line">${t.age} ans · niveau <b>${rating}</b> ${t.kind==='youth'?'<i>(potentiel inconnu)</i>':stars(t.shownRating)}</div>
+      ${profilCardHTML(p)}
       <div class="mk-deal"><div><span>Transfert</span><b>${t.price>0?$(t.price):'libre'}</b></div><div><span>Salaire / an</span><b>${$(t.wage)}</b></div><div><span>${t.price>m.budgetLeft?'Il te manquerait':'Ton budget après'}</span><b class="${t.price>m.budgetLeft?'bad':''}">${$(Math.abs(m.budgetLeft-t.price))}</b></div></div>
       ${t.access==='coup'?'<div class="mk-flag">⭐ Gros coup : il exige une place de titulaire.</div>':''}
       ${t.access==='no'?'<div class="mk-flag bad">Il ne répond pas. Ta crédibilité est trop basse.</div>':''}
@@ -418,11 +438,12 @@ function renderMercato(){
         <button class="btn ${ok?'':'secondary'}" ${ok?'':'disabled'} onclick="coachBuy(${cur.i})">${ok?'Le recruter ✅':'Impossible pour l\'instant'}</button>
         <button class="btn secondary" onclick="coachMarketGo(1)">Passer →</button>
       </div>
-      <div class="mk-count">Dossier ${cur.pos} sur ${cur.total}</div>
+      <div class="btn-row"><button class="btn danger small" onclick="coachDropTarget(${cur.i})">Écarter ce dossier ✕</button></div>
+      <div class="mk-count">Dossier ${cur.pos} sur ${cur.total}${m.dropped?` · ${m.dropped} écarté${m.dropped>1?'s':''}`:''}</div>
     </div>`;
   }
   const squadRow=p2=>{ const undo=p2.joinedWindow===marketWindow()&&p2.paid!=null;
-    return `<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}${undo?' <i class="tag-undo" title="Recruté dans ce mercato : le revendre annule le transfert au prix payé.">recrue</i>':''}</td><td>${playerAge(p2,y)}</td><td><b>${playerRating(p2,y)}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${undo?$(p2.paid):$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">${undo?'Annuler':'Vendre'}</button></td></tr>`; };
+    return `<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${fitTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}${undo?' <i class="tag-undo" title="Recruté dans ce mercato : le revendre annule le transfert au prix payé.">recrue</i>':''}</td><td>${playerAge(p2,y)}</td><td><b>${playerRating(p2,y)}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${undo?$(p2.paid):$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">${undo?'Annuler':'Vendre'}</button></td></tr>`; };
   return `<div class="card no-sticky"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2>
     ${head}
     ${m.message?`<div class="msg">${escapeHtml(m.message)}</div>`:''}
@@ -441,8 +462,12 @@ function renderTactic(){
   const y=state.year; const xi=bestXI(state.squad,FORMATIONS[tacticSel.formation],y);
   return `<div class="card">${notes.length?`<div class="section-label">Révélations du mercato</div>${notes.map(n=>`<div class="warn">${n}</div>`).join('')}`:''}${c.objectiveNote?`<div class="warn">🎯 ${escapeHtml(c.objectiveNote)}</div>`:''}<h2 class="display">Plan de jeu</h2><p class="hint">Le club demande <b>${styleById(c.styleWanted).icon} ${styleById(c.styleWanted).name}</b> (+2 de force si tu le suis). Ton style favori (${styleById(state.favoriteStyleId).icon} ${styleById(state.favoriteStyleId).name}) donne +1,5. Un style prestigieux exige de la tactique (${Math.round(state.stats.talent)}).</p>
     <div class="section-label">Formation</div><div class="formation-grid">${Object.keys(FORMATIONS).map(f=>`<button class="${tacticSel.formation===f?'on':''}" onclick="tacticSel.formation='${f}';render()"><b>${f}</b></button>`).join('')}</div>
-    <div class="section-label">Style</div><div class="style-grid">${STYLES.map(s=>`<button class="${tacticSel.style===s.id?'on':''}" onclick="tacticSel.style='${s.id}';render()"><b>${s.icon} ${s.name}</b><small>${s.desc}${s.id===c.styleWanted?' · <b>demandé par le club</b>':''}${s.id===state.favoriteStyleId?' · <b>ton style</b>':''}${s.prestige*60>state.stats.talent?` · exige tactique ${Math.round(s.prestige*60)}`:''}</small></button>`).join('')}</div>
-    <div class="section-label">Onze type en ${tacticSel.formation}</div><div class="squad">${xi.map(p=>`<div><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)} <span>${playerRating(p,y)}</span></div>`).join('')}</div>
+    <div class="section-label">Style</div>
+    <div class="hint">Chaque style va à certains de tes joueurs et en contrarie d'autres : le chiffre à droite compte ton onze.</div>
+    <div class="style-grid">${STYLES.map(s=>{ const fit=coachStyleFit(s.id);
+      return `<button class="${tacticSel.style===s.id?'on':''}" onclick="tacticSel.style='${s.id}';render()"><b>${s.icon} ${s.name}</b><span class="style-fit ${fit.plus>fit.minus?'good':fit.minus>fit.plus?'bad':''}">✅ ${fit.plus} · ⚠️ ${fit.minus}</span><small>${s.desc}${s.id===c.styleWanted?' · <b>demandé par le club</b>':''}${s.id===state.favoriteStyleId?' · <b>ton style</b>':''}${s.prestige*60>state.stats.talent?` · exige tactique ${Math.round(s.prestige*60)}`:''}</small></button>`; }).join('')}</div>
+    <div class="section-label">Onze type en ${tacticSel.formation}</div><div class="squad">${xi.map(p=>{ const f=styleFit(p,tacticSel.style); const pr=playerProfil(p);
+      return `<div class="${f>0?'fit-ok':f<0?'fit-no':''}"><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)} <small title="${escapeHtml(pr.label)}">${pr.icon}${f>0?'✅':f<0?'⚠️':''}</small> <span>${playerRating(p,y)}</span></div>`; }).join('')}</div>
     <div class="btn-row"><button class="btn" onclick="coachSetTactic(tacticSel.formation,tacticSel.style);render()">${state.tacticAfterWinter?'Reprendre la saison →':'Lancer la saison →'}</button></div></div>`;
 }
 /* Le « pourquoi » d'une phase lit exactement la même décomposition que le
