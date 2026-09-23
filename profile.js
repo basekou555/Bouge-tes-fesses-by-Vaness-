@@ -53,3 +53,45 @@ const NAT_INFO={
 };
 function natFlag(code){ const n=NAT_INFO[code]; return n?n[0]:'🏳️'; }
 function natName(code){ const n=NAT_INFO[code]; return n?n[1]:(code||'?'); }
+
+/* ---------- Les profils de jeu ----------
+   Demande du propriétaire (23/09/2026) : « plutôt que d'avoir des joueurs qui
+   ont des personnalités de fêtard ou d'égo, avoir des joueurs liés à un style
+   de jeu qui s'assoit bien ou moins bien au mien ». Un joueur n'a plus un
+   caractère, il a une manière de jouer : elle épouse certains styles et en
+   contrarie d'autres. Les mécaniques que portaient les anciens traits
+   (capitanat, cartons, blessures, récupération, progression, popularité) sont
+   reprises ici, mais elles découlent maintenant du football et non de l'humeur. */
+const PROFILS=[
+  { id:'metronome', icon:'🎼', label:"Métronome", desc:"Il touche tous les ballons, ne perd jamais la tête, et le jeu passe par lui.",
+    loves:['possession','positionnel','total'], hates:['direct','blocbas'], lead:.8 },
+  { id:'poumon', icon:'🫁', label:"Poumon", desc:"Il court pour deux et recommence la semaine suivante.",
+    loves:['pressing','physique','rock'], hates:['possession','catenaccio'], dev:.02, recovery:1 },
+  { id:'fleche', icon:'⚡', label:"Flèche", desc:"Trois appuis et il est parti. Tout ce qu'il demande, c'est de l'espace.",
+    loves:['contre','verticalite','direct'], hates:['possession','positionnel'], injury:1.4 },
+  { id:'roc', icon:'🧱', label:"Roc", desc:"Il gagne ses duels, il l'a toujours fait, et il aime qu'on défende bas.",
+    loves:['blocbas','catenaccio','physique'], hates:['total','fantaisie'], lead:.5, aggr:1.35 },
+  { id:'dribbleur', icon:'🎩', label:"Dribbleur", desc:"Il prend le ballon, il prend son vis-à-vis, et parfois il prend trop de temps.",
+    loves:['fantaisie','ailes','rock'], hates:['blocbas','physique'], fans:3, aggr:.7 },
+  { id:'polyvalent', icon:'🧰', label:"Couteau suisse", desc:"Trois postes, aucune plainte. Il comprend vite ce qu'on lui demande.",
+    loves:['total','formation','positionnel'], hates:['direct'], dev:.015, lead:.3 },
+  { id:'renard', icon:'🦊', label:"Renard des surfaces", desc:"Il ne touche que six ballons et en met deux au fond.",
+    loves:['ailes','direct','contre'], hates:['possession','positionnel'], fans:2 },
+  { id:'tour', icon:'🗼', label:"Tour de contrôle", desc:"Il règne dans les airs, sur les corners comme sur les longs ballons.",
+    loves:['direct','physique','blocbas'], hates:['possession','fantaisie'], aggr:1.2, lead:.4 },
+  { id:'cerveau', icon:'🧠', label:"Cerveau", desc:"Il voit la passe deux secondes avant les autres. Défendre l'ennuie.",
+    loves:['fantaisie','possession','verticalite'], hates:['physique','blocbas'], lead:.6, fans:2 },
+  { id:'soldat', icon:'⚙️', label:"Soldat", desc:"Il fait le travail, dans n'importe quel système, sans qu'on le remarque.",
+    loves:[], hates:[], recovery:1 },
+];
+function profilById(id){ return PROFILS.find(p=>p.id===id)||PROFILS[PROFILS.length-1]; }
+/* Les anciennes sauvegardes portent un trait de caractère : on le traduit. */
+const TRAIT_TO_PROFIL={leader:'metronome',pro:'polyvalent',ego:'dribbleur',fetard:'dribbleur',fragile:'fleche',
+  loyal:'soldat',mercenaire:'renard',showman:'dribbleur',travailleur:'poumon',discret:'soldat'};
+function playerProfil(p){ return profilById(p&&(p.profil||TRAIT_TO_PROFIL[p&&p.trait])); }
+/* +1 si le style lui va, −1 s'il le contrarie, 0 sinon. */
+function styleFit(p,styleId){
+  const pr=playerProfil(p); if(!styleId) return 0;
+  return pr.loves.includes(styleId)?1:pr.hates.includes(styleId)?-1:0;
+}
+function fitWord(f){ return f>0?"à l'aise":f<0?"contrarié":"indifférent"; }

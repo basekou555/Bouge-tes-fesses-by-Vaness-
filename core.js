@@ -95,12 +95,14 @@ function buildLeagueTeams(offer,year){
 const POS_LABEL={G:"Gardien",D:"Défenseur",M:"Milieu",A:"Attaquant"};
 const AGE_CURVE={16:.68,17:.72,18:.76,19:.8,20:.84,21:.88,22:.92,23:.95,24:.97,25:.99,26:1,27:1,28:1,29:.99,30:.97,31:.94,32:.9,33:.86,34:.81,35:.76,36:.71,37:.66,38:.6,39:.55,40:.5};
 function ageCurve(age){ return AGE_CURVE[clamp(age,16,40)]; }
-const TRAITS=[{id:'leader',label:"Leader",v:3},{id:'pro',label:"Professionnel",v:2},{id:'ego',label:"Ego",v:-3},{id:'fetard',label:"Fêtard",v:-2,scandal:true},{id:'fragile',label:"Fragile",injury:.08},{id:'loyal',label:"Loyal",v:2},{id:'mercenaire',label:"Mercenaire",v:-1},{id:'showman',label:"Showman",fans:3},{id:'travailleur',label:"Bosseur",dev:.02},{id:'discret',label:"Discret",v:1}];
+/* Les caractères (fêtard, ego, loyal…) ont été remplacés par les profils de
+   jeu de profile.js : un joueur se décrit par sa manière de jouer, pas par son
+   humeur. PROFILS porte désormais les mêmes crochets mécaniques. */
 let _pid=1;
 // Les identifiants sont mémorisés dans la sauvegarde pour ne jamais entrer en collision après un rechargement.
 function nextPid(){ if(state){ state.pidCounter=Math.max(state.pidCounter||1000,_pid)+1; _pid=state.pidCounter; return state.pidCounter; } return _pid++; }
 function makePlayer(o){
-  const p={ id:nextPid(), name:o.name, pos:o.pos, born:o.born, peak:o.peak, nat:o.nat||'FR', real:!!o.real, dev:o.dev!=null?Math.min(o.dev,1.14):clamp(1+rand(-.06,.06)+(Math.random()<.08?rand(.04,.1):0),.8,1.14), trait:o.trait||pick(TRAITS).id, morale:o.morale!=null?o.morale:65, form:0, injury:0, contractEnd:o.contractEnd||0, wage:o.wage||0, apps:0, goals:0, assists:0, seasonsAtClub:0, fanFav:false, scam:o.scam||null, promised:o.promised||false, joinedYear:o.joinedYear||0, fitness:100, yellows:0, suspended:0, sumRating:0, rated:0 };
+  const p={ id:nextPid(), name:o.name, pos:o.pos, born:o.born, peak:o.peak, nat:o.nat||'FR', real:!!o.real, dev:o.dev!=null?Math.min(o.dev,1.14):clamp(1+rand(-.06,.06)+(Math.random()<.08?rand(.04,.1):0),.8,1.14), profil:o.profil||pick(PROFILS).id, morale:o.morale!=null?o.morale:65, form:0, injury:0, contractEnd:o.contractEnd||0, wage:o.wage||0, apps:0, goals:0, assists:0, seasonsAtClub:0, fanFav:false, scam:o.scam||null, promised:o.promised||false, joinedYear:o.joinedYear||0, fitness:100, yellows:0, suspended:0, sumRating:0, rated:0 };
   return p;
 }
 function playerAge(p,year){ return year-p.born; }
@@ -128,7 +130,7 @@ function playerWage(p,year,tier){
   const ageF=age<=19?.25:age<=21?.45:age<=23?.7:age<=31?1:age<=33?.85:.7;
   return Math.max(.005,base*ageF*eraForYear(year).marketSize*(WAGE_TIER_MULT[tier]||1));
 }
-function traitLabel(id){ const t=TRAITS.find(x=>x.id===id); return t?t.label:id; }
+function traitLabel(id){ const t=profilById(id); return `${t.icon} ${t.label}`; }
 function fakeName(nat){ const k=FAKE_FIRST[nat]?nat:(['SN','ML','CI','CM','DZ','MA','GH','NG']).includes(nat)?'AF':'FR'; return `${pick(FAKE_FIRST[k])} ${pick(FAKE_LAST[k])}`; }
 function natForClub(nat){ const mix={FR:['FR','FR','FR','FR','FR','AF','AF','BR','ES','PT','BE'],ES:['ES','ES','ES','AR','BR','PT'],IT:['IT','IT','IT','AR','BR','FR'],DE:['DE','DE','DE','NL','FR','AF'],EN:['EN','EN','EN','SC','FR','BR','AF'],NL:['NL','NL','NL','BE','AF'],PT:['PT','PT','BR','BR','AF'],SC:['SC','SC','EN'],BE:['BE','BE','FR','AF','NL'],US:['EN','EN','AR','BR','FR'],SA:['AF','AF','BR','PT','FR'],JP:['DE','BR','ES','NL'],MX:['AR','ES','BR'],AR:['AR','AR','AR'],BR:['BR','BR','BR'],CN:['BR','BR','AR'],QA:['AF','BR','FR'],CA:['EN','FR','AF'],AU:['EN','EN','SC']}; return pick(mix[nat]||['FR','AF','ES','BR']); }
 /* Joueurs réels disponibles cette année (hors ceux déjà utilisés dans la carrière) */
@@ -155,6 +157,16 @@ function generateSquad(offer,year,usedNames){
         if(idx>=0){ const r=pool.splice(idx,1)[0]; p=realToPlayer(r,year); usedNames.add(r[0]); if(r[4]!==offer.nat) foreigners++; }
       }
       if(!p){ let nat=natForClub(offer.nat); if(nat!==offer.nat&&foreigners>=foreignersMax) nat=offer.nat; else if(nat!==offer.nat) foreigners++; p=generatedPlayer(pos,year,want,nat); }
+      // Un effectif a une identité : le club a recruté pour le football qu'il
+      // veut jouer. Sans ça, les profils de jeu se moyennaient à zéro et
+      // changer de style ne coûtait rien.
+      if(offer.styleWanted&&Math.random()<.5){
+        const fitting=PROFILS.filter(pr=>pr.loves.includes(offer.styleWanted));
+        if(fitting.length) p.profil=pick(fitting).id;
+      } else if(offer.styleWanted&&Math.random()<.5){
+        const ok=PROFILS.filter(pr=>!pr.hates.includes(offer.styleWanted));
+        if(ok.length) p.profil=pick(ok).id;
+      }
       p.contractEnd=year+randInt(1,3); p.wage=playerWage(p,year,offer.tier)*rand(.9,1.15); p.seasonsAtClub=randInt(0,5); p.joinedYear=year-p.seasonsAtClub; p.fanFav=p.seasonsAtClub>=3&&Math.random()<.4;
       squad.push(p);
     }
@@ -270,7 +282,7 @@ function developSquad(squad,year,ctx){
     const age=playerAge(p,year); const share=ctx.minutes?clamp((ctx.minutes[p.id]||0)/4,0,1):.5;
     const perf=p.rated>=5?clamp((p.sumRating/p.rated-6.1)*Math.min(1,p.rated/12),-.6,.6):0;
     let dev=0;
-    if(age<=23) dev=(share-.35)*.03+perf*.025+(ctx.formation-50)*.0004+(p.trait==='travailleur'?.006:0)+(ctx.youthWeeks||0)*.0006;
+    if(age<=23) dev=(share-.35)*.03+perf*.025+(ctx.formation-50)*.0004+(playerProfil(p).dev||0)*.3+(ctx.youthWeeks||0)*.0006;
     else if(age>=31) dev=-(.006+(age-30)*.004)+perf*.018+(ctx.staff-50)*.0002;
     // Même en pleine force de l'âge, on progresse en jouant et on s'émousse sur le banc.
     else dev=(share-.5)*.012+perf*.022+(ctx.staff-50)*.0002;

@@ -26,6 +26,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
               if(state.club.nat==='FR'&&eraForeignersMax(state.year)<99&&!/quota-box/.test(h)) throw new Error('quota d\'étrangers non affiché'); }
             const m=state.market; let tries=0;
             const h=renderMercato(); if(!h||!/mk-card|mk-empty/.test(h)) throw new Error('carte de mercato absente');
+            // Un joueur se décrit par sa manière de jouer, et l'écran le dit.
+            if(state.squad.some(p=>!p.profil&&!p.trait)) throw new Error('un joueur sans profil de jeu');
+            if(marketCurrent()&&!/class="profil/.test(h)) throw new Error('profil de jeu absent du mercato');
+            // Écarter un dossier doit vraiment raccourcir la pile, et ne pas le faire revenir.
+            { const cur0=marketCurrent();
+              if(cur0){ const n0=cur0.total, id0=cur0.i; coachDropTarget(id0);
+                const after=marketDeck();
+                if(after.length!==n0-1) throw new Error(`dossier écarté : pile de ${after.length} au lieu de ${n0-1}`);
+                if(after.some(x=>x.i===id0)) throw new Error('un dossier écarté revient dans la pile');
+                coachUndropAll();
+                if(marketDeck().length!==n0) throw new Error('remettre les dossiers sur la table ne les rend pas tous'); } }
             while(tries<6){ tries++; coachMarketGo(1); const cur=marketCurrent(); if(!cur) break;
               if(!coachBlockers(cur.t).length&&Math.random()<.6) coachBuy(cur.i);
               if(state.pendingChoice!=='mercato') break; }
@@ -49,7 +60,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='matchResult'){ const m=state.lastMatch; mstat.n++; mstat.g+=m.gh+m.ga; mstat.y+=m.events.filter(e=>e.kind==='yellow').length; mstat.r+=m.events.filter(e=>e.kind==='red'&&e.side==='us').length; mstat.inj+=m.events.filter(e=>e.kind==='injury').length; mstat.pen+=m.events.filter(e=>e.kind==='goal'&&/penalty/.test(e.text)||e.kind==='penmiss').length; mstat.sub+=m.events.filter(e=>e.kind==='sub').length; if(!m.ratings||!Object.keys(m.ratings).length) throw new Error('no ratings'); coachAfterMatch(); }
           else if(pc==='phaseResult'){ if(!dashSeen){ dashSeen=true; const h=renderDashboard(); if(!h||h.length<500) throw new Error('tableau de bord entraîneur vide'); }
             // Le tableau de bord, le « pourquoi » du match et le moteur doivent additionner la même chose.
-            { const bd=coachStrengthBreakdown(), moteur=teamStrength(state.squad,FORMATIONS[state.formation],state.year,{bonus:coachBonus(false)});
+            { const bd=coachStrengthBreakdown(), moteur=teamStrength(state.squad,FORMATIONS[state.formation],state.year,{bonus:coachBonus(false)+activeBoost()});
               if(Math.abs(bd.total-moteur)>.02) throw new Error(`force affichée ${bd.total.toFixed(2)} pour une force jouée de ${moteur.toFixed(2)}`);
               const somme=bd.rows.reduce((n,r)=>n+r.v,0); if(Math.abs(somme-bd.total)>.001) throw new Error('le détail de la force ne fait pas le total'); }
             { const ph=state.lastPhase; if(ph&&ph.confWhy){ const somme=ph.confWhy.reduce((n,l)=>n+l.d,0);

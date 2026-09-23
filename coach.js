@@ -234,7 +234,7 @@ function coachSell(pid){
   const price=justSigned?p.paid:playerValue(p,state.year)*rand(.8,1.05);
   state.squad=state.squad.filter(x=>x!==p); state.market.budgetLeft+=price; state.market.sold.push({name:p.name,price});
   if(justSigned){ state.market.bought=state.market.bought.filter(b=>b.p!==p); log(`↩️ ${p.name} repart aussitôt : le transfert est annulé.`); render(); return; }
-  if(p.fanFav){ state.gauges.supporters=clamp(state.gauges.supporters-7); } if(p.trait==='leader') state.gauges.vestiaire=clamp(state.gauges.vestiaire-4);
+  if(p.fanFav){ state.gauges.supporters=clamp(state.gauges.supporters-7); } if((playerProfil(p).lead||0)>=.6) state.gauges.vestiaire=clamp(state.gauges.vestiaire-4);
   if(price>=state.club.budget*1.2) unlockTrophy('m-sell');
   log(`💸 Vente de ${p.name} pour ${$(price)}.${p.fanFav?' Les supporters grognent.':''}`);
   render();
@@ -271,6 +271,7 @@ function coachSalesCover(t){
 }
 function marketDeck(){ const m=state.market;
   return m.targets.map((t,i)=>({t,i}))
+    .filter(x=>!x.t.dropped)
     .filter(x=>marketFilter==='all'||x.t.kind===marketFilter)
     .sort((a,b)=>marketRank(a.t)-marketRank(b.t)||b.t.shownRating-a.t.shownRating);
 }
@@ -278,6 +279,24 @@ function marketCurrent(){ const L=marketDeck(); if(!L.length) return null;
   const m=state.market; let k=L.findIndex(x=>x.i===m.idx); if(k<0) k=0; m.idx=L[k].i; return {...L[k],pos:k+1,total:L.length}; }
 function coachMarketGo(d){ const L=marketDeck(); if(!L.length) return; const m=state.market;
   let k=L.findIndex(x=>x.i===m.idx); if(k<0) k=0; k=(k+d+L.length)%L.length; m.idx=L[k].i; m.message=null; render(); }
+/* Écarter un dossier : il ne revient plus, et la pile raccourcit. Demande du
+   propriétaire (23/09/2026) : « pouvoir retirer les joueurs qui ne
+   m'intéressent pas des propositions ». */
+function coachDropTarget(i){
+  const m=state.market, t=m.targets[i]; if(!t||t.dropped) return;
+  // On reste sur la même position de pile : elle porte maintenant le dossier suivant.
+  const k=Math.max(0,marketDeck().findIndex(x=>x.i===i));
+  t.dropped=true; m.dropped=(m.dropped||0)+1;
+  m.message=`${t.p.name} est écarté : son dossier ne reviendra pas ${m.winter?'cet hiver':'cet été'}.`;
+  const L=marketDeck(); m.idx=L.length?L[Math.min(k,L.length-1)].i:-1;
+  render();
+}
+/* Tout remettre sur la table si on a écarté trop vite. */
+function coachUndropAll(){
+  const m=state.market; m.targets.forEach(t=>{ t.dropped=false; }); m.dropped=0;
+  m.message="Tous les dossiers écartés sont revenus sur la table.";
+  const L=marketDeck(); m.idx=L.length?L[0].i:-1; render();
+}
 function coachMarketFilter(k){ marketFilter=k; const L=marketDeck(); state.market.idx=L.length?L[0].i:-1; state.market.message=null; render(); }
 function coachCloseMercato(){
   const m=state.market; const notes=[];
@@ -364,11 +383,25 @@ function coachStartSeason(){
    tableau de bord annonçait 0,05 / 0,03 / 0,015 pendant que le match jouait
    0,055 / 0,042 / 0,022, et aucun des deux ne disait la vérité. */
 const STRENGTH_W={talent:.055,vestiaire:.042,staff:.022};
+/* Ce que ton onze pense de ton style. Un effectif taillé pour le pressing joue
+   mal au jeu de position, et ça doit se payer sur le terrain — c'est ce qui
+   fait d'un recrutement un choix de jeu et non un choix de niveau. */
+const FIT_WEIGHT=2.2;
+function coachStyleFit(styleId){
+  const st=styleId||state.styleId;
+  const xi=bestXI(state.squad,FORMATIONS[state.formation]||FORMATIONS['4-4-2'],state.year);
+  if(!xi.length) return {avg:0,plus:0,minus:0,v:0,names:[]};
+  let plus=0,minus=0; const names=[];
+  xi.forEach(p=>{ const f=styleFit(p,st); if(f>0){ plus++; names.push(`${p.name} ✅`); } else if(f<0){ minus++; names.push(`${p.name} ⚠️`); } });
+  const avg=(plus-minus)/xi.length;
+  return {avg,plus,minus,v:avg*FIT_WEIGHT,names};
+}
 function coachBonus(withNoise=true){
   const c=state.club, g=state.gauges; const style=styleById(state.styleId);
   let bonus=(state.stats.talent-50)*STRENGTH_W.talent+(g.vestiaire-50)*STRENGTH_W.vestiaire+(g.staff-50)*STRENGTH_W.staff+(state.seasonStats?state.seasonStats.form:0);
   if(state.styleId===c.styleWanted) bonus+=1.2; if(state.styleId===state.favoriteStyleId) bonus+=1; if(state.mentorStyles.includes(state.styleId)) bonus+=.3; if((state.nationalityStyles||[]).includes(state.styleId)) bonus+=.3;
   if(state.stats.talent<style.prestige*60) bonus-=(style.prestige*60-state.stats.talent)*.06;
+  bonus+=coachStyleFit().v;
   bonus+=(TRAINING[state.training]||TRAINING.tactique).strength;
   if(state.rouletteEcho&&state.rouletteEcho.seasons>0) bonus+=state.rouletteEcho.delta;
   // Porter l'année sur une compétition se paie dans l'autre.
@@ -396,6 +429,8 @@ function coachStrengthBreakdown(){
     {icon:'✊',label:"Le vestiaire",v:(g.vestiaire-50)*STRENGTH_W.vestiaire,help:gaugeHelp('Vestiaire',g.vestiaire,STRENGTH_W.vestiaire)},
     {icon:'🧑‍🤝‍🧑',label:"Le staff",v:(g.staff-50)*STRENGTH_W.staff,help:gaugeHelp('Staff',g.staff,STRENGTH_W.staff)},
     {icon:'🎨',label:"Le style",v:styleSum,help:styleWhy.length?styleWhy.join(' · '):"Aucun bonus de style : ni celui du club, ni le tien."},
+    (fit=>({icon:'🎽',label:"L'effectif et ton style",v:fit.v,
+      help:`${fit.plus} joueur${fit.plus>1?'s':''} du onze ${fit.plus>1?'sont taillés':'est taillé'} pour ${style.name.toLowerCase()}, ${fit.minus} y ${fit.minus>1?'sont mal à l\'aise':'est mal à l\'aise'}.`}))(coachStyleFit()),
     {icon:tr.icon,label:"L'entraînement",v:tr.strength,help:`${tr.label} : ${tr.desc}`},
     {icon:'📈',label:"La dynamique",v:(state.seasonStats?state.seasonStats.form:0)||0,help:"Les résultats récents."},
     ...(Math.abs(activeBoost())>=.3?[{icon:'🗣️',label:"Ta dernière décision",v:activeBoost(),help:`Elle porte encore ${boostLeft()} journée${boostLeft()>1?'s':''}.`}]:[]),
@@ -1109,9 +1144,9 @@ function coachKickoff(auto=false){
   if(!state.approach) state.approach='equilibre'; if(!state.training) state.training='tactique';
   const decided=activeBoost();
   m.bonus=coachBonus()+decided; m.approach=state.approach;
-  const extra=coachBonusLines();
-  if(Math.abs(decided)>=.3) extra.push({t:`Ta décision : ${decided>0?'+':''}${decided.toFixed(1)} de force, ${boostLabel()}`,d:decided});
-  matchFactors(m,P,{extra});
+  // coachBonusLines() lit la décomposition, qui porte déjà la ligne de la
+  // décision en cours : l'ajouter ici la comptait deux fois à l'écran.
+  matchFactors(m,P,{extra:coachBonusLines()});
   const ctx={injuryMult:1-(state.gauges.staff-50)*.006};
   matchPlayHalf(m,P,ctx);
   if(auto){ matchApplyHalftime(m,P,'keep',{}); matchPlayHalf(m,P,ctx); coachAfterMatchSim(); return; }
