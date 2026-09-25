@@ -82,7 +82,10 @@ const TEMPOS={
   rapide:{icon:'⏩',label:"Rapide",desc:"Seule la reprise de chaque phase s'arrête ; tout le reste se joue avec ta compo et tes réglages.",about:"4 matchs par saison"},
 };
 function setTempo(t){ if(TEMPOS[t]) state.tempo=t; saveGame(); render(); }
-function coteToStrength(cote){ return 46+cote*.42; }
+/* L'échelle des clubs a été resserrée (le sommet passe de 88 à 85) : la cote
+   doit viser la même échelle, sinon une cote maximale désigne un niveau de club
+   qui n'existe plus. */
+function coteToStrength(cote){ return 46+cote*.39; }
 function coachTargetStrength(){ return coteToStrength(state.cote==null?30:state.cote); }
 function coteLabel(s){ return s<52?"le monde amateur":s<61?"la Ligue 2":s<67?"le bas de la Ligue 1":s<73?"le milieu de la Ligue 1":s<79?"le haut de tableau et l'Europe":s<85?"un grand club européen":"un super-club"; }
 function gapLabel(gap){ return gap>=3?"un cran au-dessus de ta cote":gap>=-2?"dans ta cote":gap>=-6?"un cran en dessous":"bien en dessous de ta cote"; }
@@ -162,6 +165,10 @@ function coachAcceptOffer(i){
     if(o.tier==='etranger'||o.tier==='europe'||o.tier==='superclub') unlockTrophy('c-abroad'); if(o.tier==='superclub') unlockTrophy('c-superclub');
   }
   state.club.wageCap=clubWageCap(state.club);
+  // L'effectif hérité doit tenir dans le plafond du club, sinon on arrive
+  // déjà au-dessus et la contrainte n'est plus une décision mais une punition.
+  { const cap=state.club.wageCap, w=squadWages();
+    if(w>cap*.85&&w>0){ const k=cap*.85/w; state.squad.forEach(p=>{ p.wage=p.wage*k; }); } }
   state.currentOffers=[];
   log(`📝 ${o.stay?(o.underContract?'Tu poursuis à':'Tu prolonges à'):'Tu signes à'} <b>${o.club}</b> (${o.leagueName})${o.stay&&o.underContract?'':` jusqu'en ${state.club.contractEnd}`}. Objectif : ${ordinal(o.objectivePos)}. Budget transferts : ${$(o.budget)}. ${capitalize(o.presidentName)} : ${o.presidentDesc}`);
   coachOpenMercato(false);
@@ -184,12 +191,16 @@ function coachOpenMercato(winter){
 }
 function squadWages(){ return state.squad.reduce((n,p)=>n+p.wage,0); }
 /* Plafond salarial : ce qu'un club de cette force paie à un groupe de 23 joueurs de son niveau, plus un quart de marge (et le mode de jeu) */
+/* Le plafond, c'est la taille du club — pas celle de l'équipe que tu as réussi
+   à assembler. Il se calculait sur `max(force du club, moyenne du onze − 2)` :
+   chaque recrue faisait donc monter le plafond, qui autorisait la suivante. Le
+   plancher `squadWages()*1.05` avait déjà été retiré pour cette raison ; celui-ci
+   faisait la même chose autrement, et c'est lui qui rendait les dynasties
+   possibles (mesuré : jusqu'à 30 points de force au-dessus de la moyenne du
+   championnat au bout de dix saisons dans un grand club). */
 function clubWageCap(c){
-  const xi=bestXI(state.squad,FORMATIONS[state.formation]||FORMATIONS['4-4-2'],state.year);
-  const xiAvg=xi.length?xi.reduce((n,p)=>n+playerRating(p,state.year),0)/xi.length:c.strength;
-  const lvl=Math.max(c.strength,xiAvg-2);
-  const ref={born:state.year-27,peak:(lvl-1)/ageCurve(27),dev:1,form:0};
-  return 23*playerWage(ref,state.year,c.tier)*1.25*Math.sqrt(state.mode.budgetMult||1); }
+  const ref={born:state.year-27,peak:(c.strength-1)/ageCurve(27),dev:1,form:0};
+  return 23*playerWage(ref,state.year,c.tier)*1.05*Math.sqrt(state.mode.budgetMult||1); }
 function foreignCount(){ return state.squad.filter(p=>isForeign(p,state.club.nat)).length; }
 /* Ce qui manque pour boucler un dossier : prix, salaire, place, quota. */
 function coachBlockers(t){
@@ -350,8 +361,35 @@ function coachChooseCrossroad(i){
     before,after:coachSnapshot(),extra:lines,next:'phase'};
   state.pendingChoice='choiceResult'; render();
 }
+/* ---------- Le championnat répond ----------
+   Retour du propriétaire (25/09/2026) : « j'ai tout gagné pendant 10 ans ».
+   Mesuré : dans les clubs des paliers étranger et europe, la force en match
+   dépassait la moyenne du championnat de 12 à 17 points, et rien ne rattrapait
+   jamais. Une domination doit réveiller les autres : chaque saison passée très
+   au-dessus arme tes rivaux pour la suivante, et l'avance fond si tu redeviens
+   ordinaire. Mémorisé par championnat (`state.leagueArms`), donc on retrouve un
+   championnat qu'on a laissé armé. */
+const ARMS_MAX=30;
+function leagueArms(name){ return (state.leagueArms&&state.leagueArms[name])||0; }
+function coachArmLeague(){
+  const comp=state.comp; if(!comp) return null;
+  const avg=coachLeagueAverage(); if(avg==null) return null;
+  const gap=coachStrengthShown()-avg;
+  state.leagueArms=state.leagueArms||{};
+  const was=leagueArms(comp.name);
+  let now=was;
+  if(gap>2) now=Math.min(ARMS_MAX,was+Math.min(4,(gap-2)*.8));
+  else if(gap<0) now=Math.max(0,was-1);
+  now=Math.round(now*10)/10;
+  state.leagueArms[comp.name]=now;
+  const d=Math.round((now-was)*10)/10;
+  return d?{league:comp.name,delta:d,total:now,gap:Math.round(gap*10)/10}:null;
+}
 function coachStartSeason(){
   const c=state.club; const lg=buildLeagueTeams(c,state.year); c.leagueName=lg.name;
+  const arms=leagueArms(lg.name);
+  if(arms) lg.teams.forEach(t=>{ t.strength=Math.round((t.strength+arms)*10)/10; });
+  c.leagueArms=arms;
   state.comp=createCompetition(lg,c.name,state.year); state.phase=0; state.matchday=0; state.match=null;
   // L'objectif du président se recalcule sur la vraie force de ton effectif : bâtir une armada relève l'attente.
   const xi=bestXI(state.squad,FORMATIONS[state.formation],state.year); const xiAvg=xi.reduce((n,p)=>n+playerRating(p,state.year),0)/Math.max(1,xi.length);
@@ -1253,6 +1291,10 @@ function coachEndConf(){
   let dConf=objectiveMet?12:-(pos-c.objectivePos)*3; if(champion) dConf+=15; if(cupWon) dConf+=8; if(euroWon) dConf+=20; if(relegated) dConf-=25;
   if(dConf<0) dConf/=c.tolerance;
   c.confidence=clamp(c.confidence+dConf);
+  // L'armement se mesure sur l'effectif de la saison écoulée, avant que
+  // l'intersaison ne le développe et n'en retire les partants.
+  const arming=coachArmLeague();
+  if(arming) log(`🛡️ ${arming.league} s'arme contre toi : ${arming.delta>0?'+':''}${String(arming.delta).replace('.',',')} de force pour tes rivaux la saison prochaine${arming.total?` (${String(arming.total).replace('.',',')} au total)`:''}.`);
   const fx=state.rouletteFate;
   if(fx&&fx.kind==='exclusive'&&fx.installed){ state.pressure=clamp(state.pressure+(champion?4:10)); }
   if(fx&&fx.kind==='exile'&&(champion||cupWon)&&year-fx.year>=2){ log(`🕊️ ${champion?'Un titre':'Une coupe'} loin des projecteurs : l'affaire des archives est oubliée, les grands clubs recommencent à appeler.`); state.cote=clamp(state.cote+10); state.rouletteFate=null; unlockTrophy('r-redemption'); }
@@ -1324,7 +1366,7 @@ function coachEndConf(){
     meetings:ss.meetings||0,decisions:(ss.decisions||[]).slice(-3),
     gauges:Object.keys(GAUGE_INFO).map(k=>({k,icon:GAUGE_INFO[k].icon,label:GAUGE_INFO[k].label,before:Math.round(g0[k]==null?state.gauges[k]:g0[k]),after:Math.round(state.gauges[k])})),
     pressure:{before:Math.round(g0.pressure==null?state.pressure:g0.pressure),after:Math.round(state.pressure)},
-    effort:state.effort||null};
+    effort:state.effort||null,arming};
   state.history.push(season); state.lastSeason=season;
   c.since=c.since||1;
   if(c.since>=6) unlockTrophy('c-loyal'); if(state.clubsCoached.length>=8) unlockTrophy('c-nomad'); if(state.history.filter(h=>!h.sacked).length>=10) unlockTrophy('c-ten');

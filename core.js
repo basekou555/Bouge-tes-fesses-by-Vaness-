@@ -71,10 +71,16 @@ const FILLERS={
  "Brasileirão":["Grêmio","Internacional","Cruzeiro","Atlético Mineiro","Fluminense","Botafogo","Vasco da Gama","Corinthians","Athletico Paranaense","Bahia","Fortaleza","Sport Recife","Goiás","Coritiba","Ceará","Vitória"],
  "A-League":["Sydney FC","Melbourne City","Western Sydney Wanderers","Brisbane Roar","Adelaide United","Perth Glory","Central Coast Mariners","Newcastle Jets","Wellington Phoenix","Macarthur"],
 };
+/* L'échelle des clubs d'un même championnat. Elle était trop étalée : 66 à 88
+   en Europe, donc un grand club se retrouvait mécaniquement 15 points au-dessus
+   de la moyenne de son championnat dès sa première saison — mesuré, et suffisant
+   pour tout gagner pendant dix ans sans rien faire de particulier. Resserrée à
+   14 points d'amplitude, ce qui laisse un grand club environ 8 au-dessus de la
+   moyenne : dominant, pas intouchable. */
 function tierBaseStrength(tier,s){
-  if(tier==='superclub'||tier==='europe') return {1:66,2:71,3:77,4:82,5:88}[s]||70;
-  if(tier==='ligue1') return {1:64,2:69,3:74,4:79,5:85}[s]||68;
-  if(tier==='etranger') return {1:60,2:64,3:69,4:74,5:78}[s]||64;
+  if(tier==='superclub'||tier==='europe') return {1:71,2:74,3:78,4:81,5:85}[s]||73;
+  if(tier==='ligue1') return {1:68,2:71,3:75,4:79,5:83}[s]||70;
+  if(tier==='etranger') return {1:63,2:66,3:70,4:73,5:77}[s]||66;
   if(tier==='ligue2') return 58; return 48;
 }
 /* Construit la liste des équipes du championnat de notre club (notre club exclu, ajouté ensuite) */
@@ -82,12 +88,15 @@ function buildLeagueTeams(offer,year){
   const dk=decadeKey(year), teams=[];
   const self=offer.club||offer.name;
   const push=(name,strength)=>{ if(name!==self&&!teams.some(t=>t.name===name)) teams.push({name,strength:Math.round(strength+rand(-2,2))}); };
-  if(offer.tier==='ligue1'){ FR_CLUBS.filter(c=>c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('ligue1',c.s[dk]))); while(teams.length<17){ const c=pick(FR_CLUBS); push(c.n,62); } return {name:leagueName(1,'FR',year),nat:'FR',level:1,teams:teams.slice(0,17)}; }
+  // Un club de complément se situe par rapport au championnat qu'il remplit, pas
+  // à une valeur en dur : sinon il tire la moyenne vers le bas et offre un boulevard.
+  const fillStrength=()=>{ if(!teams.length) return 62; const avg=teams.reduce((n,t)=>n+t.strength,0)/teams.length; return avg-rand(0,5); };
+  if(offer.tier==='ligue1'){ FR_CLUBS.filter(c=>c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('ligue1',c.s[dk]))); while(teams.length<17){ const c=pick(FR_CLUBS); push(c.n,fillStrength()); } return {name:leagueName(1,'FR',year),nat:'FR',level:1,teams:teams.slice(0,17)}; }
   if(offer.tier==='ligue2'){ FR_CLUBS.filter(c=>!c.s[dk]).forEach(c=>push(c.n,rand(56,62))); shuffledCopy(FR_LOWER).slice(0,8).forEach(n=>push(n,rand(53,59))); return {name:leagueName(2,'FR',year),nat:'FR',level:2,teams:shuffledCopy(teams).slice(0,17)}; }
   if(offer.tier==='amateur'){ shuffledCopy(FR_LOWER).slice(0,15).forEach(n=>push(n,rand(44,52))); return {name:leagueName(3,'FR',year),nat:'FR',level:3,teams:teams.slice(0,15)}; }
-  if(offer.tier==='etranger'){ const lg=offer.league; WORLD_CLUBS.filter(c=>c.league===lg&&c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('etranger',c.s[dk]))); (FILLERS[lg]||[]).forEach(n=>push(n,rand(56,63))); return {name:lg,nat:offer.nat,level:1,teams:shuffledCopy(teams).slice(0,15)}; }
-  const nat=offer.nat; EU_CLUBS.filter(c=>c.nat===nat&&c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('europe',c.s[dk]))); (FILLERS[nat]||[]).forEach(n=>push(n,rand(60,67)));
-  while(teams.length<17){ push(pick(FILLERS.ES),62); }
+  if(offer.tier==='etranger'){ const lg=offer.league; WORLD_CLUBS.filter(c=>c.league===lg&&c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('etranger',c.s[dk]))); (FILLERS[lg]||[]).forEach(n=>push(n,fillStrength())); return {name:lg,nat:offer.nat,level:1,teams:shuffledCopy(teams).slice(0,15)}; }
+  const nat=offer.nat; EU_CLUBS.filter(c=>c.nat===nat&&c.s[dk]>0).forEach(c=>push(c.n,tierBaseStrength('europe',c.s[dk]))); (FILLERS[nat]||[]).forEach(n=>push(n,fillStrength()));
+  while(teams.length<17){ push(pick(FILLERS.ES),fillStrength()); }
   return {name:leagueName(1,nat,year),nat,level:1,teams:shuffledCopy(teams).slice(0,17)};
 }
 

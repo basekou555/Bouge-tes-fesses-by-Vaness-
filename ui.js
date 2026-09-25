@@ -552,6 +552,7 @@ function renderSeasonEnd(){
       <section><h3>🏛️ Ce qu'il en reste</h3>
         ${f.cote?`<div class="hint">Ta cote : <b>${f.cote.before} → ${f.cote.after}</b> · ${f.cote.why.map(escapeHtml).join(' · ')||'saison neutre'}. Tu vaux désormais ${escapeHtml(f.cote.level)}.</div>`:''}
         <div class="hint">🏆 ${state.titles.league} · ⬆️ ${state.titles.promo} · 🥇 ${state.titles.cup} · ⭐ ${state.titles.euro} · 🎖️ ${state.awards} · 🪓 ${state.sackings}</div>
+        ${b.arming?`<div class="hint">🛡️ <b>${escapeHtml(b.arming.league)} s'arme contre toi.</b> Tu as fini la saison ${String(b.arming.gap).replace('.',',')} de force au-dessus de la moyenne : tes rivaux gagnent ${b.arming.delta>0?'+':''}${String(b.arming.delta).replace('.',',')} pour la saison prochaine, ${String(b.arming.total).replace('.',',')} au total. Une domination finit toujours par réveiller les autres.</div>`:''}
         <div class="punchline narr">${pick(f.champion?PUNCHLINES.champion:f.relegated?PUNCHLINES.relegated:f.objectiveMet?PUNCHLINES.hit:f.pos>f.teams*.7?PUNCHLINES.flop:PUNCHLINES.mid)}</div>
       </section>
     </div>
