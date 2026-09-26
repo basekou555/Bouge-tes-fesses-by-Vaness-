@@ -20,10 +20,10 @@ const APPROACHES={
   defensif:{icon:'🛡️',label:"Fermer le jeu",desc:"Moins d'occasions des deux côtés, surtout les leurs.",atk:.8,def:.76},
 };
 const TRAINING={
-  tactique:{icon:'📐',label:"Tactique",desc:"Automatismes : +0,8 de force en match.",strength:.8,recovery:0,injury:1},
-  physique:{icon:'💪',label:"Physique",desc:"Fraîcheur +3 par semaine, blessures −15 %, force −0,3.",strength:-.3,recovery:3,injury:.85},
-  jeunes:{icon:'🌱',label:"Jeunes",desc:"Les moins de 23 ans progressent plus vite. Force −0,5.",strength:-.5,recovery:0,injury:1,youth:true},
-  recuperation:{icon:'🛌',label:"Récupération",desc:"Fraîcheur +6 par semaine, blessures −25 %, force −0,8.",strength:-.8,recovery:6,injury:.75},
+  tactique:{icon:'📐',label:"Tactique",desc:"Automatismes : +0,08 de force en match.",strength:.8,recovery:0,injury:1},
+  physique:{icon:'💪',label:"Physique",desc:"Fraîcheur +3 par semaine, blessures −15 %, force −0,03.",strength:-.3,recovery:3,injury:.85},
+  jeunes:{icon:'🌱',label:"Jeunes",desc:"Les moins de 23 ans progressent plus vite. Force −0,05.",strength:-.5,recovery:0,injury:1,youth:true},
+  recuperation:{icon:'🛌',label:"Récupération",desc:"Fraîcheur +6 par semaine, blessures −25 %, force −0,08.",strength:-.8,recovery:6,injury:.75},
 };
 const HALFTIME_CHOICES=[
   {id:'keep',icon:'🤝',label:"Garder le plan",sub:"Tu fais confiance à ce que tu as préparé."},

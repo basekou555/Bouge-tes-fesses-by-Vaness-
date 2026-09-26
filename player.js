@@ -77,7 +77,7 @@ function playerChooseSummer(i){
     extra.push(`🩼 Blessé·e ${w} semaines`); log(`🩼 ${t.label} : ton corps a dit non, ${w} semaines d'arrêt.`); }
   else log(`${t.icon} Été : ${t.label.toLowerCase()}.`);
   if(state.summerFatigue) extra.push(`🫁 Tu commenceras la saison entamé·e (récupération −${state.summerFatigue>=2?'25':'12'} % toute l'année)`);
-  if(prep<1&&t.load) extra.push(`⏳ Charge retenue : ${state.summerLoad.toFixed(2)} au lieu de ${t.load.toFixed(2)} — tes vacances ont mangé une partie de l'été`);
+  if(prep<1&&t.load) extra.push(`⏳ Charge retenue : ${state.summerLoad.toFixed(2).replace('.',',')} au lieu de ${t.load.toFixed(2).replace('.',',')} — tes vacances ont mangé une partie de l'été`);
   if(state.summerLoad>=1) extra.push("📈 Une avance de préparation qui comptera en juin");
   state.pendingResult={title:`${t.icon} La préparation`,subtitle:t.label,narrative:t.sub,before,after:pSnapshot(),extra,next:'envies'};
   state.pendingChoice='choiceResult'; saveGame(); render();
@@ -298,9 +298,9 @@ function playerClubWants(){
   if(state.consecutiveBad>=2) return {keep:false,why:"Deux saisons de trop sans rien montrer."};
   if(age>=37) return {keep:false,why:"On te propose un pot de départ, pas un contrat."};
   if(age>=35&&share<.5) return {keep:false,why:`À ${age} ans, tu n'as joué que ${Math.round(share*100)} % du temps : le club veut ces minutes pour ses jeunes.`};
-  if(age>=34&&(gap<-3||note<6.2)) return {keep:false,why:`${Math.round(r)} de niveau à ${age} ans, une saison à ${note.toFixed(1)} de moyenne : le club regarde déjà la génération suivante.`};
+  if(age>=34&&(gap<-3||note<6.2)) return {keep:false,why:`${niv(r)} de niveau à ${age} ans, une saison à ${note.toFixed(1).replace('.',',')} de moyenne : le club regarde déjà la génération suivante.`};
   if(age>=32&&state.gauges.corps<52) return {keep:false,why:"Le médecin du club a été clair : physiquement, tu n'es plus au top."};
-  if(age>=31&&gap<-9) return {keep:false,why:`Le club joue à ${c.strength} de niveau, toi à ${Math.round(r)}. On te remercie poliment.`};
+  if(age>=31&&gap<-9) return {keep:false,why:`Le club joue à ${niv(c.strength)} de niveau, toi à ${niv(r)}. On te remercie poliment.`};
   return {keep:true};
 }
 function playerClubDecision(c){
@@ -519,7 +519,7 @@ function playerAdvance(){
     if(why){ state.match.why=why; state.sinceLast=state.skipped||[]; state.skipped=[]; state.alerts=[]; state.pendingChoice='prematch'; saveGame(); return; }
     playerKickoff(false);
     if(state.pendingChoice==='penalty'){ state.match.why=["🎯 Penalty : à toi de décider"]; state.sinceLast=state.skipped||[]; state.skipped=[]; state.alerts=[]; saveGame(); return; }
-    const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,matchday:rec.matchday,mine:rec.played?`${rec.min}' · note ${rec.note.toFixed(1)}${rec.goals?' · ⚽'+rec.goals:''}${rec.assists?' · 🅰️'+rec.assists:''}`:rec.status==='bench'?'banc':'absent·e'});
+    const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,matchday:rec.matchday,mine:rec.played?`${rec.min}' · note ${rec.note.toFixed(1).replace('.',',')}${rec.goals?' · ⚽'+rec.goals:''}${rec.assists?' · 🅰️'+rec.assists:''}`:rec.status==='bench'?'banc':'absent·e'});
     state.alerts=playerAlertsAfter(rec);
     playerWeekPasses();
   }
@@ -563,7 +563,7 @@ function playerAfterMatchSim(P){
   state.coachTrust=clamp(state.coachTrust+dTrust+(res==='W'?.3:res==='L'?-.3:0));
   const rec={home:ha.home,away:ha.away,gh:ha.gh,ga:ha.ga,us:m.home?'home':'away',res,matchday:m.matchday,ht:m.ht,story:m.story,scorers:matchScorersText(m,P),events:m.events,ratings:m.ratings,motm:m.motm,xi:m.xi,bench:m.bench,played,start:!!(s&&s.start),min:s?s.min:0,goals:s?s.goals:0,assists:s?s.assists:0,yellow:s?s.yellow:0,red:s?s.red:0,inj:s?s.inj:0,note,dTrust:Math.round(dTrust*10)/10,status:m.myStatus,penNote:m.penNote||'',pos:tablePos(comp.table,c.name),themStrength:Math.round(m.themStrength),themStyle:m.themStyle};
   state.phaseMatches.push(rec); state.lastMatch=rec; state.matchday++;
-  log(`${res==='W'?'✅':res==='L'?'❌':'➖'} J${m.matchday+1} : ${ha.home} ${ha.gh}–${ha.ga} ${ha.away}. ${played?`Toi : ${s.min} min, note ${note.toFixed(1)}${s.goals?', '+s.goals+' but'+(s.goals>1?'s':''):''}${s.assists?', '+s.assists+' passe'+(s.assists>1?'s':''):''}.`:m.myStatus==='bench'?'Tu restes sur le banc.':m.myStatus==='injured'?'Blessé·e, tu regardes depuis la tribune.':m.myStatus==='suspended'?'Suspendu·e.':'Pas dans le groupe.'}`);
+  log(`${res==='W'?'✅':res==='L'?'❌':'➖'} J${m.matchday+1} : ${ha.home} ${ha.gh}–${ha.ga} ${ha.away}. ${played?`Toi : ${s.min} min, note ${note.toFixed(1).replace('.',',')}${s.goals?', '+s.goals+' but'+(s.goals>1?'s':''):''}${s.assists?', '+s.assists+' passe'+(s.assists>1?'s':''):''}.`:m.myStatus==='bench'?'Tu restes sur le banc.':m.myStatus==='injured'?'Blessé·e, tu regardes depuis la tribune.':m.myStatus==='suspended'?'Suspendu·e.':'Pas dans le groupe.'}`);
   state.pendingChoice='matchResult'; saveGame();
 }
 function playerWeekPasses(){ const me=playerMe();
@@ -578,7 +578,7 @@ function playerSimPhase(){
   let guard=0; const keep=state.tempo; state.tempo='rapide'; state.alerts=[];
   while((state.pendingChoice==='prematch'||state.pendingChoice==='matchResult')&&guard++<60){
     if(state.pendingChoice==='prematch'){ if(!state.match||state.match.done) break; playerKickoff(true); }
-    else { const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,matchday:rec.matchday,mine:rec.played?`${rec.min}' · note ${rec.note.toFixed(1)}`:rec.status==='bench'?'banc':'absent·e'}); state.lastStatus=rec.status; playerWeekPasses(); playerAdvance(); }
+    else { const rec=state.lastMatch; (state.skipped=state.skipped||[]).push({home:rec.home,away:rec.away,gh:rec.gh,ga:rec.ga,us:rec.us,res:rec.res,story:rec.story,matchday:rec.matchday,mine:rec.played?`${rec.min}' · note ${rec.note.toFixed(1).replace('.',',')}`:rec.status==='bench'?'banc':'absent·e'}); state.lastStatus=rec.status; playerWeekPasses(); playerAdvance(); }
   }
   state.tempo=keep; render();
 }
@@ -593,7 +593,7 @@ function playerFinishPhase(){
   state.totals.earned+=c.salary/4;
   const pos=tablePos(comp.table,c.name);
   const injury=mine.find(m=>m.inj)?`${state.injury} semaine${state.injury>1?'s':''} d'absence`:null;
-  const rec={n:state.phase+1,matches:mine.map(m=>({home:m.home,away:m.away,gh:m.gh,ga:m.ga,us:m.us,res:m.res,mine:m.played?`${m.min}' · note ${m.note.toFixed(1)}${m.goals?' · ⚽'+m.goals:''}${m.assists?' · 🅰️'+m.assists:''}`:m.status==='bench'?'banc':'absent·e'})),apps,goals,assists,note:note==null?0:note,share,pos,dTrust:Math.round(dTrust),injury,table:sortTable(comp.table).map(t=>({...t})),motm:played.filter(m=>m.motm==='me').length};
+  const rec={n:state.phase+1,matches:mine.map(m=>({home:m.home,away:m.away,gh:m.gh,ga:m.ga,us:m.us,res:m.res,mine:m.played?`${m.min}' · note ${m.note.toFixed(1).replace('.',',')}${m.goals?' · ⚽'+m.goals:''}${m.assists?' · 🅰️'+m.assists:''}`:m.status==='bench'?'banc':'absent·e'})),apps,goals,assists,note:note==null?0:note,share,pos,dTrust:Math.round(dTrust),injury,table:sortTable(comp.table).map(t=>({...t})),motm:played.filter(m=>m.motm==='me').length};
   ss.phases.push(rec); state.lastPhase=rec; state.match=null; state.skipped=[]; state.sinceLast=[]; state.alerts=[];
   log(`📊 Phase ${state.phase+1} : ${apps} matchs, ${goals} but${goals>1?'s':''}, ${assists} passe${assists>1?'s':''}${note!=null?', note '+note.toFixed(1):''}. ${c.name} ${ordinal(pos)}.`);
   state.phase++; state.pendingChoice='phaseResult'; saveGame();
@@ -648,7 +648,7 @@ function playerEndSeason(){
     const hard=avgShare<.06;
     const eff={mental:hard?-5:-3,pressure:hard?10:6,supporters:-4,vestiaire:-3};
     playerApplyEffects(eff);
-    idle={apps:ss.apps,share:avgShare,hard,text:hard?`Tu as traversé l'année en tribune : ${ss.apps} match${ss.apps>1?'s':''} joué${ss.apps>1?'s':''} sur ${ss.shares.length}. Une année de carrière, pour rien.`:`${Math.round(avgShare*100)} % du temps de jeu : une saison qu'on regarde plus qu'on ne la joue.`,lines:[`🧠 Mental ${hard?-5:-3}`,`🌡️ Pression +${hard?10:6}`,'📣 Supporters −4','✊ Vestiaire −3']};
+    idle={apps:ss.apps,share:avgShare,hard,text:hard?`Tu as traversé l'année en tribune : ${ss.apps} match${ss.apps>1?'s':''} joué${ss.apps>1?'s':''} sur ${ss.shares.length}. Une année de carrière, pour rien.`:`${Math.round(avgShare*100)} % du temps de jeu : une saison qu'on regarde plus qu'on ne la joue.`,lines:[`🧠 Mental ${d10(hard?-5:-3)}`,`🌡️ Pression ${d10(hard?10:6)}`,`📣 Supporters ${d10(-4)}`,`✊ Vestiaire ${d10(-3)}`]};
     log(`🌫️ ${idle.text}`);
   }
   const season={idle,year,club:c.name,league:c.leagueName,tier:c.tier,role:c.role,pos,teams:N,champion,relegated,cupWon:cup.won,cupRounds:cup.roundsReached,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached}:null,apps:ss.apps,goals:ss.goals,assists:ss.assists,note:avgNote,share:avgShare,selected,caps,capGoals,ballon,boot,bad,salary:c.salary,table:table.map(t=>({...t})),age};
@@ -660,7 +660,7 @@ function playerEndSeason(){
   const eraBefore=eraForYear(year).id; state.year++; state.age++; if(eraForYear(state.year).id!==eraBefore){ unlockTrophy('p-era-cross'); log(`⏳ Nouvelle époque : <b>${eraForYear(state.year).name}</b>.`); }
   state.comp=null; state.match=null; state.benchRun=0;
   season.clubMood=playerClubDecision(c);
-  log(`🏁 Saison terminée : ${ss.apps} matchs, ${ss.goals} buts, ${ss.assists} passes, note ${avgNote.toFixed(2)}. ${c.name} ${ordinal(pos)}${champion?' 🏆':''}${cup.won?' 🥇':''}${euro&&euro.won?' ⭐':''}${selected?` · 🇫🇷 ${caps} sélections`:''}${ballon?' · 🏅 Ballon d\'or':''}.`);
+  log(`🏁 Saison terminée : ${ss.apps} matchs, ${ss.goals} buts, ${ss.assists} passes, note ${avgNote.toFixed(2).replace('.',',')}. ${c.name} ${ordinal(pos)}${champion?' 🏆':''}${cup.won?' 🥇':''}${euro&&euro.won?' ⭐':''}${selected?` · 🇫🇷 ${caps} sélections`:''}${ballon?' · 🏅 Ballon d\'or':''}.`);
   state.pendingChoice='seasonEnd'; saveGame();
 }
 function playerAfterSeasonEnd(){ playerIntersaison(); render(); }

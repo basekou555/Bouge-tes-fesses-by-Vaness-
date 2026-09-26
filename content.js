@@ -526,7 +526,7 @@ const PLAYER_SITUATIONS=[
   {label:"Doubler la salle et les soins",result:"Le corps répond encore, à condition de ne plus jamais lâcher.",effects:{physique:2,corps:6,money:-.12,mental:-1}},
   {label:"Serrer les dents sans rien changer",result:"Tu tiens le rythme trois mois. Après, on verra.",effects:{corps:-8,forme:4,coachTrust:3,injure:2}}]},
  {id:'ps-depart',icon:'🚪',title:"Le club pense à la suite",when:()=>{const c=state.club; if(!c||pAge()<32) return false; const last=state.lastSeason; return pRating()<c.strength-1||pAge()>=34||(last&&last.note<6.4);},
-  text:()=>`Le directeur sportif t'invite à déjeuner. « Tu sais où on en est : le club joue à ${state.club.strength} de niveau, et physiquement tu n'es plus au top. On construit pour les prochaines saisons. »`,choices:[
+  text:()=>`Le directeur sportif t'invite à déjeuner. « Tu sais où on en est : le club joue à ${niv(state.club.strength)} de niveau, et physiquement tu n'es plus au top. On construit pour les prochaines saisons. »`,choices:[
   {label:"Accepter un rôle de cadre qui joue peu",result:"Tu encadres les jeunes, tu joues les fins de match. Le vestiaire t'appelle « le patron ».",effects:{vestiaire:9,mental:2,minutes:-.12,coachTrust:5}},
   {label:"Répondre que tu te bats pour ta place",result:"Le coach n'a rien promis, mais il a noté.",effects:{pressure:8,coachTrust:2,mental:-2,physique:1}},
   {label:"Demander à partir maintenant",result:"Tu préfères choisir ta sortie plutôt qu'on te la donne.",effects:{coachTrust:-8,supporters:-4,entourage:3,bigOfferNext:true}},
