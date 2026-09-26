@@ -3,6 +3,23 @@
    compétitions (championnat, coupes) et développement des joueurs. Partagé par les deux modes. */
 
 let state=null;
+/* ---------- Une seule échelle à l'écran : sur 10 ----------
+   Demande du propriétaire (26/09/2026) : « l'échelle sur 10 », et pour tout le jeu.
+   Le moteur garde ses valeurs sur 100 : tout le calibrage mesuré reste valable, et
+   un point de moteur devient un dixième affiché. `sur10()` affiche une valeur, `d10()`
+   une variation, avec la virgule française.
+   Ce qui n'est pas sur 100 (l'argent, la dynamique de −6 à +6, les pourcentages,
+   les semaines, le nombre de matchs) garde son unité. */
+/* Un niveau (un joueur, un effectif, un club, la force emmenée en match) se lit sur
+   la même échelle que les jauges : c'est le même objet arithmétique — la note globale
+   est la moyenne pondérée des attributs, on ne peut pas afficher l'une sur 10 et
+   l'autre sur 100. */
+function niv(v){ return sur10(v); }
+/* Une contribution à la force en match, sur la même échelle sur 10 : deux décimales,
+   parce qu'un dixième de jauge pèse quelques centièmes de force. */
+function fo(v){ return ((v==null?0:v)/10).toFixed(2).replace('.',','); }
+function sur10(v){ return (Math.round((v==null?0:v)/10*10)/10).toFixed(1).replace('.',','); }
+function d10(v){ const x=Math.round((v==null?0:v)/10*10)/10; return (x>0?'+':x<0?'−':'')+Math.abs(x).toFixed(1).replace('.',','); }
 function clamp(v,min=0,max=100){ return Math.max(min,Math.min(max,v)); }
 function rand(a,b){ return Math.random()*(b-a)+a; }
 function randInt(a,b){ return Math.floor(rand(a,b+1)); }

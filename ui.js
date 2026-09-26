@@ -49,7 +49,7 @@ function bonusChips(bonus,labels){ return `<div class="chip-row">${Object.entrie
 function perkChips(o){
   const chips=[];
   const gaugeLabels={...Object.fromEntries(Object.entries(GAUGE_INFO).map(([k,v])=>[k,v.icon+' '+v.label])),...Object.fromEntries(Object.entries(PGAUGE).map(([k,v])=>[k,v.icon+' '+v.label]))};
-  Object.entries(o.gauge||o.gauges||{}).forEach(([k,v])=>chips.push([`${gaugeLabels[k]||k} ${v>0?'+':''}${v}`,v>0]));
+  Object.entries(o.gauge||o.gauges||{}).forEach(([k,v])=>chips.push([`${gaugeLabels[k]||k} ${d10(v)}`,v>0]));
   if(o.pressureRes) chips.push([`Pression ${o.pressureRes>0?'−':'+'}${Math.abs(o.pressureRes)}`,o.pressureRes>0]);
   if(o.incidentMult&&o.incidentMult!==1) chips.push([`Incidents ${o.incidentMult>1?'+':'−'}${Math.round(Math.abs(o.incidentMult-1)*100)} %`,o.incidentMult<1]);
   if(o.budgetLeak) chips.push([`Budget −${Math.round(o.budgetLeak*100)} %`,false]);
@@ -84,11 +84,11 @@ function renderCreation(){
   else if(step==='summary'){
     if(creation.kind==='coach'){ const tmp=coachFreshState({...creation,favoriteStyle:creation.style}); html=`<div class="card"><h2 class="display">${escapeHtml(creation.name)}</h2><div class="identity">${creation.era.icon} <b>${creation.era.name}</b> · ${creation.mode.icon} ${creation.mode.name} · ${creation.origin.name} · ${creation.nationality.name} · style <b>${creation.style.icon} ${creation.style.name}</b> · inspiré·e par <b>${creation.mentor.name}</b> · ${creation.quality.name} / ${creation.flaw.name}</div>
       <div class="section-label">Statistiques de départ</div>${Object.keys(CSTAT).map(k=>`<div class="stat-row"><div class="lbl"><span>${CSTAT[k]}</span><b>${Math.round(tmp.stats[k])}</b></div><div class="bar"><i style="width:${tmp.stats[k]}%"></i></div></div>`).join('')}
-      <div class="section-label">Jauges de départ</div>${Object.keys(GAUGE_INFO).map(k=>`<div class="stat-row"><div class="lbl"><span>${GAUGE_INFO[k].icon} ${GAUGE_INFO[k].label}</span><b>${Math.round(tmp.gauges[k])}</b></div><div class="bar"><i style="width:${tmp.gauges[k]}%"></i></div></div>`).join('')}
+      <div class="section-label">Jauges de départ</div>${Object.keys(GAUGE_INFO).map(k=>`<div class="stat-row"><div class="lbl"><span>${GAUGE_INFO[k].icon} ${GAUGE_INFO[k].label}</span><b>${sur10(tmp.gauges[k])}</b></div><div class="bar"><i style="width:${tmp.gauges[k]}%"></i></div></div>`).join('')}
       <div class="btn-row"><button class="btn secondary" onclick="cBack()">← Retour</button><button class="btn" onclick="launchCoach()">Commencer en ${creation.era.start} ⚽</button></div></div>`; }
     else { const tmp=playerFreshState(creation); html=`<div class="card"><h2 class="display">${escapeHtml(creation.name)}</h2><div class="identity">${creation.era.icon} <b>${creation.era.name}</b> · ${creation.pos.icon} ${creation.pos.name} · ${creation.origin.name} · ${creation.trait.name} · ${tmp.age} ans</div>
       ${Object.keys(PSTAT).map(k=>`<div class="stat-row"><div class="lbl"><span>${PSTAT[k]}</span><b>${Math.round(tmp.stats[k])}</b></div><div class="bar"><i style="width:${tmp.stats[k]}%"></i></div></div>`).join('')}
-      <div class="section-label">Jauges de départ</div>${Object.keys(PGAUGE).map(k=>`<div class="stat-row"><div class="lbl"><span>${PGAUGE[k].icon} ${PGAUGE[k].label}</span><b>${Math.round(tmp.gauges[k])}</b></div><div class="bar"><i style="width:${tmp.gauges[k]}%"></i></div></div>`).join('')}
+      <div class="section-label">Jauges de départ</div>${Object.keys(PGAUGE).map(k=>`<div class="stat-row"><div class="lbl"><span>${PGAUGE[k].icon} ${PGAUGE[k].label}</span><b>${sur10(tmp.gauges[k])}</b></div><div class="bar"><i style="width:${tmp.gauges[k]}%"></i></div></div>`).join('')}
       <div class="btn-row"><button class="btn secondary" onclick="cBack()">← Retour</button><button class="btn" onclick="launchPlayer()">Commencer en ${creation.era.start} 👟</button></div></div>`; }
   }
   app.innerHTML=`<div class="fade-in">${progressHTML(creation.step,steps.length)}${html}</div>`; scrollTop();
@@ -150,26 +150,36 @@ function quotaHTML(){
     <span>${eraForYear(state.year).name} : un club français ne peut aligner que ${fmax} joueur${fmax>1?'s':''} étranger${fmax>1?'s':''}.${over?" Tu ne peux plus en recruter un de plus sans en vendre un.":''}</span>
     ${list.length?`<div class="quota-list">${list.map(p=>`<i>${natFlag(p.nat)} ${escapeHtml(p.name)} <small>${natName(p.nat)}</small></i>`).join('')}</div>`:'<div class="quota-list"><i>Aucun étranger dans l\'effectif.</i></div>'}</div>`;
 }
-function bar(label,v,cls=''){ return `<div class="stat-row"><div class="lbl"><span>${label}</span><b>${Math.round(v)}</b></div><div class="bar ${cls}"><i style="width:${clamp(v)}%"></i></div></div>`; }
-function gaugeRow(info,v){ const mood=v>=65?'':v>=35?'mid':'low'; return `<div class="gauge-row ${mood}" title="${escapeHtml(info.help)}"><span>${info.icon}</span><div><div class="bar"><i style="width:${clamp(v)}%"></i></div><div class="hint" style="font-size:10px">${info.label}</div></div><span>${Math.round(v)}</span></div>`; }
+/* ---------- Tout se lit sur 10 ----------
+   Demande du propriétaire (26/09/2026) : « une échelle sur 10, tout à 5 au départ »,
+   et, quand je lui ai demandé jusqu'où aller : **tout le jeu**. Le moteur garde ses
+   valeurs sur 100 — tout le calibrage mesuré cette semaine reste valable — et l'écran
+   ne montre plus qu'une seule échelle. Un point de moteur = un dixième affiché.
+   `SC10` liste les indicateurs concernés : les jauges et les attributs. Ce qui n'est
+   pas sur 100 (l'argent, la dynamique de −6 à +6, les pourcentages, les semaines)
+   garde son unité. */
+const SC10=new Set(['talent','technique','reseau','reputation','vestiaire','supporters','formation','staff','proches','pressure','confidence','physique','mental','corps','entourage','coachTrust','forme','cote','note']);
+function fxVal(key,v){ return SC10.has(key)?sur10(v):String(Math.round(v)); }
+function bar(label,v,cls='',raw=false){ return `<div class="stat-row"><div class="lbl"><span>${label}</span><b>${raw?Math.round(v):sur10(v)}</b></div><div class="bar ${cls}"><i style="width:${clamp(v)}%"></i></div></div>`; }
+function gaugeRow(info,v){ const mood=v>=65?'':v>=35?'mid':'low'; return `<div class="gauge-row ${mood}" title="${escapeHtml(info.help)}"><span>${info.icon}</span><div><div class="bar"><i style="width:${clamp(v)}%"></i></div><div class="hint" style="font-size:10px">${info.label}</div></div><span>${sur10(v)}</span></div>`; }
 function coachSidebar(){
   const s=state.stats, c=state.club, g=state.gauges; const pcls=state.pressure>=85?'bad':state.pressure>=50?'mid':'good';
   const xi=c?bestXI(state.squad,FORMATIONS[state.formation],state.year):[]; const xiAvg=xi.length?xi.reduce((n,p)=>n+playerRating(p,state.year),0)/xi.length:0;
   return `<div class="card"><div class="identity"><b>${escapeHtml(state.name)}</b> · ${state.age} ans · ${state.modeIcon} ${state.modeName}<br>${c?`🏟️ <b>${escapeHtml(c.name)}</b> · ${escapeHtml(c.leagueName||'')} · saison ${c.since}<br>Objectif : ${ordinal(c.objectivePos)} · ${capitalize(c.presidentName)}`:'Sans club'}</div>
-    ${c?`<div class="section-label">Confiance du président</div><div class="conf-big ${c.confidence<25?'pressure-state bad':c.confidence<50?'pressure-state mid':''}">${Math.round(c.confidence)} / 100</div><div class="bar"><i style="width:${c.confidence}%"></i></div><div class="hint">À zéro, tu es licencié·e. Sous 35 en fin de saison, tu n'es pas prolongé·e.</div>`:''}
+    ${c?`<div class="section-label">Confiance du président</div><div class="conf-big ${c.confidence<25?'pressure-state bad':c.confidence<50?'pressure-state mid':''}">${sur10(c.confidence)} / 10</div><div class="bar"><i style="width:${c.confidence}%"></i></div><div class="hint">À zéro, tu es licencié·e. Sous 3,5 en fin de saison, tu n'es pas prolongé·e.</div>`:''}
     ${coteHTML()}
     ${fateHTML()}
     <div class="section-label">Toi</div>${Object.keys(CSTAT).map(k=>bar(CSTAT[k],s[k])).join('')}${bar('Pression',state.pressure,'pressure')}
     ${c?tempoSelectHTML():''}
     <div class="section-label">Le club</div>${Object.keys(GAUGE_INFO).map(k=>gaugeRow(GAUGE_INFO[k],g[k])).join('')}
-    ${c?`<div class="section-label">Effectif</div><div class="hint">${state.squad.length} joueurs · niveau de l'effectif ${xiAvg.toFixed(1)} · ${state.formation} · ${styleById(state.styleId).icon} ${styleById(state.styleId).name}<br>Blessés : ${state.squad.filter(p=>p.injury>0).length} · Suspendus : ${state.squad.filter(p=>p.suspended>0).length} · Fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)}</div>`:''}
+    ${c?`<div class="section-label">Effectif</div><div class="hint">${state.squad.length} joueurs · niveau de l'effectif ${niv(xiAvg)} · ${state.formation} · ${styleById(state.styleId).icon} ${styleById(state.styleId).name}<br>Blessés : ${state.squad.filter(p=>p.injury>0).length} · Suspendus : ${state.squad.filter(p=>p.suspended>0).length} · Fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)}</div>`:''}
     <div class="section-label">Palmarès</div><div class="hint">🏆 ${state.titles.league} · ⬆️ ${state.titles.promo} · 🥇 ${state.titles.cup} · ⭐ ${state.titles.euro} · 🌍 ${state.titles.euro2} · 🎖️ ${state.awards} · 🪓 ${state.sackings}</div></div>
     <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,30).map(l=>`<div><span class="age">${l.year}</span>${l.msg}</div>`).join('')}</div></div>
     <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Prendre ta retraite ? La sauvegarde sera supprimée.')){coachEnd('Tu raccroches le survêtement de ton plein gré.','retire');render();}">Retraite</button></div></div>`;
 }
 const CLABELS={talent:'Tactique',technique:'Management',reseau:'Réseau',reputation:'Réputation',pressure:'Pression',confidence:'Confiance du président',vestiaire:'✊ Vestiaire',supporters:'📣 Supporters',formation:'🎓 Formation',staff:'🧑‍🤝‍🧑 Staff',note:'Note globale',coachTrust:'Confiance du coach',forme:'Forme',corps:'🩻 Corps',entourage:'👪 Entourage',physique:'Physique',mental:'Mental'};
 function deltaChips(before,after,extra=[]){
-  const chips=Object.keys(after).map(k=>{ const d=(after[k]||0)-(before[k]||0); if(Math.abs(d)<.5) return ''; const good=k==='pressure'?d<0:d>0; return `<span class="delta-chip ${good?'up':'down'}">${CLABELS[k]||k} ${d>0?'+':''}${Math.round(d)}</span>`; }).filter(Boolean).concat(extra.map(e=>`<span class="delta-chip">${escapeHtml(e)}</span>`));
+  const chips=Object.keys(after).map(k=>{ const d=(after[k]||0)-(before[k]||0); if(Math.abs(d)<1) return ''; const good=k==='pressure'?d<0:d>0; return `<span class="delta-chip ${good?'up':'down'}">${CLABELS[k]||k} ${SC10.has(k)?d10(d):(d>0?'+':'')+Math.round(d)}</span>`; }).filter(Boolean).concat(extra.map(e=>`<span class="delta-chip">${escapeHtml(e)}</span>`));
   return chips.length?`<div class="delta-chips">${chips.join('')}</div>`:'<div class="hint">Aucun changement immédiat visible.</div>';
 }
 function renderChoiceResult(){ const r=state.pendingResult; const cont=state.kind==='player'?'playerContinueChoiceResult()':'coachContinueChoiceResult()'; return `<div class="card"><h2 class="display">${r.title}</h2><div class="subtitle">${escapeHtml(r.subtitle||'')}</div><p class="narr">${escapeHtml(r.narrative||'')}</p>${deltaChips(r.before,r.after,r.extra||[])}<div class="btn-row"><button class="btn" onclick="${cont}">Continuer →</button></div></div>`; }
@@ -195,8 +205,9 @@ function effectChips(effects,seed){
     const lbl=fxLabel((pr&&pr.as)||k); if(!lbl||!v) return;
     // La couleur dit si c'est une bonne nouvelle : « Pression 41 → 32 » en vert.
     const good=k==='pressure'?v<0:v>0;
-    if(pr&&Math.round(pr.cur)!==Math.round(pr.next)){
-      out.push(`<i class="${good?'plus':'minus'}">${lbl} <b>${Math.round(pr.cur)}</b>→<b>${Math.round(pr.next)}</b></i>`);
+    const key=(pr&&pr.as)||k;
+    if(pr&&fxVal(key,pr.cur)!==fxVal(key,pr.next)){
+      out.push(`<i class="${good?'plus':'minus'}">${lbl} <b>${fxVal(key,pr.cur)}</b>→<b>${fxVal(key,pr.next)}</b></i>`);
       return;
     }
     const big=k==='budget'?Math.abs(v)>=.05:Math.abs(v)>=6;
@@ -214,7 +225,7 @@ function stateTable(keys){
     const key=pr.as||k; if(seen.has(key)||!fxLabel(key)) return; seen.add(key);
     const v=pr.cur, pct=key==='form'?(v+6)/12*100:clamp(v);
     const mood=key==='pressure'?(v>=85?'low':v>=50?'mid':''):(v>=65?'':v>=35?'mid':'low');
-    rows.push(`<div class="st-row ${mood}"><span class="st-lbl">${fxLabel(key)}</span><span class="st-bar"><i style="width:${pct}%"></i></span><b>${Math.round(v)}</b></div>`);
+    rows.push(`<div class="st-row ${mood}"><span class="st-lbl">${fxLabel(key)}</span><span class="st-bar"><i style="width:${pct}%"></i></span><b>${fxVal(key,v)}</b></div>`);
   });
   if(!rows.length) return '';
   return `<div class="section-label">Où tu en es</div><div class="state-table">${rows.join('')}</div>`;
@@ -225,7 +236,8 @@ function effectKeys(list){ return list.flatMap(e=>Object.keys(e||{})); }
 function effectInline(effects){
   return Object.entries(effects||{}).map(([k,v])=>{ const pr=project(k,v);
     const lbl=fxLabel((pr&&pr.as)||k); if(!lbl||!v) return '';
-    return pr&&Math.round(pr.cur)!==Math.round(pr.next)?`${lbl} ${Math.round(pr.cur)}→${Math.round(pr.next)}`:`${lbl} ${v>0?'+':'−'}`;
+    const key=(pr&&pr.as)||k;
+    return pr&&fxVal(key,pr.cur)!==fxVal(key,pr.next)?`${lbl} ${fxVal(key,pr.cur)}→${fxVal(key,pr.next)}`:`${lbl} ${v>0?'+':'−'}`;
   }).filter(Boolean).join(' · ');
 }
 const PHASE_NAMES=['Automne','Hiver','Printemps','Sprint final'];
@@ -268,7 +280,7 @@ function renderRoulette(){ const ev=state.currentRoulette.event; const fn=state.
 function strengthRow(r,total){
   const w=Math.min(100,Math.abs(r.v)/Math.max(.5,Math.abs(total)*.35)*100);
   const sign=r.abs?'':(r.v>0?'+':r.v<0?'−':'');
-  const val=r.abs?r.v.toFixed(1):Math.abs(r.v).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')||'0';
+  const val=r.abs?niv(r.v):fo(Math.abs(r.v));
   return `<div class="kpi-row ${r.abs?'base':r.v>0?'up':r.v<0?'down':''}">
     <span class="kpi-ico">${r.icon}</span>
     <span class="kpi-lbl"><b>${escapeHtml(r.label)}</b><small>${escapeHtml(r.help)}</small></span>
@@ -294,21 +306,21 @@ function renderDashboard(){
     <p class="narr">Ce que valent tes réglages, en chiffres. Chaque ligne ci-dessous s'additionne pour donner la force que ton équipe emmène sur le terrain.</p>
 
     <div class="section-label">La force de ton équipe</div>
-    <div class="kpi-total"><b>${bd.total.toFixed(1)}</b><span>${avg!=null?`moyenne du championnat ${avg.toFixed(1)} · tu es ${bd.total>avg+2?'au-dessus':bd.total<avg-2?'en dessous':'dans la moyenne'}`:''}</span></div>
+    <div class="kpi-total"><b>${niv(bd.total)}</b><span>${avg!=null?`moyenne du championnat ${niv(avg)} · tu es ${bd.total>avg+2?'au-dessus':bd.total<avg-2?'en dessous':'dans la moyenne'}`:''}</span></div>
     <div class="kpi-list">${bd.rows.map(r=>strengthRow(r,bd.total)).join('')}</div>
     <div class="hint">Change l'entraînement ou le style avant un match : la ligne correspondante bouge tout de suite.</div>
 
     <div class="section-label">L'entraînement de la semaine</div>
     <div class="kpi-train"><span class="ico">${tr.icon}</span><div><b>${tr.label}</b><small>${escapeHtml(tr.desc)}</small></div></div>
     ${totalWeeks?`<div class="hint">Cette saison : ${Object.entries(weeks).map(([k,n])=>`${(TRAINING[k]||{}).icon||''} ${(TRAINING[k]||{}).label||k} ${n} sem.`).join(' · ')}</div>`:'<div class="hint">Aucune semaine encore comptée cette saison.</div>'}
-    ${young.length?`<div class="section-label">Ce que les jeunes ont gagné la saison dernière</div><div class="kpi-young">${young.map(y=>`<div><span>${escapeHtml(y.p.name)} <small>${playerAge(y.p,state.year)} ans</small></span><b class="${y.d>=.4?'up':y.d<=-.4?'down':''}">${y.d>=0?'+':'−'}${Math.abs(y.d).toFixed(1)}</b><span class="n">${y.now.toFixed(1)}</span></div>`).join('')}</div><div class="hint">Le bilan est appliqué à l'intersaison. Trois choses le nourrissent : <b>ce qu'ils montrent sur le terrain</b> (la moyenne de leurs notes, autour de 6,1 pour un joueur quelconque), le temps de jeu que tu leur donnes, et ton travail de fond — ${ss&&ss.youthWeeks?`${ss.youthWeeks} semaine${ss.youthWeeks>1?'s':''} d'entraînement « jeunes » cette saison`:'aucune semaine d\'entraînement « jeunes » cette saison'}, jauge Formation ${Math.round(g.formation)}.</div>`:`<div class="section-label">Les jeunes</div><div class="hint">Leur progression est calculée à l'intersaison : cette colonne apparaîtra après ta première saison complète. Ce qui la nourrit : <b>leurs performances</b> (la moyenne de leurs notes), le temps de jeu que tu leur donnes, l'entraînement « jeunes » (${ss&&ss.youthWeeks?ss.youthWeeks:0} semaine${ss&&ss.youthWeeks>1?'s':''} cette saison) et la jauge Formation (${Math.round(g.formation)}).</div>`}
+    ${young.length?`<div class="section-label">Ce que les jeunes ont gagné la saison dernière</div><div class="kpi-young">${young.map(y=>`<div><span>${escapeHtml(y.p.name)} <small>${playerAge(y.p,state.year)} ans</small></span><b class="${y.d>=.4?'up':y.d<=-.4?'down':''}">${d10(y.d)}</b><span class="n">${niv(y.now)}</span></div>`).join('')}</div><div class="hint">Le bilan est appliqué à l'intersaison. Trois choses le nourrissent : <b>ce qu'ils montrent sur le terrain</b> (la moyenne de leurs notes, autour de 6,1 pour un joueur quelconque), le temps de jeu que tu leur donnes, et ton travail de fond — ${ss&&ss.youthWeeks?`${ss.youthWeeks} semaine${ss.youthWeeks>1?'s':''} d'entraînement « jeunes » cette saison`:'aucune semaine d\'entraînement « jeunes » cette saison'}, jauge Formation ${sur10(g.formation)}.</div>`:`<div class="section-label">Les jeunes</div><div class="hint">Leur progression est calculée à l'intersaison : cette colonne apparaîtra après ta première saison complète. Ce qui la nourrit : <b>leurs performances</b> (la moyenne de leurs notes), le temps de jeu que tu leur donnes, l'entraînement « jeunes » (${ss&&ss.youthWeeks?ss.youthWeeks:0} semaine${ss&&ss.youthWeeks>1?'s':''} cette saison) et la jauge Formation (${sur10(g.formation)}).</div>`}
 
     <div class="section-label">Tes indicateurs</div>
     ${bar(CSTAT.talent+' — '+(st.talent>=70?'tu peux imposer les styles exigeants':'les styles prestigieux te coûtent encore'),st.talent)}
     ${bar(CSTAT.technique+' — vestiaire, jeunes, présidents',st.technique)}
     ${bar(CSTAT.reseau+' — la qualité des offres et des pistes',st.reseau)}
     ${bar(CSTAT.reputation+' — ce que la presse et les clubs retiennent',st.reputation)}
-    ${bar('Pression — au-delà de 85, la crise guette',state.pressure,'pressure')}
+    ${bar('Pression — au-delà de 8,5, la crise guette',state.pressure,'pressure')}
 
     <div class="section-label">Les cinq jauges</div>
     ${Object.keys(GAUGE_INFO).map(k=>gaugeRow(GAUGE_INFO[k],g[k])).join('')}
@@ -317,7 +329,7 @@ function renderDashboard(){
     ${quotaActive()?`<div class="section-label">Le quota d'étrangers</div>${quotaHTML()}`:''}
 
     <div class="section-label">Le club</div>
-    <div class="hint">${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${pos?` · ${ordinal(pos)}`:''} · objectif ${ordinal(c.objectivePos)}${c.objectivePromised&&c.objectivePromised!==c.objectivePos?` <i>(${ordinal(c.objectivePromised)} promis à la signature, revu après le mercato)</i>`:''} · confiance ${Math.round(c.confidence)}/100<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)} · ${state.squad.length} joueurs · fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %</div>
+    <div class="hint">${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${pos?` · ${ordinal(pos)}`:''} · objectif ${ordinal(c.objectivePos)}${c.objectivePromised&&c.objectivePromised!==c.objectivePos?` <i>(${ordinal(c.objectivePromised)} promis à la signature, revu après le mercato)</i>`:''} · confiance ${sur10(c.confidence)}/10<br>Masse salariale ${$(state.squad.reduce((n,p)=>n+p.wage,0))} / ${$(c.wageCap||0)} · ${state.squad.length} joueurs · fraîcheur ${Math.round(state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length))} %</div>
 
     ${hist.length?`<div class="section-label">Tes dernières saisons</div><div class="kpi-hist">${hist.map(h=>`<div><span class="y">${h.year}</span><span class="cl">${escapeHtml(h.club)}</span><span class="r">${h.sacked?'🪓':h.pos?ordinal(h.pos):'—'}</span></div>`).join('')}</div>`:''}
 
@@ -332,26 +344,26 @@ function renderPlayerDashboard(){
   const avgNote=ss&&ss.notes&&ss.notes.length?ss.notes.reduce((a,b)=>a+b,0)/ss.notes.length:null;
   return `<div class="card no-sticky"><h2 class="display">Tableau de bord</h2>
     <p class="narr">Ce qui décide si tu joues dimanche.</p>
-    <div class="kpi-total"><b>${pRating().toFixed(1)}</b><span>ta note globale${rivals.length?` · concurrents à ton poste : ${rivals.map(r=>r.toFixed(1)).join(', ')}`:''}</span></div>
+    <div class="kpi-total"><b>${niv(pRating())}</b><span>ta note globale${rivals.length?` · concurrents à ton poste : ${rivals.map(r=>niv(r)).join(', ')}`:''}</span></div>
     ${c?`<div class="section-label">Ta place dans le groupe</div>
-    ${bar('Chances d\'être titulaire (%)',share*100)}
+    ${bar('Chances d\'être titulaire (%)',share*100,'',true)}
     ${bar('Confiance du coach',state.coachTrust)}
     ${bar('Forme',state.forme)}
-    <div class="hint">Rôle promis : ${ROLES[c.role].name.toLowerCase()} · ${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${avgNote?` · moyenne cette saison ${avgNote.toFixed(2)}`:''}</div>`:''}
+    <div class="hint">Rôle promis : ${ROLES[c.role].name.toLowerCase()} · ${escapeHtml(c.name)} · ${escapeHtml(c.leagueName||'')}${avgNote?` · moyenne cette saison ${avgNote.toFixed(2).replace('.',',')}`:''}</div>`:''}
     <div class="section-label">Tes qualités</div>
     ${Object.keys(PSTAT).map(k=>bar(PSTAT[k],st[k])).join('')}
     ${bar('Pression',state.pressure,'pressure')}
     <div class="section-label">Ce que tu fais de tes semaines</div>
     ${(()=>{ const e=pEffort(), c=pTrainingCurve(e), sh=pLoadShare(), w=(ss&&ss.trainWeeks)||0;
       const lt=state.lastTrain;
-      return `<div class="hint">Charge moyenne <b>${e.toFixed(2)}</b> sur ${w} semaine${w>1?'s':''} décidée${w>1?'s':''} · ta progression est multipliée par <b>${c.toFixed(2)}</b>.<br>${escapeHtml(pTrainingCurveHelp())}<br>Tu as poussé : ⚽ ${Math.round(sh.technique*100)} % · 💪 ${Math.round(sh.physique*100)} % · 🧠 ${Math.round(sh.mental*100)} %.${lt?`<br>La saison dernière : charge ${lt.effort}, multiplicateur ${lt.curve}, ${lt.growth>0?'+':''}${lt.growth} de progression appliquée.`:''}</div>`; })()}
+      return `<div class="hint">Charge moyenne <b>${e.toFixed(2).replace('.',',')}</b> sur ${w} semaine${w>1?'s':''} décidée${w>1?'s':''} · ta progression est multipliée par <b>${c.toFixed(2).replace('.',',')}</b>.<br>${escapeHtml(pTrainingCurveHelp())}<br>Tu as poussé : ⚽ ${Math.round(sh.technique*100)} % · 💪 ${Math.round(sh.physique*100)} % · 🧠 ${Math.round(sh.mental*100)} %.${lt?`<br>La saison dernière : charge ${lt.effort}, multiplicateur ${lt.curve}, ${lt.growth>0?'+':''}${lt.growth} de progression appliquée.`:''}</div>`; })()}
     <div class="section-label">Tes quatre jauges</div>
     ${Object.keys(PGAUGE).map(k=>gaugeRow(PGAUGE[k],g[k])).join('')}
     <div class="hint">${escapeHtml(PGAUGE.corps.help)}</div>
     ${tempoSelectHTML()}
     <div class="btn-row"><button class="btn" onclick="closeDashboard()">Retour au jeu →</button></div></div>`;
 }
-function renderPressure(){ const list=state.kind==='player'?PLAYER_PRESSURE_CHOICES:PRESSURE_CHOICES; const fn=state.kind==='player'?'playerChoosePressure':'coachChoosePressure'; return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">${state.kind==='player'?'Craquage':'Crise de pression'}</h2><p class="narr">La pression atteint ${Math.round(state.pressure)}/100. Insomnies, malaise, une famille inquiète. Il faut décider.</p><div class="choice-list">${list.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`; }
+function renderPressure(){ const list=state.kind==='player'?PLAYER_PRESSURE_CHOICES:PRESSURE_CHOICES; const fn=state.kind==='player'?'playerChoosePressure':'coachChoosePressure'; return `<div class="card event-card"><div class="ico">🌡️</div><h2 class="display">${state.kind==='player'?'Craquage':'Crise de pression'}</h2><p class="narr">La pression atteint ${sur10(state.pressure)}/10. Insomnies, malaise, une famille inquiète. Il faut décider.</p><div class="choice-list">${list.map((c,i)=>`<button class="choice-btn" onclick="${fn}(${i})"><span class="ico">${c.icon}</span><div class="body"><b>${c.label}</b><small>${c.sub}</small></div></button>`).join('')}</div></div>`; }
 function tableHTML(table,me,full){
   const N=table.length, meIdx=table.findIndex(r=>r.name===me);
   const keep=full?new Set(table.map((_,i)=>i)):new Set([0,1,2,3,N-1,N-2,N-3,meIdx-1,meIdx,meIdx+1].filter(i=>i>=0&&i<N));
@@ -371,7 +383,7 @@ function renderOffers(){
     <div class="offer-grid">${offers.map((o,i)=>`<div class="offer-card affordable poach" onclick="coachAcceptOffer(${i});render()"><div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label} · lié à vie</div><h3>${escapeHtml(o.club)}</h3><div class="syn narr">${escapeHtml(o.title)}. ${capitalize(o.presidentName)} : ${escapeHtml(o.presidentDesc)}</div>
       <div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">Objectif : ${ordinal(o.objectivePos)} / ${o.teams}</span><span class="tag">${styleById(o.styleWanted).icon} ${styleById(o.styleWanted).name} demandé</span></div>
       <div class="budget">Budget transferts : ${$(o.budget)}</div><div class="offer-hint good">⛓️ Une saison de plus, au même endroit</div></div>`).join('')}</div></div>`;
-  return `<div class="card"><h2 class="display">${under?'Intersaison sous contrat':'Les bancs qui te tendent les bras'}</h2><p class="hint">${state.year} · ${state.age} ans · cote ${cote} : ${coteLabel(coachTargetStrength())}.${fate?` ${fate.icon} ${escapeHtml(fate.label)} : ${escapeHtml(fate.text)}`:''} ${under?`${state.club.contractEnd>=9999?'Ton contrat te lie à vie.':`Ton contrat court jusqu'en ${state.club.contractEnd}.`} ${offers.length>1?'Un club vient te chercher : à toi de voir.':'Personne ne vient te chercher cette année.'}`:'Les offres arrivent autour de ta cote : un cran au-dessus si tu as performé, en dessous après un échec.'}</p>
+  return `<div class="card"><h2 class="display">${under?'Intersaison sous contrat':'Les bancs qui te tendent les bras'}</h2><p class="hint">${state.year} · ${state.age} ans · cote ${sur10(cote)} : ${coteLabel(coachTargetStrength())}.${fate?` ${fate.icon} ${escapeHtml(fate.label)} : ${escapeHtml(fate.text)}`:''} ${under?`${state.club.contractEnd>=9999?'Ton contrat te lie à vie.':`Ton contrat court jusqu'en ${state.club.contractEnd}.`} ${offers.length>1?'Un club vient te chercher : à toi de voir.':'Personne ne vient te chercher cette année.'}`:'Les offres arrivent autour de ta cote : un cran au-dessus si tu as performé, en dessous après un échec.'}</p>
     <div class="offer-grid">${offers.map((o,i)=>`<div class="offer-card affordable ${o.poach?'poach':''}" onclick="coachAcceptOffer(${i});render()"><div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label}${o.stay?(o.underContract?' · sous contrat':' · prolonger'):o.poach?' · vient te chercher':''}</div><h3>${escapeHtml(o.club)}</h3><div class="syn narr">${escapeHtml(o.title)}. ${capitalize(o.presidentName)} : ${escapeHtml(o.presidentDesc)}</div>
       <div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">Objectif : ${ordinal(o.objectivePos)} / ${o.teams}</span><span class="tag">${styleById(o.styleWanted).icon} ${styleById(o.styleWanted).name} demandé</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))} · ${gapLabel(o.gap||0)}</span><span class="tag">${o.stay&&o.underContract?`${o.duration} an${o.duration>1?'s':''} restant${o.duration>1?'s':''}`:`contrat ${o.duration} an${o.duration>1?'s':''}`}</span></div>
       <div class="budget">Budget transferts : ${$(o.budget)}</div><div class="offer-hint ${o.stay||o.poach?'good':o.styleWanted===state.favoriteStyleId?'good':''}">${o.stay?(o.underContract?'🏠 Tu honores ton contrat : continuité du projet':'🏠 Le président te garde et prolonge'):o.poach?'🎯 Un projet plus grand qui paie la clause':o.styleWanted===state.favoriteStyleId?'❤️ Le club veut ton style de jeu':o.tier==='amateur'||o.tier==='ligue2'?'🌱 Petit budget, présidents plus patients':'🎯 Objectif exigeant, moyens à la hauteur'}</div></div>`).join('')}</div>
@@ -424,7 +436,7 @@ function renderMercato(){
   } else {
     const t=cur.t, p=t.p, blockers=coachBlockers(t), rivals=coachRivals(t), sales=coachSaleOptions(t);
     const ok=!blockers.length;
-    const rating=t.kind==='youth'?`≈ ${t.shownRating}`:`${t.shownRating}`;
+    const rating=t.kind==='youth'?`≈ ${niv(t.shownRating)}`:niv(t.shownRating);
     const better=rivals.filter(r=>r.rating<t.shownRating).length;
     card=`<div class="mk-card ${t.access}">
       <div class="mk-kind">${t.label} · via ${escapeHtml(t.source)}</div>
@@ -436,12 +448,12 @@ function renderMercato(){
       ${t.access==='no'?'<div class="mk-flag bad">Il ne répond pas. Ta crédibilité est trop basse.</div>':''}
 
       <div class="section-label">À son poste, tu as déjà</div>
-      <div class="mk-rivals">${rivals.length?rivals.slice(0,5).map(r=>`<div class="${r.rating<t.shownRating?'worse':''}"><span>${natTag(r.p)} ${escapeHtml(r.p.name)}</span><small>${r.age} ans</small><b>${r.rating}</b><small>${$(r.p.wage)}</small></div>`).join(''):'<div class="hint">Personne à ce poste. Tu en as besoin.</div>'}</div>
+      <div class="mk-rivals">${rivals.length?rivals.slice(0,5).map(r=>`<div class="${r.rating<t.shownRating?'worse':''}"><span>${natTag(r.p)} ${escapeHtml(r.p.name)}</span><small>${r.age} ans</small><b>${niv(r.rating)}</b><small>${$(r.p.wage)}</small></div>`).join(''):'<div class="hint">Personne à ce poste. Tu en as besoin.</div>'}</div>
       ${rivals.length?`<div class="hint">${better?`Il serait meilleur que ${better} de tes ${posPlural(p.pos)}.`:`Aucun de tes ${posPlural(p.pos)} ne fait moins bien que lui.`}</div>`:''}
 
       ${blockers.length?`<div class="mk-block"><b>Ce qui bloque</b>${blockers.map(b=>`<span>${escapeHtml(b.txt)}</span>`).join('')}</div>`:''}
       ${blockers.length?(sales.length&&coachSalesCover(t)
-        ?`<div class="section-label">Vendre pour le faire entrer</div><div class="mk-sales">${sales.map(x=>`<button class="mk-sale" onclick="coachSell(${x.p.id})"><span>${natTag(x.p)} ${escapeHtml(x.p.name)}</span><small>${x.age} ans · niveau ${x.rating} · salaire ${$(x.p.wage)}</small><b>+${$(x.value)}</b></button>`).join('')}</div>`
+        ?`<div class="section-label">Vendre pour le faire entrer</div><div class="mk-sales">${sales.map(x=>`<button class="mk-sale" onclick="coachSell(${x.p.id})"><span>${natTag(x.p)} ${escapeHtml(x.p.name)}</span><small>${x.age} ans · niveau ${niv(x.rating)} · salaire ${$(x.p.wage)}</small><b>+${$(x.value)}</b></button>`).join('')}</div>`
         :`<div class="hint">Aucune vente de ton effectif ne comblerait l'écart. Ce dossier n'est pas pour cette saison.</div>`):''}
 
       <div class="btn-row mk-actions">
@@ -454,7 +466,7 @@ function renderMercato(){
     </div>`;
   }
   const squadRow=p2=>{ const undo=p2.joinedWindow===marketWindow()&&p2.paid!=null;
-    return `<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${fitTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}${undo?' <i class="tag-undo" title="Recruté dans ce mercato : le revendre annule le transfert au prix payé.">recrue</i>':''}</td><td>${playerAge(p2,y)}</td><td><b>${playerRating(p2,y)}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${undo?$(p2.paid):$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">${undo?'Annuler':'Vendre'}</button></td></tr>`; };
+    return `<tr class="${p2.injury?'inj':''}"><td><span class="pos-badge pos-${p2.pos}">${p2.pos}</span></td><td>${natTag(p2)} ${fitTag(p2)} ${escapeHtml(p2.name)}${p2.promised?' ⭐':''}${undo?' <i class="tag-undo" title="Recruté dans ce mercato : le revendre annule le transfert au prix payé.">recrue</i>':''}</td><td>${playerAge(p2,y)}</td><td><b>${niv(playerRating(p2,y))}</b></td><td class="r">${$(p2.wage)}</td><td class="r">${undo?$(p2.paid):$(playerValue(p2,y))}</td><td class="r"><button class="btn secondary small" onclick="coachSell(${p2.id})">${undo?'Annuler':'Vendre'}</button></td></tr>`; };
   return `<div class="card no-sticky"><h2 class="display">${m.winter?'Mercato d\'hiver':'Mercato d\'été'} · ${escapeHtml(c.name)}</h2>
     ${head}
     ${m.message?`<div class="msg">${escapeHtml(m.message)}</div>`:''}
@@ -476,9 +488,9 @@ function renderTactic(){
     <div class="section-label">Style</div>
     <div class="hint">Chaque style va à certains de tes joueurs et en contrarie d'autres : le chiffre à droite compte ton onze.</div>
     <div class="style-grid">${STYLES.map(s=>{ const fit=coachStyleFit(s.id);
-      return `<button class="${tacticSel.style===s.id?'on':''}" onclick="tacticSel.style='${s.id}';render()"><b>${s.icon} ${s.name}</b><span class="style-fit ${fit.plus>fit.minus?'good':fit.minus>fit.plus?'bad':''}">✅ ${fit.plus} · ⚠️ ${fit.minus}</span><small>${s.desc}${s.id===c.styleWanted?' · <b>demandé par le club</b>':''}${s.id===state.favoriteStyleId?' · <b>ton style</b>':''}${s.prestige*60>state.stats.talent?` · exige tactique ${Math.round(s.prestige*60)}`:''}</small></button>`; }).join('')}</div>
+      return `<button class="${tacticSel.style===s.id?'on':''}" onclick="tacticSel.style='${s.id}';render()"><b>${s.icon} ${s.name}</b><span class="style-fit ${fit.plus>fit.minus?'good':fit.minus>fit.plus?'bad':''}">✅ ${fit.plus} · ⚠️ ${fit.minus}</span><small>${s.desc}${s.id===c.styleWanted?' · <b>demandé par le club</b>':''}${s.id===state.favoriteStyleId?' · <b>ton style</b>':''}${s.prestige*60>state.stats.talent?` · exige tactique ${sur10(s.prestige*60)}`:''}</small></button>`; }).join('')}</div>
     <div class="section-label">Onze type en ${tacticSel.formation}</div><div class="squad">${xi.map(p=>{ const f=styleFit(p,tacticSel.style); const pr=playerProfil(p);
-      return `<div class="${f>0?'fit-ok':f<0?'fit-no':''}"><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)} <small title="${escapeHtml(pr.label)}">${pr.icon}${f>0?'✅':f<0?'⚠️':''}</small> <span>${playerRating(p,y)}</span></div>`; }).join('')}</div>
+      return `<div class="${f>0?'fit-ok':f<0?'fit-no':''}"><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)} <small title="${escapeHtml(pr.label)}">${pr.icon}${f>0?'✅':f<0?'⚠️':''}</small> <span>${niv(playerRating(p,y))}</span></div>`; }).join('')}</div>
     <div class="btn-row"><button class="btn" onclick="coachSetTactic(tacticSel.formation,tacticSel.style);render()">${state.tacticAfterWinter?'Reprendre la saison →':'Lancer la saison →'}</button></div></div>`;
 }
 /* Le « pourquoi » d'une phase lit exactement la même décomposition que le
@@ -486,10 +498,10 @@ function renderTactic(){
    réponses différentes à la même question. */
 function impactLines(){
   const c=state.club, bd=coachStrengthBreakdown(), lines=[];
-  lines.push({t:`Niveau de l'effectif ${bd.base.toFixed(1)} pour une force de club attendue de ${c.strength}`,d:bd.base-c.strength});
+  lines.push({t:`Niveau de l'effectif ${niv(bd.base)} pour une force de club attendue de ${niv(c.strength)}`,d:bd.base-c.strength});
   bd.rows.filter(r=>!r.abs&&Math.abs(r.v)>=.05).forEach(r=>lines.push({t:`${r.label} — ${r.help}`,d:r.v}));
-  const inj=state.squad.filter(p=>p.injury).length; if(inj) lines.push({t:`${inj} blessé${inj>1?'s':''} à soigner (staff ${Math.round(state.gauges.staff)})`,d:-inj*.6});
-  lines.push({t:`Force emmenée sur le terrain : ${bd.total.toFixed(1)}`,d:0});
+  const inj=state.squad.filter(p=>p.injury).length; if(inj) lines.push({t:`${inj} blessé${inj>1?'s':''} à soigner (staff ${sur10(state.gauges.staff)})`,d:-inj*.6});
+  lines.push({t:`Force emmenée sur le terrain : ${niv(bd.total)}`,d:0});
   return `<div class="impact">${lines.map(l=>`<div class="${l.d>=.5?'up':l.d<=-.5?'down':''}">${l.d>=.5?'▲':l.d<=-.5?'▼':'•'} ${escapeHtml(l.t)}</div>`).join('')}</div>`;
 }
 /* Ce qui a bougé la confiance du président, ligne par ligne : c'est le chiffre
@@ -502,7 +514,7 @@ function renderPhaseResult(){
   const ph=state.lastPhase, c=state.club, N=state.comp.teams.length;
   const conf=c.confidence; const gap=c.objectivePos-ph.pos;
   return `<div class="card"><h2 class="display">Phase ${ph.n} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}
-    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(ph.pos)}</div><div class="k">sur ${N} · objectif ${ordinal(c.objectivePos)}</div></div><div class="score-box ${ph.W>ph.L?'good':ph.L>ph.W?'bad':''}"><div class="v">${ph.W}-${ph.D}-${ph.L}</div><div class="k">V-N-D · ${ph.gf} buts pour, ${ph.ga} contre</div></div><div class="score-box ${ph.dConf>=0?'good':'bad'}"><div class="v">${ph.dConf>=0?'+':''}${ph.dConf}</div><div class="k">Confiance du président → ${Math.round(conf)}</div></div><div class="score-box"><div class="v">${ph.strength}</div><div class="k">Force en match${ph.base!=null?` · effectif seul ${ph.base}`:''}</div></div></div>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(ph.pos)}</div><div class="k">sur ${N} · objectif ${ordinal(c.objectivePos)}</div></div><div class="score-box ${ph.W>ph.L?'good':ph.L>ph.W?'bad':''}"><div class="v">${ph.W}-${ph.D}-${ph.L}</div><div class="k">V-N-D · ${ph.gf} buts pour, ${ph.ga} contre</div></div><div class="score-box ${ph.dConf>=0?'good':'bad'}"><div class="v">${d10(ph.dConf)}</div><div class="k">Confiance du président → ${sur10(conf)}</div></div><div class="score-box"><div class="v">${niv(ph.strength)}</div><div class="k">Force en match${ph.base!=null?` · effectif seul ${niv(ph.base)}`:''}</div></div></div>
     <div class="section-label">Tes matchs</div>${matchesHTML(ph.matches,c.name)}
     ${ph.injuries.length?`<div class="warn">🩼 Blessures : ${ph.injuries.map(escapeHtml).join(', ')}</div>`:''}
     <div class="section-label">Pourquoi ce résultat</div>${impactLines()}
@@ -520,7 +532,7 @@ function bilanGaugeRow(g){
   const d=g.after-g.before;
   return `<div class="bil-row"><span>${g.icon} ${escapeHtml(g.label)}</span>
     <span class="bil-bar"><i style="width:${clamp(g.after)}%"></i></span>
-    <b>${g.after}</b><i class="${d>0?'up':d<0?'down':''}">${d>0?'+':''}${d||'='}</i></div>`;
+    <b>${sur10(g.after)}</b><i class="${d>0?'up':d<0?'down':''}">${d?d10(d):'='}</i></div>`;
 }
 function renderSeasonEnd(){
   const f=state.lastSeason, c=state.club, b=f.bilan||{};
@@ -532,7 +544,7 @@ function renderSeasonEnd(){
       <h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2>
       <div class="verdict">${verdict} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)} · objectif ${ordinal(f.objective)}</div></div>
 
-    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(f.pos)}</div><div class="k">Classement</div></div><div class="score-box"><div class="v">${f.goals} / ${f.conceded}</div><div class="k">Buts pour / contre</div></div><div class="score-box ${f.cupWon?'good':''}"><div class="v">${f.cupWon?'🥇':f.cupRounds}</div><div class="k">${f.cupWon?'Coupe gagnée':'Tour atteint en coupe'}</div></div><div class="score-box ${f.dConf>=0?'good':'bad'}"><div class="v">${f.dConf>=0?'+':''}${f.dConf}</div><div class="k">Confiance → ${f.confidence}</div></div></div>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ordinal(f.pos)}</div><div class="k">Classement</div></div><div class="score-box"><div class="v">${f.goals} / ${f.conceded}</div><div class="k">Buts pour / contre</div></div><div class="score-box ${f.cupWon?'good':''}"><div class="v">${f.cupWon?'🥇':f.cupRounds}</div><div class="k">${f.cupWon?'Coupe gagnée':'Tour atteint en coupe'}</div></div><div class="score-box ${f.dConf>=0?'good':'bad'}"><div class="v">${d10(f.dConf)}</div><div class="k">Confiance → ${sur10(f.confidence)}</div></div></div>
     ${f.award?`<div class="trophy-line">🎖️ ${f.award}</div>`:''}${f.euro?`<div class="trophy-line">${f.euro.won?'⭐ Vainqueur de la '+escapeHtml(f.euro.name):'🌍 '+escapeHtml(f.euro.name)+' : éliminé au tour '+f.euro.rounds}</div>`:''}
 
     <div class="bil-sections">
@@ -544,24 +556,24 @@ function renderSeasonEnd(){
       </section>
 
       <section><h3>✊ Le vestiaire</h3>
-        ${b.risen&&b.risen.length?`<div class="bil-people"><b>Ils ont grandi</b>${b.risen.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans</small> <i class="up">+${x.gain.toFixed(1)}</i> → ${x.rating}</span>`).join('')}</div>`:''}
-        ${b.wantOut&&b.wantOut.length?`<div class="bil-people warnbox"><b>Ils veulent partir</b>${b.wantOut.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans · niveau ${x.rating}</small> <i class="down">moral ${x.morale}</i></span>`).join('')}</div>`:'<div class="hint">Personne ne demande à partir.</div>'}
-        ${b.loyal&&b.loyal.length?`<div class="bil-people"><b>Ils resteraient pour toi</b>${b.loyal.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans · niveau ${x.rating}</small></span>`).join('')}</div>`:''}
+        ${b.risen&&b.risen.length?`<div class="bil-people"><b>Ils ont grandi</b>${b.risen.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans</small> <i class="up">${d10(x.gain)}</i> → ${niv(x.rating)}</span>`).join('')}</div>`:''}
+        ${b.wantOut&&b.wantOut.length?`<div class="bil-people warnbox"><b>Ils veulent partir</b>${b.wantOut.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans · niveau ${niv(x.rating)}</small> <i class="down">moral ${x.morale}</i></span>`).join('')}</div>`:'<div class="hint">Personne ne demande à partir.</div>'}
+        ${b.loyal&&b.loyal.length?`<div class="bil-people"><b>Ils resteraient pour toi</b>${b.loyal.map(x=>`<span>${escapeHtml(x.name)} <small>${x.age} ans · niveau ${niv(x.rating)}</small></span>`).join('')}</div>`:''}
         ${f.contracts&&f.contracts.length?`<div class="hint">Contrats : ${f.contracts.map(escapeHtml).join(' · ')}</div>`:''}
       </section>
 
       <section><h3>🕴️ ${escapeHtml(capitalize(c.presidentName))}</h3>
         <p class="narr quote">${escapeHtml(b.presLine||'')}</p>
-        <div class="hint">Confiance ${f.confidence - f.dConf} → <b>${f.confidence}</b> sur 100.${f.confidence<35?" Sous 35, il ne te prolongera pas.":f.confidence>=70?" Tu as les mains libres.":""}</div>
+        <div class="hint">Confiance ${sur10(f.confidence - f.dConf)} → <b>${sur10(f.confidence)}</b> sur 10.${f.confidence<35?" Sous 3,5, il ne te prolongera pas.":f.confidence>=70?" Tu as les mains libres.":""}</div>
       </section>
 
       <section><h3>📈 Où en sont les jauges</h3>
         ${(b.gauges||[]).map(bilanGaugeRow).join('')}
-        <div class="bil-row"><span>🌡️ Pression</span><span class="bil-bar hot"><i style="width:${clamp(p.after)}%"></i></span><b>${p.after}</b><i class="${dp<0?'up':dp>0?'down':''}">${dp>0?'+':''}${dp||'='}</i></div>
+        <div class="bil-row"><span>🌡️ Pression</span><span class="bil-bar hot"><i style="width:${clamp(p.after)}%"></i></span><b>${sur10(p.after)}</b><i class="${dp<0?'up':dp>0?'down':''}">${dp?d10(dp):'='}</i></div>
       </section>
 
       <section><h3>🏛️ Ce qu'il en reste</h3>
-        ${f.cote?`<div class="hint">Ta cote : <b>${f.cote.before} → ${f.cote.after}</b> · ${f.cote.why.map(escapeHtml).join(' · ')||'saison neutre'}. Tu vaux désormais ${escapeHtml(f.cote.level)}.</div>`:''}
+        ${f.cote?`<div class="hint">Ta cote : <b>${sur10(f.cote.before)} → ${sur10(f.cote.after)}</b> · ${f.cote.why.map(escapeHtml).join(' · ')||'saison neutre'}. Tu vaux désormais ${escapeHtml(f.cote.level)}.</div>`:''}
         <div class="hint">🏆 ${state.titles.league} · ⬆️ ${state.titles.promo} · 🥇 ${state.titles.cup} · ⭐ ${state.titles.euro} · 🎖️ ${state.awards} · 🪓 ${state.sackings}</div>
         ${b.arming?`<div class="hint">🛡️ <b>${escapeHtml(b.arming.league)} s'arme contre toi.</b> Tu as fini la saison ${String(b.arming.gap).replace('.',',')} de force au-dessus de la moyenne : tes rivaux gagnent ${b.arming.delta>0?'+':''}${String(b.arming.delta).replace('.',',')} pour la saison prochaine, ${String(b.arming.total).replace('.',',')} au total. Une domination finit toujours par réveiller les autres.</div>`:''}
         <div class="punchline narr">${pick(f.champion?PUNCHLINES.champion:f.relegated?PUNCHLINES.relegated:f.objectiveMet?PUNCHLINES.hit:f.pos>f.teams*.7?PUNCHLINES.flop:PUNCHLINES.mid)}</div>
@@ -592,7 +604,7 @@ function renderCoachEnd(){
   const life=lifeVerdict(state.gauges.proches==null?50:state.gauges.proches,false);
   app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">${state.endingCause==='death'||state.endingCause==='roulette'?'⚰️':'🏁'}</span><h2 class="display">${escapeHtml(state.name)} — ${coachEpithet()}</h2><div class="verdict">${state.modeIcon} ${state.modeName} · ${state.startYear||ERAS.find(e=>e.id===state.startEra).name} → ${state.year} · fin à ${state.age} ans · score ${coachScore()}</div></div><p class="narr">${escapeHtml(state.endingText)}</p>
     <div class="score-grid"><div class="score-box gold"><div class="v">${state.history.filter(h=>!h.sacked).length}</div><div class="k">Saisons complètes</div></div><div class="score-box good"><div class="v">${t.league+t.promo}</div><div class="k">Titres et montées</div></div><div class="score-box good"><div class="v">${t.cup+t.euro+t.euro2}</div><div class="k">Coupes</div></div><div class="score-box gold"><div class="v">${state.awards}</div><div class="k">Récompenses</div></div><div class="score-box"><div class="v">${state.clubsCoached.length}</div><div class="k">Clubs</div></div><div class="score-box bad"><div class="v">${state.sackings}</div><div class="k">Licenciements</div></div></div>
-    <div class="section-label">Ce qu'il en reste</div><div class="${life.cls}">🏡 ${life.text} <span class="hint">Proches ${Math.round(state.gauges.proches==null?50:state.gauges.proches)}/100.</span></div>
+    <div class="section-label">Ce qu'il en reste</div><div class="${life.cls}">🏡 ${life.text} <span class="hint">Proches ${sur10(state.gauges.proches==null?50:state.gauges.proches)}/10.</span></div>
     ${newB.length?`<div class="section-label">Badges débloqués</div><div class="badge-grid">${newB.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
     <div class="section-label">Toutes les saisons</div>${state.history.map(seasonLine).join('')||'<div class="hint">Aucune saison.</div>'}
     <div class="btn-row"><button class="btn" onclick="state=null;startCoachCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button></div></div></div>`; scrollTop();
@@ -602,9 +614,9 @@ function renderCoachEnd(){
 function playerSidebar(){
   const s=state.stats,g=state.gauges,c=state.club;
   return `<div class="card"><div class="identity"><b>${escapeHtml(state.name)}</b> · ${pAge()} ans · ${state.posIcon} ${state.posName}<br>${c?`🏟️ <b>${escapeHtml(c.name)}</b> · ${escapeHtml(c.leagueName||'')} · ${ROLES[c.role].name} · coach ${escapeHtml(c.coach)}`:'Sans club'}</div>
-    ${c?`<div class="section-label">Confiance du coach</div><div class="conf-big ${state.coachTrust<25?'pressure-state bad':state.coachTrust<50?'pressure-state mid':''}">${Math.round(state.coachTrust)} / 100</div><div class="bar"><i style="width:${state.coachTrust}%"></i></div><div class="hint">Décide ton temps de jeu. Concurrents au poste : ${state.squad.filter(p=>p.pos===state.pos).map(p=>`${escapeHtml(p.name)} (${playerRating(p,state.year)})`).join(', ')||'aucun'}</div>`:''}
+    ${c?`<div class="section-label">Confiance du coach</div><div class="conf-big ${state.coachTrust<25?'pressure-state bad':state.coachTrust<50?'pressure-state mid':''}">${sur10(state.coachTrust)} / 10</div><div class="bar"><i style="width:${state.coachTrust}%"></i></div><div class="hint">Décide ton temps de jeu. Concurrents au poste : ${state.squad.filter(p=>p.pos===state.pos).map(p=>`${escapeHtml(p.name)} (${niv(playerRating(p,state.year))})`).join(', ')||'aucun'}</div>`:''}
     ${c&&state.clubStuck&&state.clubStuck.club===c.name?`<div class="warn">🚪 Le club pense à l'après-toi. Contrat jusqu'en ${state.clubStuck.until}.</div>`:''}${c&&state.legendOf&&state.legendOf===c.name?`<div class="msg ok">🗿 Tu es de la maison ici.</div>`:''}${c&&pBenchRun()>=3?`<div class="hint">🪑 ${pBenchRun()} journées de suite sans entrer.</div>`:''}
-    <div class="section-label">Toi · note ${pRating().toFixed(1)}</div>${Object.keys(PSTAT).map(k=>bar(PSTAT[k],s[k])).join('')}${bar('Forme',state.forme)}${bar('Pression',state.pressure,'pressure')}
+    <div class="section-label">Toi · note ${niv(pRating())}</div>${Object.keys(PSTAT).map(k=>bar(PSTAT[k],s[k])).join('')}${bar('Forme',state.forme)}${bar('Pression',state.pressure,'pressure')}
     ${fateHTML()}
     <div class="hint">Ton agent vise ${coteLabel(playerTargetStrength())}${c&&c.contractEnd?` · contrat jusqu'en ${c.contractEnd}`:''}</div>
     ${c?tempoSelectHTML():''}
@@ -646,7 +658,7 @@ function renderPSummer(){
   return `<div class="card event-card">${pStepHTML(2)}<div class="ico">🏋️</div><h2 class="display">La préparation</h2>
     <p class="narr">Le club reprend dans cinq semaines. Ce que tu fais d'ici là ne se verra pas en août — ça se verra en mars.</p>
     <div class="section-label">Ton été de travail</div>
-    <div class="choice-list">${PSUMMER.map((t,i)=>`<button class="choice-btn" onclick="playerChooseSummer(${i})"><span class="ico">${t.icon}</span><div class="body"><b>${escapeHtml(t.label)}</b><small>${escapeHtml(t.sub)}</small><div class="traits">${t.load?`<i class="plus">📈 Charge ${t.load.toFixed(1)} — comptera pour ta progression de juin</i>`:'<i class="minus">📈 Aucune avance de préparation</i>'}${t.fatigue?`<i class="minus">🫁 Récupération −${t.fatigue===2?25:12} % toute la saison</i>`:'<i class="plus">🫁 Tu repartiras frais</i>'}</div>${effectChips(t.effects)}${t.risk?`<div class="traits"><i class="minus">🩼 ${Math.round(t.risk*100)} % de risque de blessure</i></div>`:''}</div></button>`).join('')}</div>
+    <div class="choice-list">${PSUMMER.map((t,i)=>`<button class="choice-btn" onclick="playerChooseSummer(${i})"><span class="ico">${t.icon}</span><div class="body"><b>${escapeHtml(t.label)}</b><small>${escapeHtml(t.sub)}</small><div class="traits">${t.load?`<i class="plus">📈 Charge ${t.load.toFixed(1).replace('.',',')} — comptera pour ta progression de juin</i>`:'<i class="minus">📈 Aucune avance de préparation</i>'}${t.fatigue?`<i class="minus">🫁 Récupération −${t.fatigue===2?25:12} % toute la saison</i>`:'<i class="plus">🫁 Tu repartiras frais</i>'}</div>${effectChips(t.effects)}${t.risk?`<div class="traits"><i class="minus">🩼 ${Math.round(t.risk*100)} % de risque de blessure</i></div>`:''}</div></button>`).join('')}</div>
     ${stateTable(keys)}
     <div class="hint">${escapeHtml(pTrainingCurveHelp())}</div></div>`;
 }
@@ -683,7 +695,7 @@ function renderPOffers(){
     <div class="btn-row"><button class="btn" onclick="playerSkipYear()">Passer l'année →</button></div></div>`;
   if(!offers.length) return `<div class="card"><h2 class="display">Aucune proposition</h2><p class="narr">Ton agent ne répond plus. Le marché t'a oublié·e cette année.</p><div class="btn-row"><button class="btn" onclick="playerSkipYear()">Attendre une année</button></div></div>`;
   const stay=offers.find(o=>o.stay); const under=stay&&stay.underContract;
-  return `<div class="card"><h2 class="display">${under?'Intersaison sous contrat':'Ton agent a des propositions'}</h2><p class="hint">${state.year} · ${pAge()} ans · note ${pRating().toFixed(1)} · ton agent vise ${coteLabel(playerTargetStrength())}. ${under?`Ton contrat court jusqu'en ${state.club.contractEnd}. ${offers.length>1?'Un club vient te chercher.':'Aucun club ne s\'est manifesté cette année.'}`:'Le rôle promis pèse sur ton temps de jeu, ta progression et ta pression.'}</p>
+  return `<div class="card"><h2 class="display">${under?'Intersaison sous contrat':'Ton agent a des propositions'}</h2><p class="hint">${state.year} · ${pAge()} ans · note ${niv(pRating())} · ton agent vise ${coteLabel(playerTargetStrength())}. ${under?`Ton contrat court jusqu'en ${state.club.contractEnd}. ${offers.length>1?'Un club vient te chercher.':'Aucun club ne s\'est manifesté cette année.'}`:'Le rôle promis pèse sur ton temps de jeu, ta progression et ta pression.'}</p>
     ${pClubNewsHTML()}
     <div class="offer-grid">${offers.map((o,i)=>`<div class="offer-card affordable ${o.poach?'poach':''}" onclick="playerAcceptOffer(${i});render()"><div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label}${o.stay?(o.underContract?' · sous contrat':' · prolonger'):o.poach?' · vient te chercher':''}</div><h3>${escapeHtml(o.club)}</h3><div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">${ROLES[o.role].name}</span><span class="tag">${o.stay&&o.underContract?`${o.duration} an${o.duration>1?'s':''} restant${o.duration>1?'s':''}`:`${o.duration} an${o.duration>1?'s':''}`}</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))} · ${gapLabel(o.gap||0)}</span></div><div class="budget">${$(o.salary)} / saison</div><div class="offer-hint">Coach : ${escapeHtml(o.coach)} · ${o.role==='titulaire'?'⭐ Temps de jeu garanti, pression maximale':o.role==='rotation'?'🔄 Du temps de jeu à gagner':'🪑 Peu de matchs, progression lente'}</div></div>`).join('')}</div>
     <div class="btn-row">${under?'<button class="btn secondary" onclick="if(confirm(\'Demander ton transfert ? Supporters −6, entourage −3.\')) playerBreakContract()">Demander un transfert</button>':''}<button class="btn secondary" onclick="playerSkipYear()">Refuser tout et attendre une année</button></div></div>`;
@@ -691,7 +703,7 @@ function renderPOffers(){
 function renderPPhaseResult(){
   const ph=state.lastPhase, c=state.club, N=state.comp.teams.length;
   return `<div class="card"><h2 class="display">Phase ${ph.n} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}
-    <div class="score-grid"><div class="score-box gold"><div class="v">${ph.apps}</div><div class="k">matchs joués (${Math.round(ph.share*100)} % du temps)${ph.motm?` · ⭐ ${ph.motm}`:''}</div></div><div class="score-box good"><div class="v">${ph.goals} / ${ph.assists}</div><div class="k">buts / passes</div></div><div class="score-box ${!ph.apps?'':ph.note>=6.8?'good':ph.note<5.8?'bad':''}"><div class="v">${ph.apps?ph.note.toFixed(1):'—'}</div><div class="k">note moyenne</div></div><div class="score-box ${ph.dTrust>=0?'good':'bad'}"><div class="v">${ph.dTrust>=0?'+':''}${ph.dTrust}</div><div class="k">confiance du coach → ${Math.round(state.coachTrust)}</div></div><div class="score-box"><div class="v">${ordinal(ph.pos)}</div><div class="k">${escapeHtml(c.name)} sur ${N}</div></div></div>
+    <div class="score-grid"><div class="score-box gold"><div class="v">${ph.apps}</div><div class="k">matchs joués (${Math.round(ph.share*100)} % du temps)${ph.motm?` · ⭐ ${ph.motm}`:''}</div></div><div class="score-box good"><div class="v">${ph.goals} / ${ph.assists}</div><div class="k">buts / passes</div></div><div class="score-box ${!ph.apps?'':ph.note>=6.8?'good':ph.note<5.8?'bad':''}"><div class="v">${ph.apps?ph.note.toFixed(1):'—'}</div><div class="k">note moyenne</div></div><div class="score-box ${ph.dTrust>=0?'good':'bad'}"><div class="v">${d10(ph.dTrust)}</div><div class="k">confiance du coach → ${sur10(state.coachTrust)}</div></div><div class="score-box"><div class="v">${ordinal(ph.pos)}</div><div class="k">${escapeHtml(c.name)} sur ${N}</div></div></div>
     ${ph.injury?`<div class="warn">🩼 Blessure : ${ph.injury}</div>`:''}
     <div class="section-label">Les matchs de ${escapeHtml(c.name)}</div>${matchesHTML(ph.matches,c.name)}
     <div class="section-label">Classement</div>${tableHTML(ph.table,c.name,false)}
@@ -700,7 +712,7 @@ function renderPPhaseResult(){
 function renderPSeasonEnd(){
   const f=state.lastSeason;
   const lines=[]; if(f.champion) lines.push(`🏆 Champion·ne avec ${escapeHtml(f.club)}`); if(f.cupWon) lines.push('🥇 Vainqueur de la coupe'); if(f.euro) lines.push(f.euro.won?`⭐ Vainqueur de la ${escapeHtml(f.euro.name)}`:`🌍 ${escapeHtml(f.euro.name)} : tour ${f.euro.rounds}`); if(f.selected) lines.push(`🇫🇷 Sélection nationale : ${f.caps} capes, ${f.capGoals} but${f.capGoals>1?'s':''}`); if(f.ballon) lines.push("🏅 Ballon d'or"); if(f.boot) lines.push('👞 Soulier d\'or'); if(f.relegated) lines.push('⬇️ Le club est relégué');
-  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${f.ballon?'🏅':f.champion?'🏆':f.bad?'🥶':f.note>=6.8?'🔥':'📊'}</span><h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2><div class="verdict">${ROLES[f.role].name} · note ${f.note.toFixed(2)} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)}</div></div>
+  return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${f.ballon?'🏅':f.champion?'🏆':f.bad?'🥶':f.note>=6.8?'🔥':'📊'}</span><h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2><div class="verdict">${ROLES[f.role].name} · note ${f.note.toFixed(2).replace('.',',')} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)}</div></div>
     <div class="score-grid"><div class="score-box gold"><div class="v">${f.apps}</div><div class="k">Matchs</div></div><div class="score-box good"><div class="v">${f.goals}</div><div class="k">Buts</div></div><div class="score-box good"><div class="v">${f.assists}</div><div class="k">Passes</div></div><div class="score-box"><div class="v">${Math.round(f.share*100)} %</div><div class="k">Temps de jeu</div></div><div class="score-box gold"><div class="v">${$(f.salary)}</div><div class="k">Salaire</div></div></div>
     ${lines.map(l=>`<div class="trophy-line">${l}</div>`).join('')}
     ${f.idle?`<div class="warn">🌫️ ${escapeHtml(f.idle.text)}<br><span class="hint">${f.idle.lines.join(' · ')}</span></div>`:''}
@@ -713,9 +725,9 @@ function renderPlayerEnd(){
   const life=lifeVerdict(state.gauges.entourage==null?50:state.gauges.entourage,true);
   app.innerHTML=`<div class="fade-in"><div class="card"><div class="result-hero"><span class="result-hero-icon">🎗️</span><h2 class="display">${escapeHtml(state.name)}</h2><div class="verdict">${state.posIcon} ${state.posName} · ${state.startYear||ERAS.find(e=>e.id===state.startEra).name} → ${state.year} · fin à ${pAge()} ans · score ${playerScore()}</div></div><p class="narr">${escapeHtml(state.endingText)}</p>
     <div class="score-grid"><div class="score-box gold"><div class="v">${state.history.length}</div><div class="k">Saisons</div></div><div class="score-box"><div class="v">${t.apps}</div><div class="k">Matchs</div></div><div class="score-box good"><div class="v">${t.goals}</div><div class="k">Buts</div></div><div class="score-box good"><div class="v">${t.assists}</div><div class="k">Passes</div></div><div class="score-box gold"><div class="v">${t.titles+t.cups+t.euros}</div><div class="k">Trophées</div></div><div class="score-box"><div class="v">${t.caps}</div><div class="k">Sélections</div></div><div class="score-box gold"><div class="v">${t.ballons}</div><div class="k">Ballons d'or</div></div><div class="score-box good"><div class="v">${$(t.earned)}</div><div class="k">Gains</div></div></div>
-    <div class="section-label">Ce qu'il en reste</div><div class="${life.cls}">🏡 ${life.text} <span class="hint">Entourage ${Math.round(state.gauges.entourage==null?50:state.gauges.entourage)}/100.</span></div>
+    <div class="section-label">Ce qu'il en reste</div><div class="${life.cls}">🏡 ${life.text} <span class="hint">Entourage ${sur10(state.gauges.entourage==null?50:state.gauges.entourage)}/10.</span></div>
     ${newB.length?`<div class="section-label">Badges débloqués</div><div class="badge-grid">${newB.map(b=>`<div class="badge"><span class="ico">${b.icon}</span><div><b>${b.label}</b><small>${b.cat}</small></div></div>`).join('')}</div>`:''}
-    <div class="section-label">Saisons</div>${state.history.map(f=>`<div class="season-line"><span><span class="pos">${f.ballon?'🏅':f.champion?'🏆':f.note.toFixed(1)}</span> ${f.year} · ${escapeHtml(f.club)} · ${escapeHtml(f.league)}</span><span>${f.apps} m · ${f.goals} b · ${f.assists} p${f.selected?' · 🇫🇷':''}</span></div>`).join('')}
+    <div class="section-label">Saisons</div>${state.history.map(f=>`<div class="season-line"><span><span class="pos">${f.ballon?'🏅':f.champion?'🏆':f.note.toFixed(1).replace('.',',')}</span> ${f.year} · ${escapeHtml(f.club)} · ${escapeHtml(f.league)}</span><span>${f.apps} m · ${f.goals} b · ${f.assists} p${f.selected?' · 🇫🇷':''}</span></div>`).join('')}
     <div class="btn-row"><button class="btn" onclick="state=null;startPlayerCreation()">Nouvelle carrière</button><button class="btn secondary" onclick="state=null;renderStart()">Accueil</button></div></div></div>`; scrollTop();
 }
 
@@ -724,7 +736,7 @@ function renderBadges(){ showGameBanner(); filmstripEl.style.display='none'; con
 function renderHall(){ showGameBanner(); filmstripEl.style.display='none'; const h=hallOfFame(); app.innerHTML=`<div class="fade-in"><div class="card"><h2 class="display">Panthéon</h2><div class="hall">${h.length?h.map(e=>`<div><span>${e.kind==='player'?'👟':'🧢'} <b>${escapeHtml(e.name)}</b> · ${escapeHtml(e.mode||'')} · ${escapeHtml(e.era||'')} · ${e.seasons} saisons · ${e.titles} titre${e.titles>1?'s':''} · fin à ${e.age} ans</span><span>score ${e.score}${e.date?` · ${e.date}`:''}</span></div>`).join(''):'<div class="hint">Aucune carrière terminée pour l\'instant.</div>'}</div><div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop(); }
 function renderRules(){ showGameBanner(); filmstripEl.style.display='none'; app.innerHTML=`<div class="fade-in"><div class="card rules"><h2 class="display">Comment ça marche</h2>
   <h3>Les époques</h3><ul>${ERAS.map(e=>`<li><b>${e.icon} ${e.name}</b> (${e.start}-${e.end}) : ${e.rules.join(', ')}.</li>`).join('')}<li>Les joueurs réels apparaissent selon leur âge dans l'année en cours. Une carrière longue traverse l'époque suivante.</li></ul>
-  <h3>Carrière d'entraîneur·euse</h3><ul><li>Chaque offre fixe un championnat réel, un objectif de classement, un budget de transferts et un président avec son caractère.</li><li>Le mercato est libre : vends, recrute des stars (si ta crédibilité le permet), des pros, des pépites (parfois des arnaques), des joueurs libres ou des jeunes du centre. Un « gros coup » coûte cher et exige une place de titulaire.</li><li>La force de l'équipe vient de ton onze type, du vestiaire, de la cohérence entre ton style et celui que le club demande, de ta tactique et de la dynamique.</li><li><b>Rythme</b> : « Temps forts » (par défaut) ne t'arrête que sur les chocs, les concurrents directs, les matchs de la peur, la reprise de chaque phase, et sur une alerte (blessé ou suspendu dans ton onze, trois défaites de suite, président impatient). Les autres matchs se jouent avec ta compo et apparaissent en résumé. « Complet » joue tout, « Rapide » ne s'arrête qu'à la reprise. Changeable à tout moment dans la barre latérale.</li><li><b>Cote et contrats</b> : ta cote (0-100) résume ce que ta carrière vaut ; les offres arrivent autour d'elle, un cran au-dessus après une bonne saison, en dessous après un échec. Tant que ton contrat court et que le président te garde, tu restes, sauf si un club plus ambitieux vient te chercher. Rompre coûte de la réputation.</li><li>La saison se joue journée par journée, en quatre phases. Avant chaque match : l'adversaire (force, style, forme), ta formation, ton onze, ton banc, ton capitaine, ton approche et l'entraînement de la semaine. Le match se déroule minute par minute (buts, penaltys, cartons, blessures, remplacements), avec une décision à la mi-temps. Chaque joueur reçoit une note. Un bouton simule le reste de la phase avec le onze automatique.</li><li>Fraîcheur : un titulaire perd 10 à 16 points par match selon son âge et en récupère 9 par semaine (plus avec le staff et l'entraînement). Sous 75 %, son niveau baisse et il se blesse plus. Trois avertissements ou un rouge : suspension.</li><li>Styles : contrôle bat pression, pression bat contre, contre bat contrôle, le jeu direct ouvre le match. Le style de l'adversaire est visible avant le coup d'envoi.</li><li><b>Confiance du président</b> : elle monte quand tu dépasses l'objectif, chute quand tu es en dessous ou que la masse salariale explose. À zéro, licenciement immédiat. Sous 35 en fin de saison, pas de prolongation.</li><li>Quatre jauges du club : Vestiaire (force de l'équipe), Supporters (pression et patience), Formation (jeunes, arnaques), Staff (blessures, progression). Une jauge basse déclenche des dilemmes.</li><li>Pression : à 100, une crise impose un choix, dont un à 50 % de risque de mort. Entre 90 et 99, 1 % de risque par intersaison.</li><li>Roulette du destin : après trois saisons, 20 % de chance par intersaison, quatre issues cachées dont une fatale.</li><li>Fin : 75 ans, quatre licenciements d'affilée, deux années sans offre, roulette, pression, retraite.</li></ul>
+  <h3>Carrière d'entraîneur·euse</h3><ul><li>Chaque offre fixe un championnat réel, un objectif de classement, un budget de transferts et un président avec son caractère.</li><li>Le mercato est libre : vends, recrute des stars (si ta crédibilité le permet), des pros, des pépites (parfois des arnaques), des joueurs libres ou des jeunes du centre. Un « gros coup » coûte cher et exige une place de titulaire.</li><li>La force de l'équipe vient de ton onze type, du vestiaire, de la cohérence entre ton style et celui que le club demande, de ta tactique et de la dynamique.</li><li><b>Rythme</b> : « Temps forts » (par défaut) ne t'arrête que sur les chocs, les concurrents directs, les matchs de la peur, la reprise de chaque phase, et sur une alerte (blessé ou suspendu dans ton onze, trois défaites de suite, président impatient). Les autres matchs se jouent avec ta compo et apparaissent en résumé. « Complet » joue tout, « Rapide » ne s'arrête qu'à la reprise. Changeable à tout moment dans la barre latérale.</li><li><b>Cote et contrats</b> : ta cote (0-100) résume ce que ta carrière vaut ; les offres arrivent autour d'elle, un cran au-dessus après une bonne saison, en dessous après un échec. Tant que ton contrat court et que le président te garde, tu restes, sauf si un club plus ambitieux vient te chercher. Rompre coûte de la réputation.</li><li>La saison se joue journée par journée, en quatre phases. Avant chaque match : l'adversaire (force, style, forme), ta formation, ton onze, ton banc, ton capitaine, ton approche et l'entraînement de la semaine. Le match se déroule minute par minute (buts, penaltys, cartons, blessures, remplacements), avec une décision à la mi-temps. Chaque joueur reçoit une note. Un bouton simule le reste de la phase avec le onze automatique.</li><li>Fraîcheur : un titulaire perd 10 à 16 points par match selon son âge et en récupère 9 par semaine (plus avec le staff et l'entraînement). Sous 75 %, son niveau baisse et il se blesse plus. Trois avertissements ou un rouge : suspension.</li><li>Styles : contrôle bat pression, pression bat contre, contre bat contrôle, le jeu direct ouvre le match. Le style de l'adversaire est visible avant le coup d'envoi.</li><li><b>Confiance du président</b> : elle monte quand tu dépasses l'objectif, chute quand tu es en dessous ou que la masse salariale explose. À zéro, licenciement immédiat. Sous 3,5 en fin de saison, pas de prolongation.</li><li>Quatre jauges du club : Vestiaire (force de l'équipe), Supporters (pression et patience), Formation (jeunes, arnaques), Staff (blessures, progression). Une jauge basse déclenche des dilemmes.</li><li>Pression : à 10, une crise impose un choix, dont un à 50 % de risque de mort. Entre 9 et 10, 1 % de risque par intersaison.</li><li>Roulette du destin : après trois saisons, 20 % de chance par intersaison, quatre issues cachées dont une fatale.</li><li>Fin : 75 ans, quatre licenciements d'affilée, deux années sans offre, roulette, pression, retraite.</li></ul>
   <h3>Carrière de joueur·euse</h3><ul><li>Tu rejoins des clubs réels avec un rôle promis. Ton temps de jeu dépend de ta note face aux concurrents à ton poste et de la confiance du coach.</li><li><b>Rythme et contrats</b> : même logique qu'en mode entraîneur·euse. Les temps forts sont les chocs où tu es dans le groupe, les penaltys, une blessure, une place perdue ou retrouvée. Ton agent vise un niveau de club selon ta note, ta dernière saison, la sélection et ton âge ; sous contrat, tu restes sauf si un club vient te chercher ou si tu demandes ton transfert.</li><li>Chaque journée, le coach compose : ta note face aux concurrents, sa confiance, le rôle promis et ta fraîcheur décident si tu es titulaire, sur le banc ou en tribune. Tu vis le match minute par minute avec une note à la fin, et un penalty à tirer ou non quand il se présente.</li><li>Quatre jauges : Corps (à zéro, fin de carrière), Vestiaire, Supporters, Entourage.</li><li>Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.</li>
   <li><b>La fin de carrière</b> : les clubs qui appellent dépendent de ton niveau <i>du moment</i>, pas d'une sélection passée ; après 33 ans les plus grands ne construisent plus avec toi. Ton club regarde ton âge, ta dernière saison et ton corps : il peut ne pas prolonger, et il te le dit. Tant que ton contrat court, tu restes — en sachant ce qu'on pense. Huit saisons au même club font de toi une légende maison : celui-là te gardera jusqu'au bout.</li>
   <li><b>Ne pas jouer coûte</b> : une saison sous 18 % de temps de jeu abîme le moral, la pression et ta place dans le groupe. Les semaines en tribune deviennent des décisions — travailler seul, parler au coach, ou mettre la tête ailleurs.</li></ul>
@@ -733,13 +745,13 @@ function renderRules(){ showGameBanner(); filmstripEl.style.display='none'; app.
 /* ---------- Le match : écrans partagés ---------- */
 function formChips(arr){ return `<span class="form-chips">${(arr&&arr.length?arr:[]).map(r=>`<i class="${r}">${r==='W'?'V':r==='D'?'N':'D'}</i>`).join('')||'<i class="none">—</i>'}</span>`; }
 function fitBar(v){ const c=v>=75?'ok':v>=55?'mid':'low'; return `<span class="fit ${c}" title="Fraîcheur ${Math.round(v)} %"><i style="width:${clamp(v)}%"></i></span>`; }
-function notePill(n){ if(n==null) return ''; return `<span class="note ${n>=7.5?'top':n>=6.5?'good':n<5.5?'bad':''}">${n.toFixed(1)}</span>`; }
+function notePill(n){ if(n==null) return ''; return `<span class="note ${n>=7.5?'top':n>=6.5?'good':n<5.5?'bad':''}">${n.toFixed(1).replace('.',',')}</span>`; }
 function oppCardHTML(m){
   const comp=state.comp, c=state.club; const st=styleById(m.themStyle); const N=comp.teams.length;
   const pos=tablePos(comp.table,m.themName), myPos=tablePos(comp.table,c.name);
   const P=state.kind==='player'?playerSquadMap():coachSquadMap(); const xi=m.xi.map(id=>P[id]).filter(Boolean); const avg=xi.length?xi.reduce((n,p)=>n+effRating(p,m.year),0)/xi.length:0; const d=avg-m.themStrength;
   const level=d>=6?'nettement plus faible que ton onze':d>=2?'un peu plus faible que ton onze':d>-2?'du même niveau que ton onze':d>-6?'un peu plus fort que ton onze':'nettement plus fort que ton onze';
-  return `<div class="opp-card"><div class="opp-top"><span class="tag gold">${m.home?'🏟️ Domicile':'🚌 Extérieur'}</span><b class="opp-name">${escapeHtml(m.themName)}</b><span class="tag">${ordinal(pos)} sur ${N}</span><span class="tag">force ${Math.round(m.themStrength)} · ${level}</span></div>
+  return `<div class="opp-card"><div class="opp-top"><span class="tag gold">${m.home?'🏟️ Domicile':'🚌 Extérieur'}</span><b class="opp-name">${escapeHtml(m.themName)}</b><span class="tag">${ordinal(pos)} sur ${N}</span><span class="tag">force ${niv(m.themStrength)} · ${level}</span></div>
     <div class="opp-meta">${st.icon} <b>${st.name}</b> · ${escapeHtml(matchupText(m.ourStyle,m.themStyle))} · forme ${formChips(comp.form&&comp.form[m.themName])}</div>
     <div class="opp-meta">Toi : ${ordinal(myPos)} sur ${N} · forme ${formChips(comp.form&&comp.form[c.name])} · ${styleById(m.ourStyle).icon} ${styleById(m.ourStyle).name}</div></div>`;
 }
@@ -763,7 +775,7 @@ function fateHTML(){
   const f=state.rouletteFate, e=state.rouletteEcho; if(!f&&!(e&&e.seasons>0)) return '';
   return `<div class="section-label">La roulette</div>${f?`<div class="why-row"><span class="why">${f.icon} ${escapeHtml(f.label)}</span></div><div class="hint">${escapeHtml(f.text)}</div>`:''}${e&&e.seasons>0?`<div class="hint">${e.icon} <b>${escapeHtml(e.label)}</b> : ${escapeHtml(e.short)}. ${e.delta>0?'+':''}${e.delta} ${state.kind==='player'?'sur ce que le coach voit de toi':"sur la force de l'équipe"}, encore ${e.seasons} saison${e.seasons>1?'s':''}.</div>`:''}`;
 }
-function coteHTML(){ const cote=state.cote==null?30:state.cote; const s=coteToStrength(cote); return `<div class="section-label">Ta cote</div><div class="conf-big">${Math.round(cote)} / 100</div><div class="bar"><i style="width:${clamp(cote)}%"></i></div><div class="hint">Le niveau de banc que ta carrière justifie : ${coteLabel(s)}. Objectifs tenus, titres et coupes la font monter ; échecs, relégations et licenciements la font chuter.${state.club&&state.club.contractEnd?(state.club.contractEnd>=9999?" Contrat à vie : la clause de la roulette t'y oblige.":` Contrat jusqu'en ${state.club.contractEnd}.`):''}</div>`; }
+function coteHTML(){ const cote=state.cote==null?30:state.cote; const s=coteToStrength(cote); return `<div class="section-label">Ta cote</div><div class="conf-big">${sur10(cote)} / 10</div><div class="bar"><i style="width:${clamp(cote)}%"></i></div><div class="hint">Le niveau de banc que ta carrière justifie : ${coteLabel(s)}. Objectifs tenus, titres et coupes la font monter ; échecs, relégations et licenciements la font chuter.${state.club&&state.club.contractEnd?(state.club.contractEnd>=9999?" Contrat à vie : la clause de la roulette t'y oblige.":` Contrat jusqu'en ${state.club.contractEnd}.`):''}</div>`; }
 function matchdayLabel(){ const comp=state.comp; return `Journée ${Math.min((state.matchday||0)+1,comp.schedule.length)} / ${comp.schedule.length}`; }
 
 /* ---------- Entraîneur·euse : avant-match, mi-temps, résultat ---------- */
@@ -776,7 +788,7 @@ function matchChip(c){
   if(Math.abs(b)<.3) return '';
   const worn=raw>0&&boostFactor()<.95?` <small>(amorti à ${Math.round(boostFactor()*100)} % : tu tires sur la même corde)</small>`:'';
   const n=state.comp?Math.max(1,Math.min(state.comp.phaseEnds[state.phase]-state.matchday,boostSpan())):1;
-  return `<div class="traits"><i class="${b>0?'plus':'minus'}">⚽ <b>${b>0?'+':''}${b.toFixed(1)}</b> de force sur ce match${n>1?`, puis en s'estompant sur ${n} journées`:''}${worn}</i></div>`;
+  return `<div class="traits"><i class="${b>0?'plus':'minus'}">⚽ <b>${b>0?'+':''}${fo(b)}</b> de force sur ce match${n>1?`, puis en s'estompant sur ${n} journées`:''}${worn}</i></div>`;
 }
 function renderMeeting(){
   const mt=state.meeting; if(!mt) return '<div class="card"><p class="narr">…</p></div>';
@@ -817,11 +829,11 @@ function renderMatchResult(){
 function renderPPrematch(){
   const m=state.match, c=state.club, P=playerSquadMap(), me=P.me; const rivals=state.squad.filter(p=>p.pos===state.pos&&availableForMatch(p)).sort((a,b)=>effRating(b,state.year)-effRating(a,state.year));
   const st=m.myStatus; const label={xi:'✅ Titulaire',bench:'🪑 Sur le banc',injured:'🩼 Blessé·e',suspended:'🟥 Suspendu·e',out:'🚫 Hors du groupe'}[st];
-  const why=st==='xi'?`Le coach te fait confiance (${Math.round(state.coachTrust)}/100). Ton niveau du jour : ${Math.round(effRating(me,state.year))}${me.selBonus>=0?' +':' −'}${Math.abs(me.selBonus).toFixed(1)} de crédit auprès du coach.`:st==='bench'?`Devant toi au poste : ${rivals.slice(0,state.pos==='G'?1:state.pos==='A'?2:4).map(p=>`${escapeHtml(p.name)} (${Math.round(effRating(p,state.year))})`).join(', ')}. Toi : ${Math.round(effRating(me,state.year))}, confiance du coach ${Math.round(state.coachTrust)}. Une entrée en jeu reste possible.`:st==='injured'?`Encore ${state.injury} semaine${state.injury>1?'s':''} d'absence.`:st==='suspended'?`Encore ${state.suspended} match${state.suspended>1?'s':''} de suspension.`:`Le coach ne t'a pas retenu·e (confiance ${Math.round(state.coachTrust)}).`;
+  const why=st==='xi'?`Le coach te fait confiance (${sur10(state.coachTrust)}/10). Ton niveau du jour : ${niv(effRating(me,state.year))}${me.selBonus>=0?' +':' −'}${Math.abs(me.selBonus).toFixed(1).replace('.',',')} de crédit auprès du coach.`:st==='bench'?`Devant toi au poste : ${rivals.slice(0,state.pos==='G'?1:state.pos==='A'?2:4).map(p=>`${escapeHtml(p.name)} (${niv(effRating(p,state.year))})`).join(', ')}. Toi : ${niv(effRating(me,state.year))}, confiance du coach ${sur10(state.coachTrust)}. Une entrée en jeu reste possible.`:st==='injured'?`Encore ${state.injury} semaine${state.injury>1?'s':''} d'absence.`:st==='suspended'?`Encore ${state.suspended} match${state.suspended>1?'s':''} de suspension.`:`Le coach ne t'a pas retenu·e (confiance ${sur10(state.coachTrust)}).`;
   return `<div class="card"><h2 class="display">${matchdayLabel()} · ${escapeHtml(c.leagueName)}</h2>${phaseTrack()}${whyHTML(m.why)}${sinceHTML(state.sinceLast)}
     ${oppCardHTML(m)}
     <div class="my-status ${st}"><b>${label}</b><div class="hint">${why}</div><div class="hint">Fraîcheur ${fitBar(state.fitness==null?100:state.fitness)} ${Math.round(state.fitness==null?100:state.fitness)} % · forme ${Math.round(state.forme)} · ${'⚽'} ${state.seasonStats.goals} b · 🅰️ ${state.seasonStats.assists} p · ${state.seasonStats.apps} matchs cette saison${state.yellows?` · 🟨 ${state.yellows}`:''}</div></div>
-    <div class="section-label">Le onze du coach (${m.formation})</div><div class="squad">${m.xi.map(id=>P[id]).filter(Boolean).map(p=>`<div class="${p.isMe?'me':''}"><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)}${p.isMe?' (toi)':''} <span>${Math.round(effRating(p,state.year))}</span></div>`).join('')}</div>
+    <div class="section-label">Le onze du coach (${m.formation})</div><div class="squad">${m.xi.map(id=>P[id]).filter(Boolean).map(p=>`<div class="${p.isMe?'me':''}"><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)}${p.isMe?' (toi)':''} <span>${niv(effRating(p,state.year))}</span></div>`).join('')}</div>
     ${m.bench.length?`<div class="hint">Banc : ${m.bench.map(id=>P[id]).filter(Boolean).map(p=>`${escapeHtml(p.name)}${p.isMe?' (toi)':''}`).join(', ')}</div>`:''}
     <div class="section-label">Ta semaine</div>
     <div class="hint">Ce que tu fais de ces jours-là coûte des jambes pour dimanche et se paiera — ou se paiera en juin. ${escapeHtml(pTrainingCurveHelp())}</div>
@@ -839,7 +851,7 @@ function renderPPenalty(){
 }
 function renderPMatchResult(){
   const rec=state.lastMatch, c=state.club, P=playerSquadMap(), comp=state.comp; const N=comp.teams.length; const last=state.matchday>=comp.phaseEnds[state.phase];
-  const mine=rec.played?`<div class="my-line ${rec.note>=7?'good':rec.note<5.5?'bad':''}"><b>Toi</b> · ${rec.start?'titulaire':'entré·e en jeu'} · ${rec.min} min · note ${notePill(rec.note)}${rec.goals?` · ⚽ ${rec.goals}`:''}${rec.assists?` · 🅰️ ${rec.assists}`:''}${rec.yellow?' · 🟨':''}${rec.red?' · 🟥':''}${rec.inj?` · 🩼 ${rec.inj} sem.`:''}${rec.motm==='me'?' · ⭐ joueur·euse du match':''} · confiance du coach ${rec.dTrust>=0?'+':''}${rec.dTrust} → ${Math.round(state.coachTrust)}</div>`:`<div class="my-line"><b>Toi</b> · ${rec.status==='bench'?'resté·e sur le banc · confiance du coach −0,6':rec.status==='injured'?'blessé·e, en tribune':rec.status==='suspended'?'suspendu·e':'hors du groupe'} → ${Math.round(state.coachTrust)}</div>`;
+  const mine=rec.played?`<div class="my-line ${rec.note>=7?'good':rec.note<5.5?'bad':''}"><b>Toi</b> · ${rec.start?'titulaire':'entré·e en jeu'} · ${rec.min} min · note ${notePill(rec.note)}${rec.goals?` · ⚽ ${rec.goals}`:''}${rec.assists?` · 🅰️ ${rec.assists}`:''}${rec.yellow?' · 🟨':''}${rec.red?' · 🟥':''}${rec.inj?` · 🩼 ${rec.inj} sem.`:''}${rec.motm==='me'?' · ⭐ joueur·euse du match':''} · confiance du coach ${d10(rec.dTrust*1)} → ${sur10(state.coachTrust)}</div>`:`<div class="my-line"><b>Toi</b> · ${rec.status==='bench'?'resté·e sur le banc · confiance du coach −0,06':rec.status==='injured'?'blessé·e, en tribune':rec.status==='suspended'?'suspendu·e':'hors du groupe'} → ${sur10(state.coachTrust)}</div>`;
   return `<div class="card">${scoreHero(rec,c.name)}<p class="narr story">${escapeHtml(rec.story)}${rec.penNote?` ${escapeHtml(rec.penNote)}`:''}</p>${mine}
     <div class="two-cols"><div><div class="section-label">Le film du match</div>${eventsHTML(rec.events)}</div><div><div class="section-label">Les notes${rec.motm&&P[rec.motm]?` · ${rec.motm==='me'?'toi':escapeHtml(P[rec.motm].name)} en tête`:''}</div>${ratingsHTML(rec,P,'me')}</div></div>
     <div class="section-label">Classement</div><div class="hint">${escapeHtml(c.name)} ${ordinal(rec.pos)} sur ${N} · forme ${formChips(comp.form&&comp.form[c.name])}</div>${tableHTML(sortTable(comp.table),c.name,false)}

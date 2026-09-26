@@ -512,8 +512,8 @@ function fmtW(w){ return w.toFixed(3).replace(/0+$/,'').replace('.',','); }
    50 » pour une jauge à 40 ne veut rien dire. */
 function gaugeHelp(nom,v,w){
   const d=Math.round(v)-50;
-  if(!d) return `${nom} ${Math.round(v)} : pile la moyenne, ni gain ni perte.`;
-  return `${nom} ${Math.round(v)} : ${Math.abs(d)} point${Math.abs(d)>1?'s':''} ${d>0?'au-dessus':'en dessous'} de 50, à ${fmtW(w)} le point.`;
+  if(!d) return `${nom} ${sur10(v)} : pile la moyenne, ni gain ni perte.`;
+  return `${nom} ${sur10(v)} : ${sur10(Math.abs(d))} ${d>0?'au-dessus':'en dessous'} de la moyenne (5,0), à ${fmtW(w)} de force le point.`;
 }
 /* La force réelle emmenée sur le terrain, sans l'aléa du jour : c'est ce
    chiffre-là qu'on affiche, jamais un tirage au sort déguisé en mesure. */
@@ -810,10 +810,10 @@ function coachMeetingInjured(m){
   (state.metFor=state.metFor||[]).push(out.id);
   const why=out.suspended>0?`suspendu`:`blessé ${out.injury} semaine${out.injury>1?'s':''}`;
   const choices=[];
-  if(vet) choices.push({label:`Aligner ${vet.name}`,sub:`${playerAge(vet,y)} ans · niveau ${playerRating(vet,y)} · le choix sûr`,
+  if(vet) choices.push({label:`Aligner ${vet.name}`,sub:`${playerAge(vet,y)} ans · niveau ${niv(playerRating(vet,y))} · le choix sûr`,
     plan:{forceIn:vet.id},effects:{},
     seed:kid?{in:2,icon:'🌱',title:"Le jeune qu'on n'a pas lancé",text:`${kid.name} attendait cette ouverture. Il l'a attendue toute la saison, puis il a signé ailleurs.`,effects:{formation:-6,vestiaire:-3}}:null});
-  if(kid) choices.push({label:`Lancer ${kid.name}`,sub:`${playerAge(kid,y)} ans · niveau ${playerRating(kid,y)} · jamais titularisé`,
+  if(kid) choices.push({label:`Lancer ${kid.name}`,sub:`${playerAge(kid,y)} ans · niveau ${niv(playerRating(kid,y))} · jamais titularisé`,
     plan:{forceIn:kid.id,bonus:-.8},effects:{formation:4,supporters:2},
     seed:{in:2,icon:'🌟',title:"Celui que tu as lancé",text:`${kid.name} n'a plus jamais quitté le onze. Il raconte partout qui lui a donné sa chance.`,effects:{formation:6,reputation:4,vestiaire:3}}});
   if(out.injury>0&&out.injury<=2) choices.push({label:`Faire jouer ${out.name} quand même`,sub:`La blessure est légère. Le médecin n'est pas d'accord.`,
@@ -821,7 +821,7 @@ function coachMeetingInjured(m){
     seed:{in:1,icon:'🫀',title:"La rechute annoncée",text:`${out.name} n'a jamais vraiment récupéré de ce match-là. Le staff te l'avait dit.`,effects:{staff:-4,vestiaire:-4}}});
   choices.push({label:"Laisser l'adjoint trancher",sub:"Tu as d'autres soucis. Il décidera bien.",plan:{delegate:true},effects:{staff:3,technique:-1}});
   return {kind:'homme',side:'terrain',icon:'🩼',title:`${out.name} est ${why}`,
-    text:`${out.name} (${POS_LABEL[out.pos].toLowerCase()}, niveau ${playerRating(out,y)}) ne jouera pas. Sa place est à prendre, et celui qui la prend prive quelqu'un d'autre.`,
+    text:`${out.name} (${POS_LABEL[out.pos].toLowerCase()}, niveau ${niv(playerRating(out,y))}) ne jouera pas. Sa place est à prendre, et celui qui la prend prive quelqu'un d'autre.`,
     choices};
 }
 
@@ -854,7 +854,7 @@ function coachMeetingSquad(m,it,left){
   }
   if(g.vestiaire<45){
     return {kind:'symptome',side:'terrain',icon:'🧊',title:"Le vestiaire s'est refroidi",
-      text:`Vestiaire ${Math.round(g.vestiaire)}/100. Les séances sont silencieuses et personne ne se parle après les matchs.`,
+      text:`Vestiaire ${sur10(g.vestiaire)}/10. Les séances sont silencieuses et personne ne se parle après les matchs.`,
       choices:[
         {label:"Une mise au point collective",sub:"Tout le monde parle, ça pique.",plan:{bonus:-.6},effects:{vestiaire:9,technique:1}},
         {label:"Voir les cadres un par un",sub:"Discret, long, et ça laisse les autres de côté.",effects:{vestiaire:5,proches:-4}},
@@ -895,7 +895,7 @@ function coachMeetingPresident(m,it,left){
   markOnce('president',costly.id);
   const aboutId=costly.id;
   return {kind:'president',side:'vie',aboutId,icon:'🕴️',title:`${capitalize(c.presidentName)} veut voir ${costly.name} jouer`,
-    text:`« Je paie ${$(costly.wage)} par an pour qu'il regarde les matchs ? » ${costly.name} (niveau ${playerRating(costly,y)}) est le plus gros salaire du club, et il n'est pas dans ton onze.`,
+    text:`« Je paie ${$(costly.wage)} par an pour qu'il regarde les matchs ? » ${costly.name} (niveau ${niv(playerRating(costly,y))}) est le plus gros salaire du club, et il n'est pas dans ton onze.`,
     choices:[
       {label:"Le titulariser",sub:"Le président se tait. Le vestiaire comprend qui décide.",plan:{forceIn:costly.id},effects:{confidence:6,vestiaire:-5}},
       {label:"Expliquer ton choix sportif",sub:"Argumenter, chiffres à l'appui. Ça passe ou ça casse.",effects:{confidence:-6,technique:2,vestiaire:4}},
@@ -1131,7 +1131,7 @@ function coachMeetingFans(m,it,left){
   const f=(state.comp.form&&state.comp.form[c.name])||[];
   const bad=f.slice(-4).filter(r=>r==='L').length>=2;
   if(g.supporters>=48&&!bad) return null;
-  const j=`Supporters ${Math.round(g.supporters)}/100.`;
+  const j=`Supporters ${sur10(g.supporters)}/10.`;
   const sc=pickScene('tribune',g.supporters<35?[
     {t:"Une banderole au centre d'entraînement",x:`Ils sont venus à l'aube accrocher deux draps sur les grilles. Le message ne parle pas que des joueurs. ${j}`},
     {t:"Le parcage est resté muet",x:`Quatre-vingt-dix minutes sans un chant, pancartes retournées. C'est plus dur à encaisser que des sifflets. ${j}`},
@@ -1166,7 +1166,7 @@ function coachMeetingHome(m,it,left){
   ];
   const sc=pick(scenes);
   return {kind:'maison',side:'vie',icon:'🏡',title:sc.t,
-    text:`${sc.x} Proches ${Math.round(g.proches)}/100 — c'est ce qui reste quand le football s'arrête.`,
+    text:`${sc.x} Proches ${sur10(g.proches)}/10 — c'est ce qui reste quand le football s'arrête.`,
     choices:[
       {label:sc.a,sub:"Le groupe comprendra. Ou fera semblant.",plan:{bonus:-.6},effects:{proches:10,staff:-3,pressure:-4}},
       {label:"Rester avec le groupe",sub:"C'est le métier. On te l'a assez dit.",plan:{bonus:.4},effects:{proches:-8,staff:2}},
@@ -1242,7 +1242,7 @@ function coachApplyPlan(plan){
   else if(pl.bonus<0||!pl.bonus){ state.boostStreak=Math.max(0,(state.boostStreak||0)-1); }
   if(pl.bonus){ const b=pl.bonus*MEETING_WEIGHT*(pl.bonus>0?fac:1);
     state.matchBoost={v:b,from:state.matchday,until:state.comp?Math.min(state.comp.phaseEnds[state.phase],state.matchday+boostSpan()):state.matchday+1};
-    notes.push(`${b>0?'Ton choix porte l\'équipe':'Ton choix coûte à l\'équipe'} : ${b>0?'+':''}${b.toFixed(1)} de force ${boostLabel()}.`);
+    notes.push(`${b>0?'Ton choix porte l\'équipe':'Ton choix coûte à l\'équipe'} : ${b>0?'+':''}${fo(b)} de force ${boostLabel()}.`);
     if(b>0&&fac<.95) notes.push(`Amorti à ${Math.round(fac*100)} % : tu tires sur la même corde depuis ${state.boostStreak-1} rendez-vous.`); }
   if(pl.effort){ state.effort=pl.effort; }
   return notes;
@@ -1373,7 +1373,7 @@ function coachFinishPhase(){
   const injuries=(ss.injuries||[]).splice(0);
   const phaseRec={n:state.phase+1,matches:mine.map(m=>({home:m.home,away:m.away,gh:m.gh,ga:m.ga,us:m.us,res:m.res,story:m.story,scorers:m.scorers})),W,D,L,gf:goalsFor,ga:goalsAg,pos,dConf:Math.round(dConf),confBefore,injuries,table:sortTable(comp.table).map(t=>({...t})),strength:Math.round(coachStrengthShown()*10)/10,base:Math.round(coachStrengthBreakdown().base*10)/10,confWhy:why.map(x=>({t:x.t,d:Math.round(x.d*10)/10}))};
   ss.phases.push(phaseRec); state.lastPhase=phaseRec; state.match=null; state.skipped=[]; state.sinceLast=[]; state.alerts=[];
-  log(`📊 Phase ${state.phase+1} : ${W} V · ${D} N · ${L} D. ${c.name} est ${ordinal(pos)} en ${c.leagueName}. Confiance du président ${Math.round(confBefore)} → ${Math.round(c.confidence)}.`);
+  log(`📊 Phase ${state.phase+1} : ${W} V · ${D} N · ${L} D. ${c.name} est ${ordinal(pos)} en ${c.leagueName}. Confiance du président ${sur10(confBefore)} → ${sur10(c.confidence)}.`);
   state.phase++;
   state.pendingChoice='phaseResult'; saveGame();
 }
@@ -1427,14 +1427,14 @@ function coachEndConf(){
   // L'armement se mesure sur l'effectif de la saison écoulée, avant que
   // l'intersaison ne le développe et n'en retire les partants.
   const arming=coachArmLeague();
-  if(arming) log(`🛡️ ${arming.league} s'arme contre toi : ${arming.delta>0?'+':''}${String(arming.delta).replace('.',',')} de force pour tes rivaux la saison prochaine${arming.total?` (${String(arming.total).replace('.',',')} au total)`:''}.`);
+  if(arming) log(`🛡️ ${arming.league} s'arme contre toi : ${fo(arming.delta)} de force pour tes rivaux la saison prochaine${arming.total?` (${String(arming.total).replace('.',',')} au total)`:''}.`);
   const fx=state.rouletteFate;
   if(fx&&fx.kind==='exclusive'&&fx.installed){ state.pressure=clamp(state.pressure+(champion?4:10)); }
   if(fx&&fx.kind==='exile'&&(champion||cupWon)&&year-fx.year>=2){ log(`🕊️ ${champion?'Un titre':'Une coupe'} loin des projecteurs : l'affaire des archives est oubliée, les grands clubs recommencent à appeler.`); state.cote=clamp(state.cote+10); state.rouletteFate=null; unlockTrophy('r-redemption'); }
   // Une saison de football coûte du temps à ceux qui t'attendent, d'autant plus qu'elle a été dure.
   const wear=(1+Math.round(state.pressure/40))*Math.max(.25,Math.min(1,state.gauges.proches/45));
   state.gauges.proches=clamp(state.gauges.proches-wear);
-  if(state.gauges.proches<=18) log(`🏡 Chez toi, on ne t'attend plus vraiment pour dîner. Proches ${Math.round(state.gauges.proches)}/100.`);
+  if(state.gauges.proches<=18) log(`🏡 Chez toi, on ne t'attend plus vraiment pour dîner. Proches ${sur10(state.gauges.proches)}/10.`);
   if(state.rouletteEcho&&state.rouletteEcho.seasons>0){ state.rouletteEcho.seasons--; if(!state.rouletteEcho.seasons){ log(`${state.rouletteEcho.icon} ${state.rouletteEcho.label} : c'est fini, la saison prochaine repart sur tes seules forces.`); state.rouletteEcho=null; } }
   const s=state.stats; s.reputation=clamp(s.reputation+clamp(overperf*1,-5,5)+(champion?4:0)+(cupWon?2:0)+(euroWon?6:0)+(relegated?-6:0)+(c.tier==='superclub'?1:0)+(c.tier==='amateur'?-1:0)+(55-s.reputation)*.06);
   // cote : ce que cette saison vaut sur le marché des bancs
@@ -1449,13 +1449,13 @@ function coachEndConf(){
   dCote*=(TIER_LEVEL[c.tier]||1); if(dCote>0) dCote=Math.min(12,dCote*(1-coteBefore/130)); else dCote*=(.3+coteBefore/100);
   const scale=rawSum?dCote/rawSum:1;
   const coteWhy=raw.map(r=>{ const v=Math.round(r.v*scale*10)/10; return `${r.t} ${v>0?'+':''}${String(v).replace('.',',')}`; });
-  if(rawSum&&Math.abs(scale-1)>=.08) coteWhy.push(rawSum>0?`amorti : à ${Math.round(coteBefore)} de cote et à ce niveau de club, un exploit rapporte moins`:`amorti : à ${Math.round(coteBefore)} de cote, tu n'as pas grand-chose à perdre`);
+  if(rawSum&&Math.abs(scale-1)>=.08) coteWhy.push(rawSum>0?`amorti : à ${sur10(coteBefore)} de cote et à ce niveau de club, un exploit rapporte moins`:`amorti : à ${sur10(coteBefore)} de cote, tu n'as pas grand-chose à perdre`);
   dCote+=2; coteWhy.push("une saison de plus au compteur +2"); dCote=Math.round(dCote*10)/10; state.cote=clamp(coteBefore+dCote);
   // Une cote au sommet (ou au plancher) absorbe le reste : il faut le dire,
   // sinon le bilan annonce « +9,5 mérités » pour une cote qui bouge d'un point.
   const coteApplied=Math.round((state.cote-coteBefore)*10)/10;
   if(Math.abs(coteApplied-dCote)>=.3){ const d=Math.round((coteApplied-dCote)*10)/10;
-    coteWhy.push(`${d<0?'plafond':'plancher'} de la cote (${Math.round(state.cote)}/100) ${d>0?'+':''}${String(d).replace('.',',')}`); }
+    coteWhy.push(`${d<0?'plafond':'plancher'} de la cote (${sur10(state.cote)}/10) ${d10(d)}`); }
   state.coteDelta=state.cote-coteBefore;
   s.talent=clamp(s.talent+1+(overperf>0?1:0)); s.technique=clamp(s.technique+1.5+(state.squad.length>22?.5:0)); s.reseau=clamp(s.reseau+1+(c.tier!=='amateur'&&c.tier!=='ligue2'?1.5:0)+(c.nat!=='FR'?1.5:0));
   state.pressure=clamp(state.pressure+(objectiveMet?-8:6)*state.mode.pressureMult-4);
@@ -1481,7 +1481,7 @@ function coachEndConf(){
   state.squad.forEach(p=>{ if(playerAge(p,nextYear)<=21&&playerRating(p,nextYear)>=85&&!p.real) unlockTrophy('m-youth-star'); if(p.joinedYear===year&&p.paid===0&&(ss.minutes[p.id]||0)>=3) unlockTrophy('m-free'); });
   const topScorer=Object.entries(ss.scorers).sort((a,b)=>b[1]-a[1])[0];
   const bestPlayer=[...state.squad].filter(p=>(p.rated||0)>=8).sort((a,b)=>(b.sumRating/b.rated)-(a.sumRating/a.rated))[0];
-  const season={year,club:c.name,league:c.leagueName,tier:c.tier,pos,teams:N,objective:c.objectivePos,objectiveMet,champion,promotion,relegated,cupWon,cupRounds:state.cup.roundsReached,cupPath:state.cup.path,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached,path:euro.path}:null,award,goals:ss.goals,conceded:ss.conceded,topScorer:topScorer?`${topScorer[0]} (${topScorer[1]})`:null,bestPlayer:bestPlayer?`${bestPlayer.name} (${(bestPlayer.sumRating/bestPlayer.rated).toFixed(2)})`:null,table:table.map(t=>({...t})),phases:ss.phases.map(p=>({n:p.n,W:p.W,D:p.D,L:p.L,pos:p.pos})),devNotes,contracts,dConf:Math.round(dConf),confidence:Math.round(c.confidence),formation:state.formation,style:styleById(state.styleId).name,budgetUsed:c.budget-(state.market?state.market.budgetLeft:0),cote:{before:Math.round(coteBefore),after:Math.round(state.cote),why:coteWhy,level:coteLabel(coteToStrength(state.cote))},contractEnd:c.contractEnd};
+  const season={year,club:c.name,league:c.leagueName,tier:c.tier,pos,teams:N,objective:c.objectivePos,objectiveMet,champion,promotion,relegated,cupWon,cupRounds:state.cup.roundsReached,cupPath:state.cup.path,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached,path:euro.path}:null,award,goals:ss.goals,conceded:ss.conceded,topScorer:topScorer?`${topScorer[0]} (${topScorer[1]})`:null,bestPlayer:bestPlayer?`${bestPlayer.name} (${(bestPlayer.sumRating/bestPlayer.rated).toFixed(2).replace('.',',')})`:null,table:table.map(t=>({...t})),phases:ss.phases.map(p=>({n:p.n,W:p.W,D:p.D,L:p.L,pos:p.pos})),devNotes,contracts,dConf:Math.round(dConf),confidence:Math.round(c.confidence),formation:state.formation,style:styleById(state.styleId).name,budgetUsed:c.budget-(state.market?state.market.budgetLeft:0),cote:{before:Math.round(coteBefore),after:Math.round(state.cote),why:coteWhy,level:coteLabel(coteToStrength(state.cote))},contractEnd:c.contractEnd};
   // Ce que la saison laisse chez les gens : c'est ça, le bilan.
   const all=(ss.phases||[]).flatMap(ph=>ph.matches||[]);
   const margin=x=>(x.us==='home'?x.gh-x.ga:x.ga-x.gh);
@@ -1521,7 +1521,7 @@ function coachAfterSeasonEnd(){
 function coachIntersaison(){
   if(coachCheckEnd()){ render(); return; }
   if(state.pressure>=100){ state.pendingChoice='pressureCrisis'; unlockTrophy('x-pressure'); return; }
-  if(state.pressure>=90&&Math.random()<.01){ unlockTrophy('x-death'); coachEnd(`À ${Math.round(state.pressure)}/100 de pression, ton cœur lâche pendant l'intersaison. Le football perd un·e entraîneur·euse.`,'death'); return; }
+  if(state.pressure>=90&&Math.random()<.01){ unlockTrophy('x-death'); coachEnd(`À ${sur10(state.pressure)}/10 de pression, ton cœur lâche pendant l'intersaison. Le football perd un·e entraîneur·euse.`,'death'); return; }
   if(state.pressure>=85&&!(state.pressureCrisisCooldown>0)&&Math.random()<.5){ state.pendingChoice='pressureCrisis'; unlockTrophy('x-pressure'); return; }
   if(state.pressureCrisisCooldown>0) state.pressureCrisisCooldown--;
   state.pressure=clamp(state.pressure-6);
@@ -1573,7 +1573,7 @@ const PRESSURE_CHOICES=[
 ];
 function coachChoosePressure(i){
   const ch=PRESSURE_CHOICES[i]; if(!ch) return;
-  if(ch.deathChance&&Math.random()<ch.deathChance){ unlockTrophy('x-death'); coachEnd(`Tu as choisi de continuer coûte que coûte à ${Math.round(state.pressure)}/100 de pression. Un malaise en plein match met fin à ta vie et à ta carrière.`,'death'); render(); return; }
+  if(ch.deathChance&&Math.random()<ch.deathChance){ unlockTrophy('x-death'); coachEnd(`Tu as choisi de continuer coûte que coûte à ${sur10(state.pressure)}/10 de pression. Un malaise en plein match met fin à ta vie et à ta carrière.`,'death'); render(); return; }
   if(ch.deathChance) unlockTrophy('x-push'); if(ch.id==='pause') unlockTrophy('x-pause');
   const before=coachSnapshot(); coachApplyEffects(ch.effects);
   if(ch.years){ state.year+=ch.years; state.age+=ch.years; if(state.club){ state.club.sacked=true; } state.comp=null; log(`${ch.icon} ${ch.label}. Tu reviens en ${state.year}, à ${state.age} ans.`); }
