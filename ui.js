@@ -637,7 +637,7 @@ function renderPVacances(){
     <p class="narr">La saison est finie. Six semaines devant toi, et tout le monde attend de savoir avec qui tu les passes.</p>
     ${pClubNewsHTML()}
     <div class="section-label">Ce que tu fais de tes vacances</div>
-    <div class="choice-list">${PVACANCES.map((v,i)=>`<button class="choice-btn" onclick="playerChooseVacances(${i})"><span class="ico">${v.icon}</span><div class="body"><b>${escapeHtml(v.label)}</b><small>${escapeHtml(v.sub)}</small>${effectChips(v.effects)}${v.risk?`<div class="traits"><i class="minus">🩼 ${Math.round(v.risk*100)} % de risque de blessure</i></div>`:''}</div></button>`).join('')}</div>
+    <div class="choice-list">${PVACANCES.map((v,i)=>`<button class="choice-btn" onclick="playerChooseVacances(${i})"><span class="ico">${v.icon}</span><div class="body"><b>${escapeHtml(v.label)}</b><small>${escapeHtml(v.sub)}</small>${effectChips(v.effects)}<div class="traits">${(v.prep==null||v.prep>=1)?"<i class=\"plus\">⏳ Tout l'été reste pour travailler</i>":`<i class="minus">⏳ Ta préparation ne comptera qu'à ${Math.round(v.prep*100)} %</i>`}${v.fatigue?'<i class="minus">🩼 Tu rentres entamé·e : récupération réduite toute la saison</i>':'<i class="plus">🩼 Tu rentres frais·che</i>'}${v.risk?`<i class="minus">🩼 ${Math.round(v.risk*100)} % de risque de blessure</i>`:''}</div></div></button>`).join('')}</div>
     ${stateTable(keys)}
     <div class="hint">Six semaines ne se rattrapent pas. Ce que tu prends ici te manquera ailleurs.</div></div>`;
 }
