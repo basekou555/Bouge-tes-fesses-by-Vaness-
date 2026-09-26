@@ -98,7 +98,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
         let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0}, pdashSeen=false, onceEv=new Set();
         while(!state.ended&&steps<5000){
           steps++; const pc=state.pendingChoice; if(steps%100===0) await new Promise(r=>setTimeout(r,0));
-          if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ playerBreakContract(); if(!state.currentOffers.length){ playerSkipYear(); render(); continue; } } playerAcceptOffer(rnd(state.currentOffers.length)); } else playerSkipYear(); }
+          // L'intersaison du joueur·euse est une suite : vacances → été → envies → offres une par une.
+          if(pc==='vacances'){ const h=renderPVacances(); if(!/playerChooseVacances/.test(h)) throw new Error("écran des vacances vide"); playerChooseVacances(rnd(PVACANCES.length)); }
+          else if(pc==='ete'){ const h=renderPSummer(); if(!/playerChooseSummer/.test(h)) throw new Error("écran de préparation vide"); playerChooseSummer(rnd(PSUMMER.length)); }
+          else if(pc==='envies'){ const h=renderPWish(); if(!/playerChooseWish/.test(h)) throw new Error("écran des envies vide"); playerChooseWish(rnd(PWISHES.length)); }
+          else if(pc==='offerOne'){ const n0=(state.offerQueue||[]).length;
+            const h=renderPOfferOne(); if(!/playerSignOffer/.test(h)) throw new Error("offre unique non affichée");
+            if(n0>1&&Math.random()<.45){ playerRefuseOffer();
+              const n1=(state.offerQueue||[]).length; if(n1!==n0-1) throw new Error(`refus : file de ${n1} au lieu de ${n0-1}`); }
+            else playerSignOffer(); }
+          else if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ playerBreakContract(); if(!state.currentOffers.length){ playerSkipYear(); render(); continue; } } playerAcceptOffer(rnd(state.currentOffers.length)); } else playerSkipYear(); }
           else if(pc==='event'){ const ce=state.currentEvent;
             // Ce qui n'arrive qu'une fois dans une vie ne doit jamais revenir.
             if(ce.event.once){ const k=ce.event.id||ce.event.title;
