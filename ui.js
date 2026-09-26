@@ -180,6 +180,10 @@ const FX_LABEL={talent:'🧠 Tactique',technique:'🗣️ Management',reseau:'�
   physique:'💪 Physique',mental:'🧠 Mental',corps:'🩻 Corps',entourage:'👪 Entourage',coachTrust:'🎽 Confiance du coach',forme:'📈 Forme',money:'💰 Argent'};
 const FX_SPECIAL={injure:'🩼 Un blessé',sellStar:'💸 Ta star part',promoteYouth:'🌱 Un jeune monte',skipHalf:'⏭️ Une demi-saison sautée',stayLocal:'🏡 Plus de départ lointain',points:'⚖️ Points au classement',releaseCaptain:'👋 Un cadre s\'en va'};
 function project(k,v){ return state.kind==='player'?playerProject(k,v):coachProject(k,v); }
+/* Le même mot partout : `technique` est le Management de l'entraîneur·euse et la
+   Technique du joueur·euse. Les pastilles d'effet affichaient « Management » dans une
+   carrière de joueur·euse, alors que la fiche disait Technique deux centimètres plus haut. */
+function fxLabel(k){ return state.kind==='player'&&k==='technique'?'⚽ Technique':FX_LABEL[k]; }
 /* Un arbitrage se prend en sachant d'où l'on part : chaque effet chiffrable
    affiche sa valeur actuelle et celle qu'il donnerait. */
 function effectChips(effects,seed){
@@ -188,7 +192,7 @@ function effectChips(effects,seed){
     if(k==='noReinvest') return;
     if(FX_SPECIAL[k]){ out.push(`<i class="minus">${FX_SPECIAL[k]}</i>`); return; }
     const pr=project(k,v);
-    const lbl=FX_LABEL[(pr&&pr.as)||k]; if(!lbl||!v) return;
+    const lbl=fxLabel((pr&&pr.as)||k); if(!lbl||!v) return;
     // La couleur dit si c'est une bonne nouvelle : « Pression 41 → 32 » en vert.
     const good=k==='pressure'?v<0:v>0;
     if(pr&&Math.round(pr.cur)!==Math.round(pr.next)){
@@ -207,10 +211,10 @@ function effectChips(effects,seed){
 function stateTable(keys){
   const seen=new Set(), rows=[];
   keys.forEach(k=>{ const pr=project(k,0); if(!pr) return;
-    const key=pr.as||k; if(seen.has(key)||!FX_LABEL[key]) return; seen.add(key);
+    const key=pr.as||k; if(seen.has(key)||!fxLabel(key)) return; seen.add(key);
     const v=pr.cur, pct=key==='form'?(v+6)/12*100:clamp(v);
     const mood=key==='pressure'?(v>=85?'low':v>=50?'mid':''):(v>=65?'':v>=35?'mid':'low');
-    rows.push(`<div class="st-row ${mood}"><span class="st-lbl">${FX_LABEL[key]}</span><span class="st-bar"><i style="width:${pct}%"></i></span><b>${Math.round(v)}</b></div>`);
+    rows.push(`<div class="st-row ${mood}"><span class="st-lbl">${fxLabel(key)}</span><span class="st-bar"><i style="width:${pct}%"></i></span><b>${Math.round(v)}</b></div>`);
   });
   if(!rows.length) return '';
   return `<div class="section-label">Où tu en es</div><div class="state-table">${rows.join('')}</div>`;
@@ -220,7 +224,7 @@ function effectKeys(list){ return list.flatMap(e=>Object.keys(e||{})); }
    par option noyaient le choix. */
 function effectInline(effects){
   return Object.entries(effects||{}).map(([k,v])=>{ const pr=project(k,v);
-    const lbl=FX_LABEL[(pr&&pr.as)||k]; if(!lbl||!v) return '';
+    const lbl=fxLabel((pr&&pr.as)||k); if(!lbl||!v) return '';
     return pr&&Math.round(pr.cur)!==Math.round(pr.next)?`${lbl} ${Math.round(pr.cur)}→${Math.round(pr.next)}`:`${lbl} ${v>0?'+':'−'}`;
   }).filter(Boolean).join(' · ');
 }
@@ -230,10 +234,12 @@ const PHASE_NAMES=['Automne','Hiver','Printemps','Sprint final'];
 function renderEvent(){
   const ce=state.currentEvent, ev=ce.event;
   if(ce.kind==='carrefour') return renderCrossroad(ev);
-  const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Hors du terrain'}[ce.kind];
+  const kind={incident:'Incident de saison',dilemma:'Dilemme',happening:'Hors du terrain',situation:'Ce qui est en train de t\'arriver'}[ce.kind];
+  // Une situation parle de ta saison : son texte se calcule au moment de l'afficher.
+  const txt=typeof ev.text==='function'?ev.text():ev.text;
   const G=state.kind==='player'?PGAUGE:GAUGE_INFO;
   const fn=state.kind==='player'?'playerChooseEvent':'coachChooseEvent';
-  return `<div class="card event-card"><div class="hint">${PHASE_NAMES[state.phase]||''} · ${kind}${ev.gauge?` · jauge ${G[ev.gauge]?G[ev.gauge].label:''} au plus bas`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(ev.text)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>${stateTable(effectKeys(ev.choices.map(c=>c.effects)))}<div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`;
+  return `<div class="card event-card"><div class="hint">${PHASE_NAMES[state.phase]||''} · ${kind}${ev.gauge?` · jauge ${G[ev.gauge]?G[ev.gauge].label:''} au plus bas`:''}</div><div class="ico">${ev.icon}</div><h2 class="display">${escapeHtml(ev.title)}</h2><p class="narr">${escapeHtml(txt)}</p><div class="choice-list">${ev.choices.filter(c=>!c.minYear||state.year>=c.minYear).map(c=>`<button class="choice-btn" onclick="${fn}(${ev.choices.indexOf(c)})"><div class="body"><b>${escapeHtml(c.label)}</b>${effectChips(c.effects,c.seed)}</div></button>`).join('')}</div>${stateTable(effectKeys(ev.choices.map(c=>c.effects)))}<div class="hint">Aucune option n'est gratuite : ce que tu gagnes d'un côté se paie de l'autre.</div></div>`;
 }
 /* Le carrefour : trois chantiers sur la table, un seul reçoit ton énergie du trimestre.
    Chaque option montre ce qu'elle fait avancer et ce qu'elle laisse reculer. */
@@ -597,6 +603,7 @@ function playerSidebar(){
   const s=state.stats,g=state.gauges,c=state.club;
   return `<div class="card"><div class="identity"><b>${escapeHtml(state.name)}</b> · ${pAge()} ans · ${state.posIcon} ${state.posName}<br>${c?`🏟️ <b>${escapeHtml(c.name)}</b> · ${escapeHtml(c.leagueName||'')} · ${ROLES[c.role].name} · coach ${escapeHtml(c.coach)}`:'Sans club'}</div>
     ${c?`<div class="section-label">Confiance du coach</div><div class="conf-big ${state.coachTrust<25?'pressure-state bad':state.coachTrust<50?'pressure-state mid':''}">${Math.round(state.coachTrust)} / 100</div><div class="bar"><i style="width:${state.coachTrust}%"></i></div><div class="hint">Décide ton temps de jeu. Concurrents au poste : ${state.squad.filter(p=>p.pos===state.pos).map(p=>`${escapeHtml(p.name)} (${playerRating(p,state.year)})`).join(', ')||'aucun'}</div>`:''}
+    ${c&&state.clubStuck&&state.clubStuck.club===c.name?`<div class="warn">🚪 Le club pense à l'après-toi. Contrat jusqu'en ${state.clubStuck.until}.</div>`:''}${c&&state.legendOf&&state.legendOf===c.name?`<div class="msg ok">🗿 Tu es de la maison ici.</div>`:''}${c&&pBenchRun()>=3?`<div class="hint">🪑 ${pBenchRun()} journées de suite sans entrer.</div>`:''}
     <div class="section-label">Toi · note ${pRating().toFixed(1)}</div>${Object.keys(PSTAT).map(k=>bar(PSTAT[k],s[k])).join('')}${bar('Forme',state.forme)}${bar('Pression',state.pressure,'pressure')}
     ${fateHTML()}
     <div class="hint">Ton agent vise ${coteLabel(playerTargetStrength())}${c&&c.contractEnd?` · contrat jusqu'en ${c.contractEnd}`:''}</div>
@@ -606,12 +613,29 @@ function playerSidebar(){
     <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,30).map(l=>`<div><span class="age">${l.year}</span>${l.msg}</div>`).join('')}</div></div>
     <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Raccrocher les crampons ?')){playerEnd('Tu décides de raccrocher les crampons.','retire');render();}">Retraite</button></div></div>`;
 }
+/* Ce que le club pense de la suite : dit au bilan, rappelé à chaque écran de
+   l'intersaison. Le déclin doit se **dire**, sinon il ne se ressent pas. */
+function clubMoodHTML(m,club){
+  if(!m) return '';
+  if(m.legend) return `<div class="msg ok">🗿 ${escapeHtml(club)} te garde jusqu'au bout. Après huit saisons, tu es de la maison : ta place ne se rediscute plus.</div>`;
+  if(m.reluctant) return `<div class="warn">🚪 ${escapeHtml(club)} aimerait tourner la page. ${escapeHtml(m.why||'')} Ton contrat court jusqu'en ${m.until} : tu restes, mais tu sais ce qu'on pense.</div>`;
+  if(!m.keep) return `<div class="warn">👋 ${escapeHtml(club)} ne te prolonge pas. ${escapeHtml(m.why||'')}</div>`;
+  return '';
+}
+function pClubNewsHTML(){
+  const out=[];
+  if(state.clubLeft) out.push(`<div class="warn">👋 ${escapeHtml(state.clubLeft.club)} ne te prolonge pas. ${escapeHtml(state.clubLeft.why||'')} Il faudra trouver ailleurs.</div>`);
+  else if(state.clubStuck) out.push(`<div class="warn">🚪 ${escapeHtml(state.clubStuck.club)} aimerait tourner la page. ${escapeHtml(state.clubStuck.why||'')} Ton contrat court jusqu'en ${state.clubStuck.until}.</div>`);
+  else if(state.legendOf&&state.club&&state.legendOf===state.club.name) out.push(`<div class="msg ok">🗿 Tu es chez toi à ${escapeHtml(state.legendOf)} : le club te gardera jusqu'à la fin.</div>`);
+  return out.join('');
+}
 /* ---------- L'intersaison du joueur·euse, en quatre temps ---------- */
 function pStepHTML(n){ return `<div class="creation-progress"><span>Intersaison · étape ${n}/4</span><div class="track"><i style="width:${n*25}%"></i></div></div>`; }
 function renderPVacances(){
   const keys=effectKeys(PVACANCES.map(v=>v.effects));
   return `<div class="card event-card">${pStepHTML(1)}<div class="ico">🌴</div><h2 class="display">L'été commence</h2>
     <p class="narr">La saison est finie. Six semaines devant toi, et tout le monde attend de savoir avec qui tu les passes.</p>
+    ${pClubNewsHTML()}
     <div class="section-label">Ce que tu fais de tes vacances</div>
     <div class="choice-list">${PVACANCES.map((v,i)=>`<button class="choice-btn" onclick="playerChooseVacances(${i})"><span class="ico">${v.icon}</span><div class="body"><b>${escapeHtml(v.label)}</b><small>${escapeHtml(v.sub)}</small>${effectChips(v.effects)}${v.risk?`<div class="traits"><i class="minus">🩼 ${Math.round(v.risk*100)} % de risque de blessure</i></div>`:''}</div></button>`).join('')}</div>
     ${stateTable(keys)}
@@ -646,6 +670,7 @@ function renderPOfferOne(){
       <div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">${ROLES[o.role].name} promis·e</span><span class="tag">${$(o.salary)} par saison</span><span class="tag">${o.duration} an${o.duration>1?'s':''}</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))}</span></div>
       <div class="offer-hint ${o.role==='titulaire'?'good':''}">${o.role==='titulaire'?'✅ On te promet la place':o.role==='rotation'?'🔄 Tu tourneras':'🪑 Tu commenceras derrière'}</div>
     </div></div>
+    ${pClubNewsHTML()}
     <div class="msg">📞 ${escapeHtml(playerAgentRead())}</div>
     <div class="btn-row"><button class="btn" onclick="playerSignOffer()">Signer ✍️</button><button class="btn danger" onclick="playerRefuseOffer()">Refuser</button></div>
     <div class="hint">Refuser fait disparaître cette offre pour de bon. La suivante peut être meilleure. Ou il n'y en aura pas.</div></div>`;
@@ -659,6 +684,7 @@ function renderPOffers(){
   if(!offers.length) return `<div class="card"><h2 class="display">Aucune proposition</h2><p class="narr">Ton agent ne répond plus. Le marché t'a oublié·e cette année.</p><div class="btn-row"><button class="btn" onclick="playerSkipYear()">Attendre une année</button></div></div>`;
   const stay=offers.find(o=>o.stay); const under=stay&&stay.underContract;
   return `<div class="card"><h2 class="display">${under?'Intersaison sous contrat':'Ton agent a des propositions'}</h2><p class="hint">${state.year} · ${pAge()} ans · note ${pRating().toFixed(1)} · ton agent vise ${coteLabel(playerTargetStrength())}. ${under?`Ton contrat court jusqu'en ${state.club.contractEnd}. ${offers.length>1?'Un club vient te chercher.':'Aucun club ne s\'est manifesté cette année.'}`:'Le rôle promis pèse sur ton temps de jeu, ta progression et ta pression.'}</p>
+    ${pClubNewsHTML()}
     <div class="offer-grid">${offers.map((o,i)=>`<div class="offer-card affordable ${o.poach?'poach':''}" onclick="playerAcceptOffer(${i});render()"><div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label}${o.stay?(o.underContract?' · sous contrat':' · prolonger'):o.poach?' · vient te chercher':''}</div><h3>${escapeHtml(o.club)}</h3><div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">${ROLES[o.role].name}</span><span class="tag">${o.stay&&o.underContract?`${o.duration} an${o.duration>1?'s':''} restant${o.duration>1?'s':''}`:`${o.duration} an${o.duration>1?'s':''}`}</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))} · ${gapLabel(o.gap||0)}</span></div><div class="budget">${$(o.salary)} / saison</div><div class="offer-hint">Coach : ${escapeHtml(o.coach)} · ${o.role==='titulaire'?'⭐ Temps de jeu garanti, pression maximale':o.role==='rotation'?'🔄 Du temps de jeu à gagner':'🪑 Peu de matchs, progression lente'}</div></div>`).join('')}</div>
     <div class="btn-row">${under?'<button class="btn secondary" onclick="if(confirm(\'Demander ton transfert ? Supporters −6, entourage −3.\')) playerBreakContract()">Demander un transfert</button>':''}<button class="btn secondary" onclick="playerSkipYear()">Refuser tout et attendre une année</button></div></div>`;
 }
@@ -677,6 +703,8 @@ function renderPSeasonEnd(){
   return `<div class="card"><div class="result-hero"><span class="result-hero-icon">${f.ballon?'🏅':f.champion?'🏆':f.bad?'🥶':f.note>=6.8?'🔥':'📊'}</span><h2 class="display">${escapeHtml(f.club)} · ${f.year}-${f.year+1}</h2><div class="verdict">${ROLES[f.role].name} · note ${f.note.toFixed(2)} · ${ordinal(f.pos)} sur ${f.teams} en ${escapeHtml(f.league)}</div></div>
     <div class="score-grid"><div class="score-box gold"><div class="v">${f.apps}</div><div class="k">Matchs</div></div><div class="score-box good"><div class="v">${f.goals}</div><div class="k">Buts</div></div><div class="score-box good"><div class="v">${f.assists}</div><div class="k">Passes</div></div><div class="score-box"><div class="v">${Math.round(f.share*100)} %</div><div class="k">Temps de jeu</div></div><div class="score-box gold"><div class="v">${$(f.salary)}</div><div class="k">Salaire</div></div></div>
     ${lines.map(l=>`<div class="trophy-line">${l}</div>`).join('')}
+    ${f.idle?`<div class="warn">🌫️ ${escapeHtml(f.idle.text)}<br><span class="hint">${f.idle.lines.join(' · ')}</span></div>`:''}
+    ${clubMoodHTML(f.clubMood,f.club)}
     <div class="section-label">Classement final</div>${tableHTML(f.table,f.club,false)}
     <div class="btn-row"><button class="btn" onclick="playerAfterSeasonEnd()">Intersaison →</button></div></div>`;
 }
@@ -697,7 +725,9 @@ function renderHall(){ showGameBanner(); filmstripEl.style.display='none'; const
 function renderRules(){ showGameBanner(); filmstripEl.style.display='none'; app.innerHTML=`<div class="fade-in"><div class="card rules"><h2 class="display">Comment ça marche</h2>
   <h3>Les époques</h3><ul>${ERAS.map(e=>`<li><b>${e.icon} ${e.name}</b> (${e.start}-${e.end}) : ${e.rules.join(', ')}.</li>`).join('')}<li>Les joueurs réels apparaissent selon leur âge dans l'année en cours. Une carrière longue traverse l'époque suivante.</li></ul>
   <h3>Carrière d'entraîneur·euse</h3><ul><li>Chaque offre fixe un championnat réel, un objectif de classement, un budget de transferts et un président avec son caractère.</li><li>Le mercato est libre : vends, recrute des stars (si ta crédibilité le permet), des pros, des pépites (parfois des arnaques), des joueurs libres ou des jeunes du centre. Un « gros coup » coûte cher et exige une place de titulaire.</li><li>La force de l'équipe vient de ton onze type, du vestiaire, de la cohérence entre ton style et celui que le club demande, de ta tactique et de la dynamique.</li><li><b>Rythme</b> : « Temps forts » (par défaut) ne t'arrête que sur les chocs, les concurrents directs, les matchs de la peur, la reprise de chaque phase, et sur une alerte (blessé ou suspendu dans ton onze, trois défaites de suite, président impatient). Les autres matchs se jouent avec ta compo et apparaissent en résumé. « Complet » joue tout, « Rapide » ne s'arrête qu'à la reprise. Changeable à tout moment dans la barre latérale.</li><li><b>Cote et contrats</b> : ta cote (0-100) résume ce que ta carrière vaut ; les offres arrivent autour d'elle, un cran au-dessus après une bonne saison, en dessous après un échec. Tant que ton contrat court et que le président te garde, tu restes, sauf si un club plus ambitieux vient te chercher. Rompre coûte de la réputation.</li><li>La saison se joue journée par journée, en quatre phases. Avant chaque match : l'adversaire (force, style, forme), ta formation, ton onze, ton banc, ton capitaine, ton approche et l'entraînement de la semaine. Le match se déroule minute par minute (buts, penaltys, cartons, blessures, remplacements), avec une décision à la mi-temps. Chaque joueur reçoit une note. Un bouton simule le reste de la phase avec le onze automatique.</li><li>Fraîcheur : un titulaire perd 10 à 16 points par match selon son âge et en récupère 9 par semaine (plus avec le staff et l'entraînement). Sous 75 %, son niveau baisse et il se blesse plus. Trois avertissements ou un rouge : suspension.</li><li>Styles : contrôle bat pression, pression bat contre, contre bat contrôle, le jeu direct ouvre le match. Le style de l'adversaire est visible avant le coup d'envoi.</li><li><b>Confiance du président</b> : elle monte quand tu dépasses l'objectif, chute quand tu es en dessous ou que la masse salariale explose. À zéro, licenciement immédiat. Sous 35 en fin de saison, pas de prolongation.</li><li>Quatre jauges du club : Vestiaire (force de l'équipe), Supporters (pression et patience), Formation (jeunes, arnaques), Staff (blessures, progression). Une jauge basse déclenche des dilemmes.</li><li>Pression : à 100, une crise impose un choix, dont un à 50 % de risque de mort. Entre 90 et 99, 1 % de risque par intersaison.</li><li>Roulette du destin : après trois saisons, 20 % de chance par intersaison, quatre issues cachées dont une fatale.</li><li>Fin : 75 ans, quatre licenciements d'affilée, deux années sans offre, roulette, pression, retraite.</li></ul>
-  <h3>Carrière de joueur·euse</h3><ul><li>Tu rejoins des clubs réels avec un rôle promis. Ton temps de jeu dépend de ta note face aux concurrents à ton poste et de la confiance du coach.</li><li><b>Rythme et contrats</b> : même logique qu'en mode entraîneur·euse. Les temps forts sont les chocs où tu es dans le groupe, les penaltys, une blessure, une place perdue ou retrouvée. Ton agent vise un niveau de club selon ta note, ta dernière saison, la sélection et ton âge ; sous contrat, tu restes sauf si un club vient te chercher ou si tu demandes ton transfert.</li><li>Chaque journée, le coach compose : ta note face aux concurrents, sa confiance, le rôle promis et ta fraîcheur décident si tu es titulaire, sur le banc ou en tribune. Tu vis le match minute par minute avec une note à la fin, et un penalty à tirer ou non quand il se présente.</li><li>Quatre jauges : Corps (à zéro, fin de carrière), Vestiaire, Supporters, Entourage.</li><li>Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.</li></ul>
+  <h3>Carrière de joueur·euse</h3><ul><li>Tu rejoins des clubs réels avec un rôle promis. Ton temps de jeu dépend de ta note face aux concurrents à ton poste et de la confiance du coach.</li><li><b>Rythme et contrats</b> : même logique qu'en mode entraîneur·euse. Les temps forts sont les chocs où tu es dans le groupe, les penaltys, une blessure, une place perdue ou retrouvée. Ton agent vise un niveau de club selon ta note, ta dernière saison, la sélection et ton âge ; sous contrat, tu restes sauf si un club vient te chercher ou si tu demandes ton transfert.</li><li>Chaque journée, le coach compose : ta note face aux concurrents, sa confiance, le rôle promis et ta fraîcheur décident si tu es titulaire, sur le banc ou en tribune. Tu vis le match minute par minute avec une note à la fin, et un penalty à tirer ou non quand il se présente.</li><li>Quatre jauges : Corps (à zéro, fin de carrière), Vestiaire, Supporters, Entourage.</li><li>Sélection nationale, Ballon d'or, Soulier d'or, coupes d'Europe. Progression forte avant 25 ans, déclin après 31.</li>
+  <li><b>La fin de carrière</b> : les clubs qui appellent dépendent de ton niveau <i>du moment</i>, pas d'une sélection passée ; après 33 ans les plus grands ne construisent plus avec toi. Ton club regarde ton âge, ta dernière saison et ton corps : il peut ne pas prolonger, et il te le dit. Tant que ton contrat court, tu restes — en sachant ce qu'on pense. Huit saisons au même club font de toi une légende maison : celui-là te gardera jusqu'au bout.</li>
+  <li><b>Ne pas jouer coûte</b> : une saison sous 18 % de temps de jeu abîme le moral, la pression et ta place dans le groupe. Les semaines en tribune deviennent des décisions — travailler seul, parler au coach, ou mettre la tête ailleurs.</li></ul>
   <div class="btn-row"><button class="btn secondary" onclick="${state?'render()':'renderStart()'}">Retour</button></div></div></div>`; scrollTop(); }
 
 /* ---------- Le match : écrans partagés ---------- */

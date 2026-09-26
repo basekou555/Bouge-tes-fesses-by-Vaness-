@@ -207,7 +207,7 @@ function playerFreshState(c){
   const g={corps:75,vestiaire:50,supporters:45,entourage:50}; [c.origin,c.trait].forEach(o=>Object.entries(o.gauges||{}).forEach(([k,v])=>g[k]=clamp(g[k]+v)));
   const nat=c.origin.nat==='AF'?pick(['SN','CI','ML','CM','DZ','MA']):'FR';
   return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, focus:[], lastFocus:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
-    stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, ended:false, endingText:'', endingCause:null };
+    stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, benchRun:0, clubLeft:null, clubStuck:null, legendOf:null, ended:false, endingText:'', endingCause:null };
 }
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
 function pAge(){ return state.year-state.born; }
@@ -253,7 +253,61 @@ function playerTargetStrength(){
   if(state.selected) t+=2; if(pAge()>=32) t-=3; if(pAge()<=19) t-=2;
   return t;
 }
-function playerTiers(){ const t=['amateur','ligue2','ligue1']; if(state.gauges.entourage>=45) t.push('etranger'); t.push('europe'); if(state.selected||state.gauges.supporters>=60||pRating()>=76) t.push('superclub'); return t; }
+/* Qui t'appelle dépend de ton niveau **du moment**, pas d'un exploit passé.
+   Retour du propriétaire (26/09/2026) : « à la fin de carrière le joueur baisse
+   en note globale mais les clubs proposés restent le Real, le Barça, le Bayern ».
+   C'était exact : `state.selected` est un drapeau permanent — une seule sélection
+   à 24 ans ouvrait les super-clubs jusqu'à 38 ans. */
+function playerTiers(){
+  const r=pRating(), age=pAge(), t=['amateur','ligue2'];
+  if(r>=58) t.push('ligue1');
+  if(state.gauges.entourage>=45&&r>=60) t.push('etranger');
+  if(r>=70) t.push('europe');
+  if(r>=78&&(state.selected||state.gauges.supporters>=55)) t.push('superclub');
+  // Après 34 ans, les grands clubs ne construisent plus avec toi — sauf si tu es
+  // encore à leur niveau, et même là, plus pour longtemps.
+  if(age>=35) return t.filter(x=>x!=='superclub'&&(x!=='europe'||r>=76));
+  if(age>=33&&r<80) return t.filter(x=>x!=='superclub');
+  return t;
+}
+/* Depuis combien de journées tu n'es pas entré·e, et quelle part du temps tu as
+   jouée depuis le début de la saison : deux lectures dont les situations ont besoin. */
+function pBenchRun(){ return state.benchRun||0; }
+function pShareSoFar(){ const ss=state.seasonStats; if(!ss||!ss.shares.length) return null; return ss.shares.reduce((n,x)=>n+x,0)/ss.shares.length; }
+/* Ton club a-t-il encore envie de toi ? Il regarde ton niveau contre le sien et
+   ton âge, comme n'importe quel club regarde un joueur qui décline. */
+function playerClubWants(){
+  const c=state.club; if(!c) return {keep:true};
+  const r=pRating(), age=pAge(), gap=r-c.strength, last=state.lastSeason;
+  const share=last?last.share:1, note=last?last.note:6.5;
+  // Une légende maison : huit saisons au même club, on te garde pour finir chez toi.
+  if(c.since>=8) return {keep:true,legend:true};
+  if(state.coachTrust<30) return {keep:false,why:"Le coach ne compte plus sur toi."};
+  if(state.consecutiveBad>=2) return {keep:false,why:"Deux saisons de trop sans rien montrer."};
+  if(age>=37) return {keep:false,why:"On te propose un pot de départ, pas un contrat."};
+  if(age>=35&&share<.5) return {keep:false,why:`À ${age} ans, tu n'as joué que ${Math.round(share*100)} % du temps : le club veut ces minutes pour ses jeunes.`};
+  if(age>=34&&(gap<-3||note<6.2)) return {keep:false,why:`${Math.round(r)} de niveau à ${age} ans, une saison à ${note.toFixed(1)} de moyenne : le club regarde déjà la génération suivante.`};
+  if(age>=32&&state.gauges.corps<52) return {keep:false,why:"Le médecin du club a été clair : physiquement, tu n'es plus au top."};
+  if(age>=31&&gap<-9) return {keep:false,why:`Le club joue à ${c.strength} de niveau, toi à ${Math.round(r)}. On te remercie poliment.`};
+  return {keep:true};
+}
+function playerClubDecision(c){
+  if(!c) return null;
+  const wants=playerClubWants();
+  state.clubLeft=null; state.clubStuck=null;
+  if(wants.keep){
+    if(wants.legend&&state.legendOf!==c.name){ state.legendOf=c.name; log(`🗿 ${c.since} saisons à ${c.name} : tu y es chez toi. Le club te gardera jusqu'au bout.`); }
+    return wants;
+  }
+  if(c.contractEnd>state.year){
+    state.clubStuck={club:c.name,why:wants.why,until:c.contractEnd};
+    log(`🚪 ${c.name} aimerait tourner la page. ${wants.why} Ton contrat court jusqu'en ${c.contractEnd} : tu restes, mais tu sais ce qu'on pense.`);
+    return {keep:true,reluctant:true,why:wants.why,until:c.contractEnd};
+  }
+  state.clubLeft={club:c.name,why:wants.why};
+  log(`👋 ${c.name} ne te prolonge pas. ${wants.why}`);
+  return wants;
+}
 function playerBuildOffer(tier,forced){
   const o=buildCoachOffer(tier,forced); const r=pRating();
   const gap=r-o.strength; const role=gap>=4?'titulaire':gap>=-4?pick(['titulaire','rotation']):gap>=-10?pick(['rotation','remplacant']):'remplacant';
@@ -264,7 +318,11 @@ function playerBuildOffer(tier,forced){
 }
 function playerGenerateOffers(opts={}){
   const offers=[]; const c=state.club; const target=playerTargetStrength(); const last=state.history[state.history.length-1];
-  const clubKeeps=!!(c&&state.coachTrust>=30&&state.consecutiveBad<2); const underContract=!!(c&&c.contractEnd>state.year&&!opts.broke);
+  // La décision du club a été prise au bilan de saison (`playerClubDecision`) et dite
+  // à l'écran : on la lit ici, on ne la recalcule pas — sinon l'offre pourrait
+  // contredire ce que le bilan vient d'annoncer.
+  const left=c&&state.clubLeft&&state.clubLeft.club===c.name?state.clubLeft:null;
+  const clubKeeps=!!c&&!left; const underContract=!!(c&&c.contractEnd>state.year&&!opts.broke);
   if(c&&clubKeeps&&!opts.noStay){ const o=playerBuildOffer(c.tier,{name:c.name,nat:c.nat,league:c.league,s:c.s}); o.stay=true; o.coach=c.coach; o.underContract=underContract; if(underContract){ o.role=c.role; o.salary=c.salary; o.duration=c.contractEnd-state.year; } else { o.salary=Math.max(o.salary,c.salary*rand(1,1.3)); } o.gap=o.strength-target; offers.push(o); }
   const tiers=playerTiers(); const pool=[]; let tries=0;
   while(pool.length<18&&tries<50){ tries++; const o=playerBuildOffer(pick(tiers)); if((c&&o.club===c.name)||pool.some(x=>x.club===o.club)) continue; o.gap=o.strength-target; pool.push(o); }
@@ -304,8 +362,9 @@ function playerAcceptOffer(i){
     state.squad=squad; state.club={name:o.club,tier:o.tier,nat:o.nat,league:o.league,s:o.s,strength:o.strength,leagueName:o.leagueName,coach:o.coach,role:o.role,salary:o.salary,since:1,contractEnd:state.year+o.duration};
     state.coachTrust=o.role==='titulaire'?62:o.role==='rotation'?50:40; state.gauges.vestiaire=clamp(state.gauges.vestiaire*.6+25); state.gauges.supporters=clamp(state.gauges.supporters*.5+22);
     if(!state.clubs.includes(o.club)) state.clubs.push(o.club); if(o.tier==='superclub') unlockTrophy('p-superclub');
+    state.legendOf=null;
   }
-  state.currentOffers=[]; log(`🖊️ ${o.stay?(o.underContract?'Tu poursuis à':'Tu prolonges à'):o.poach?'Transfert ! Tu signes à':'Tu signes à'} <b>${o.club}</b> (${o.leagueName}) : ${ROLES[o.role].name.toLowerCase()} promis·e, ${money(o.salary,state.year)} par saison, coach ${o.coach}${o.stay&&o.underContract?'':`, jusqu'en ${state.club.contractEnd}`}.`);
+  state.currentOffers=[]; state.clubLeft=null; log(`🖊️ ${o.stay?(o.underContract?'Tu poursuis à':'Tu prolonges à'):o.poach?'Transfert ! Tu signes à':'Tu signes à'} <b>${o.club}</b> (${o.leagueName}) : ${ROLES[o.role].name.toLowerCase()} promis·e, ${money(o.salary,state.year)} par saison, coach ${o.coach}${o.stay&&o.underContract?'':`, jusqu'en ${state.club.contractEnd}`}.`);
   playerStartSeason();
 }
 /* Un carrefour : trois chantiers, un seul reçoit tes heures. Les deux autres reculent. */
@@ -374,6 +433,9 @@ function playerDrawPhaseEvent(){
   PLAYER_INCIDENTS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)&&(!e.gauge||low.includes(e.gauge)))
     .forEach(e=>bag.push({kind:'incident',event:e,w:1.8}));
   PLAYER_HAPPENINGS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)).forEach(e=>bag.push({kind:'happening',event:e,w:2}));
+  // Une situation vraie passe devant une anecdote : elle ne se tire que si `when` est
+  // vrai, et elle pèse assez pour être vue quand elle l'est.
+  PLAYER_SITUATIONS.forEach(e=>bag.push({kind:'situation',event:e,w:14}));
   return weightedDraw(bag);
 }
 function playerChooseEvent(i){
@@ -484,8 +546,8 @@ function playerAfterMatchSim(P){
     state.totals.apps++; state.totals.goals+=s.goals; state.totals.assists+=s.assists;
     dTrust=clamp((note-6.2)*2.5,-4,4); state.forme=clamp(state.forme-.9+(note>=7?1.5:0)); state.gauges.corps=clamp(state.gauges.corps-.4*(s.min/90)-(pAge()>=30?.3:0));
     if(s.goals>=2) state.gauges.supporters=clamp(state.gauges.supporters+2); if(note>=7.5) state.gauges.supporters=clamp(state.gauges.supporters+1); if(note<5.5) state.gauges.supporters=clamp(state.gauges.supporters-1);
-    if(s.inj){ state.gauges.corps=clamp(state.gauges.corps-s.inj*.6); } }
-  else { ss.shares.push(0); if(m.myStatus==='bench'){ dTrust=-.6; state.forme=clamp(state.forme+1); } state.gauges.vestiaire=clamp(state.gauges.vestiaire-(m.myStatus==='out'?.3:0)); }
+    if(s.inj){ state.gauges.corps=clamp(state.gauges.corps-s.inj*.6); } state.benchRun=0; }
+  else { ss.shares.push(0); state.benchRun=(state.benchRun||0)+1; if(m.myStatus==='bench'){ dTrust=-.6; state.forme=clamp(state.forme+1); } state.gauges.vestiaire=clamp(state.gauges.vestiaire-(m.myStatus==='out'?.3:0)); }
   state.coachTrust=clamp(state.coachTrust+dTrust+(res==='W'?.3:res==='L'?-.3:0));
   const rec={home:ha.home,away:ha.away,gh:ha.gh,ga:ha.ga,us:m.home?'home':'away',res,matchday:m.matchday,ht:m.ht,story:m.story,scorers:matchScorersText(m,P),events:m.events,ratings:m.ratings,motm:m.motm,xi:m.xi,bench:m.bench,played,start:!!(s&&s.start),min:s?s.min:0,goals:s?s.goals:0,assists:s?s.assists:0,yellow:s?s.yellow:0,red:s?s.red:0,inj:s?s.inj:0,note,dTrust:Math.round(dTrust*10)/10,status:m.myStatus,penNote:m.penNote||'',pos:tablePos(comp.table,c.name),themStrength:Math.round(m.themStrength),themStyle:m.themStyle};
   state.phaseMatches.push(rec); state.lastMatch=rec; state.matchday++;
@@ -567,14 +629,25 @@ function playerEndSeason(){
   state.lastTrain={effort:Math.round(effort*100)/100,curve:Math.round(curve*100)/100,weeks:(ss.trainWeeks||0),share,growth:Math.round(g*10)/10};
   state.gauges.corps=clamp(state.gauges.corps+8-(age>=32?4:0)); state.forme=clamp(state.forme+12); state.pressure=clamp(state.pressure-6);
   state.gauges.supporters=clamp(state.gauges.supporters+(champion?8:0)+(bad?-5:2)); state.gauges.entourage=clamp(state.gauges.entourage+(selected?3:0)+(bad?-2:1));
-  const season={year,club:c.name,league:c.leagueName,tier:c.tier,role:c.role,pos,teams:N,champion,relegated,cupWon:cup.won,cupRounds:cup.roundsReached,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached}:null,apps:ss.apps,goals:ss.goals,assists:ss.assists,note:avgNote,share:avgShare,selected,caps,capGoals,ballon,boot,bad,salary:c.salary,table:table.map(t=>({...t})),age};
+  // Ne pas jouer coûte quelque chose. Une année passée en tribune laissait jusqu'ici
+  // le moral intact : c'était la saison la moins chère de la carrière.
+  let idle=null;
+  if(ss.shares.length>=10&&avgShare<.18){
+    const hard=avgShare<.06;
+    const eff={mental:hard?-5:-3,pressure:hard?10:6,supporters:-4,vestiaire:-3};
+    playerApplyEffects(eff);
+    idle={apps:ss.apps,share:avgShare,hard,text:hard?`Tu as traversé l'année en tribune : ${ss.apps} match${ss.apps>1?'s':''} joué${ss.apps>1?'s':''} sur ${ss.shares.length}. Une année de carrière, pour rien.`:`${Math.round(avgShare*100)} % du temps de jeu : une saison qu'on regarde plus qu'on ne la joue.`,lines:[`🧠 Mental ${hard?-5:-3}`,`🌡️ Pression +${hard?10:6}`,'📣 Supporters −4','✊ Vestiaire −3']};
+    log(`🌫️ ${idle.text}`);
+  }
+  const season={idle,year,club:c.name,league:c.leagueName,tier:c.tier,role:c.role,pos,teams:N,champion,relegated,cupWon:cup.won,cupRounds:cup.roundsReached,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached}:null,apps:ss.apps,goals:ss.goals,assists:ss.assists,note:avgNote,share:avgShare,selected,caps,capGoals,ballon,boot,bad,salary:c.salary,table:table.map(t=>({...t})),age};
   state.history.push(season); state.lastSeason=season;
   // développement des coéquipiers et contrats
   developSquad(state.squad,year,{minutes:null,formation:50,staff:50,vestiaire:state.gauges.vestiaire});
   state.squad=state.squad.filter(p=>playerAge(p,year+1)<36||Math.random()<.5);
   if(c.since>=8) unlockTrophy('p-legend');
   const eraBefore=eraForYear(year).id; state.year++; state.age++; if(eraForYear(state.year).id!==eraBefore){ unlockTrophy('p-era-cross'); log(`⏳ Nouvelle époque : <b>${eraForYear(state.year).name}</b>.`); }
-  state.comp=null; state.match=null;
+  state.comp=null; state.match=null; state.benchRun=0;
+  season.clubMood=playerClubDecision(c);
   log(`🏁 Saison terminée : ${ss.apps} matchs, ${ss.goals} buts, ${ss.assists} passes, note ${avgNote.toFixed(2)}. ${c.name} ${ordinal(pos)}${champion?' 🏆':''}${cup.won?' 🥇':''}${euro&&euro.won?' ⭐':''}${selected?` · 🇫🇷 ${caps} sélections`:''}${ballon?' · 🏅 Ballon d\'or':''}.`);
   state.pendingChoice='seasonEnd'; saveGame();
 }

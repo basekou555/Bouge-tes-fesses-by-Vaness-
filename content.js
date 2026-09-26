@@ -499,6 +499,45 @@ const PLAYER_HAPPENINGS=[
   {label:"Te déclarer forfait",result:"Ton club respire. La sélection note ton nom quelque part.",effects:{coachTrust:6,forme:3,supporters:-5,selectionBoost:-15}}]},
 ];
 
+/* ---------- Les situations : ce que ta saison rend vrai ----------
+   Retour du propriétaire (26/09/2026) : « je fais deux saisons pleines où je joue
+   zéro match, c'est quand même peu commun ; ces années-là il faut qu'on arrive à
+   faire passer le temps autrement » et « au bout d'un moment le club n'est pas censé
+   vouloir le garder, son niveau a diminué, il faut penser aux prochaines générations…
+   on ne ressent pas cette continuité dans le jeu ».
+   Une situation ne se tire que quand elle est vraie (`when`), et elle passe devant le
+   reste du sac : c'est ce qui est en train de t'arriver, pas une anecdote. */
+const PLAYER_SITUATIONS=[
+ {id:'ps-tribune',icon:'🪑',title:"Des semaines sans une minute",when:()=>pBenchRun()>=5,
+  text:()=>`${pBenchRun()} matchs de suite sans entrer. Tu t'entraînes tous les jours pour des journées qui ne t'appartiennent pas.`,choices:[
+  {label:"Demander une explication au coach",result:"Il te parle franchement : tu n'es pas dans ses plans du moment, mais il respecte la démarche.",effects:{coachTrust:4,mental:-1,pressure:3}},
+  {label:"Rester après chaque séance",result:"Personne ne te voit jouer, mais tout le staff te voit travailler.",effects:{technique:2,physique:1,corps:-3,coachTrust:2}},
+  {label:"Faire passer le message par ton agent",result:"Le vestiaire apprend que tu veux partir avant le coach.",effects:{coachTrust:-6,vestiaire:-4,entourage:2,minutes:-.05}},
+  {label:"Mettre la tête ailleurs",result:"La famille, la maison, les gens : ces semaines-là servent à autre chose.",effects:{entourage:8,mental:2,coachTrust:-3,forme:-4}}]},
+ {id:'ps-tribune-long',icon:'🌫️',title:"Une saison qui passe sans toi",when:()=>pShareSoFar()!=null&&state.seasonStats.shares.length>=8&&pShareSoFar()<.12,
+  text:()=>`On est en ${state.year+1} et tu as joué ${state.seasonStats.apps} match${state.seasonStats.apps>1?'s':''}. Une année de ta carrière est en train de disparaître.`,choices:[
+  {label:"Prendre le club à la gorge en janvier",result:"Tu exiges de partir. Le club te répond qu'il verra en juin.",effects:{pressure:8,coachTrust:-4,supporters:-3,bigOfferNext:true}},
+  {label:"Accepter l'année et bâtir la suivante",result:"Tu passes l'hiver à travailler pour un été où tu seras prêt·e.",effects:{technique:2,physique:2,mental:2,corps:-4,pressure:-4}},
+  {label:"Vivre autre chose en attendant",result:"Un enfant qu'on emmène à l'école, des dimanches à la maison. Le foot attendra mai.",effects:{entourage:10,mental:3,physique:-2,coachTrust:-4}},
+  {label:"T'enfermer là-dedans",result:"Tu ne parles plus à personne. Le corps tient, la tête non.",effects:{mental:-6,pressure:10,vestiaire:-5,entourage:-5,technique:1}}]},
+ {id:'ps-corps',icon:'🦴',title:"Le corps ne suit plus",when:()=>pAge()>=33||(pAge()>=31&&state.gauges.corps<62),
+  text:()=>`${pAge()} ans. Le préparateur te le dit sans détour : tu ne récupères plus comme avant, et ça se voit en fin de match.`,choices:[
+  {label:"Changer de jeu : moins courir, mieux placer",result:"Tu joues dix mètres plus bas et tu touches plus de ballons.",effects:{technique:3,physique:-2,mental:2,corps:4}},
+  {label:"Doubler la salle et les soins",result:"Le corps répond encore, à condition de ne plus jamais lâcher.",effects:{physique:2,corps:6,money:-.12,mental:-1}},
+  {label:"Serrer les dents sans rien changer",result:"Tu tiens le rythme trois mois. Après, on verra.",effects:{corps:-8,forme:4,coachTrust:3,injure:2}}]},
+ {id:'ps-depart',icon:'🚪',title:"Le club pense à la suite",when:()=>{const c=state.club; if(!c||pAge()<32) return false; const last=state.lastSeason; return pRating()<c.strength-1||pAge()>=34||(last&&last.note<6.4);},
+  text:()=>`Le directeur sportif t'invite à déjeuner. « Tu sais où on en est : le club joue à ${state.club.strength} de niveau, et physiquement tu n'es plus au top. On construit pour les prochaines saisons. »`,choices:[
+  {label:"Accepter un rôle de cadre qui joue peu",result:"Tu encadres les jeunes, tu joues les fins de match. Le vestiaire t'appelle « le patron ».",effects:{vestiaire:9,mental:2,minutes:-.12,coachTrust:5}},
+  {label:"Répondre que tu te bats pour ta place",result:"Le coach n'a rien promis, mais il a noté.",effects:{pressure:8,coachTrust:2,mental:-2,physique:1}},
+  {label:"Demander à partir maintenant",result:"Tu préfères choisir ta sortie plutôt qu'on te la donne.",effects:{coachTrust:-8,supporters:-4,entourage:3,bigOfferNext:true}},
+  {label:"Parler d'après : le diplôme, le club, la suite",result:"On te propose un rôle au club quand tu raccrocheras. Ça change le regard sur les mois qui restent.",effects:{mental:4,entourage:5,pressure:-8,coachTrust:-2}}]},
+ {id:'ps-jeune',icon:'🐣',title:"Le jeune qui prend ta place",when:()=>pAge()>=31&&!!state.club,
+  text:"Un gamin de dix-huit ans à ton poste s'entraîne avec le groupe. Tout le monde a compris ce que ça veut dire.",choices:[
+  {label:"Le prendre sous ton aile",result:"Tu lui apprends le métier. Il te prendra ta place plus vite, et mieux.",effects:{vestiaire:8,supporters:3,mental:2,minutes:-.08}},
+  {label:"Lui montrer qu'il n'est pas prêt",result:"Deux séances où tu le passes en boucle. Le message est reçu.",effects:{coachTrust:4,vestiaire:-4,physique:1,corps:-3}},
+  {label:"L'ignorer complètement",result:"Ce n'est pas ton problème. Le staff trouve ça petit.",effects:{coachTrust:-3,vestiaire:-3,mental:-1}}]},
+];
+
 const PLAYER_DILEMMAS=[
  {gauge:'corps',icon:'🩻',title:"Le corps parle",text:"Douleurs partout, sommeil cassé. Le préparateur propose un programme radical.",choices:[{label:"Suivre le programme",effects:{corps:10,forme:3,money:-.03}},{label:"Le suivre à moitié",effects:{corps:4}},{label:"Ignorer",effects:{corps:-5,injure:3}}]},
  {gauge:'corps',icon:'🥗',title:"Le nutritionniste",text:"Un nutritionniste veut bannir tes plats préférés.",choices:[{label:"Accepter",effects:{corps:8,mental:-1}},{label:"Compromis",effects:{corps:3}},{label:"Refuser",effects:{corps:-3,vestiaire:1}}]},

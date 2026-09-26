@@ -94,7 +94,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
     for(let run=0;run<8;run++){
       try{
         localStorage.clear(); const era=ERAS[run%ERAS.length];
-        creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer(); state.tempo=pick(Object.keys(TEMPOS));
+        const psup=[]; let pidle=0; creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer(); state.tempo=pick(Object.keys(TEMPOS));
         let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0}, pdashSeen=false, onceEv=new Set();
         while(!state.ended&&steps<5000){
           steps++; const pc=state.pendingChoice; if(steps%100===0) await new Promise(r=>setTimeout(r,0));
@@ -104,6 +104,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='envies'){ const h=renderPWish(); if(!/playerChooseWish/.test(h)) throw new Error("écran des envies vide"); playerChooseWish(rnd(PWISHES.length)); }
           else if(pc==='offerOne'){ const n0=(state.offerQueue||[]).length;
             const h=renderPOfferOne(); if(!/playerSignOffer/.test(h)) throw new Error("offre unique non affichée");
+            // Ce que le club a décidé au bilan doit être dit sur l'écran des offres.
+            if(state.clubLeft&&!/ne te prolonge pas/.test(h)) throw new Error("non-renouvellement non affiché");
+            // Après 35 ans, un super-club ne construit plus avec toi.
+            (state.offerQueue||[]).forEach(o=>{ if(pAge()>=35&&o.tier==='superclub'&&!o.stay) throw new Error('offre de super-club à '+pAge()+' ans'); if(o.tier==='superclub'&&!o.stay) psup.push([pAge(),Math.round(pRating()),o.strength]); });
             if(n0>1&&Math.random()<.45){ playerRefuseOffer();
               const n1=(state.offerQueue||[]).length; if(n1!==n0-1) throw new Error(`refus : file de ${n1} au lieu de ${n0-1}`); }
             else playerSignOffer(); }
@@ -120,21 +124,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='penalty'){ pstat.pen++; playerPenaltyChoice(Math.random()<.7); }
           else if(pc==='matchResult'){ const m=state.lastMatch; pstat.n++; if(m.played) pstat.played++; if(m.start) pstat.start++; pstat.g+=m.gh+m.ga; if(m.inj) pstat.inj++; playerAfterMatch(); }
           else if(pc==='phaseResult'){ if(!pdashSeen){ pdashSeen=true; const h=renderPlayerDashboard(); if(!h||h.length<400) throw new Error('tableau de bord joueur vide'); } playerAfterPhase(); }
-          else if(pc==='seasonEnd'){ playerAfterSeasonEnd(); }
+          else if(pc==='seasonEnd'){ const h=renderPSeasonEnd(); const f=state.lastSeason;
+            if(f.idle&&!/Mental/.test(h)) throw new Error("saison sans jouer non expliquée");
+            if(f.clubMood&&!f.clubMood.keep&&!/ne te prolonge pas/.test(h)) throw new Error("non-renouvellement absent du bilan");
+            if(f.idle) pidle++;
+            playerAfterSeasonEnd(); }
           else if(pc==='roulette'){ playerChooseRoulette(rnd(4)); }
           else if(pc==='pressureCrisis'){ playerChoosePressure(rnd(3)); }
           else { res.player.push({run,error:'unknown pc '+pc}); break; }
           render();
         }
         render();
-        res.player.push({run,era:era.id,pos:state.pos,cause:state.endingCause,age:pAge(),seasons:state.history.length,totals:state.totals,note:Math.round(pRating()),clubs:state.clubs.length,best:state.history.reduce((b,h)=>Math.max(b,h.note||0),0).toFixed(2),p:pstat,ev:pcar,entourage:Math.round(state.gauges.entourage)});
+        res.player.push({run,era:era.id,pos:state.pos,cause:state.endingCause,age:pAge(),seasons:state.history.length,totals:state.totals,note:Math.round(pRating()),clubs:state.clubs.length,sup:psup.length,idle:pidle,best:state.history.reduce((b,h)=>Math.max(b,h.note||0),0).toFixed(2),p:pstat,ev:pcar,entourage:Math.round(state.gauges.entourage)});
       }catch(e){ res.player.push({run,error:e.message+' @ '+(e.stack||'').split('\n')[1],pc:state&&state.pendingChoice}); }
     }
     try{ renderBadges(); renderHall(); renderRules(); state=null; renderStart(); startCoachCreation(); cPick('name','X'); cPickEra(2); render; startPlayerCreation(); cPick('name','Y'); cPickEra(5); cPick('pos',PLAYER_POS[3]); cPick('origin',PLAYER_ORIGINS[0]); cPick('trait',PLAYER_TRAITS[0]); }catch(e){ res.ui='UI error: '+e.message+' '+(e.stack||'').split('\n')[1]; }
     return res;
   });
   console.log('COACH'); out.coach.forEach(c=>console.log(c.error?JSON.stringify(c):[c.run,c.era,c.mode,c.cause,'age'+c.age,c.year,'seasons'+c.seasons,'sack'+c.sackings,'L'+c.titles.league+'/P'+c.titles.promo+'/C'+c.titles.cup+'/E'+c.titles.euro,'aw'+c.awards,'clubs'+c.clubs,'rep'+c.rep,'scams'+c.scams,'gap'+c.gap,'gapMax'+c.gapMax,'wages'+c.wr,'matches'+c.m.n,'goals/m'+(c.m.g/Math.max(1,c.m.n)).toFixed(2),'yel/m'+(c.m.y/Math.max(1,c.m.n)).toFixed(2),'red/m'+(c.m.r/Math.max(1,c.m.n)).toFixed(3),'inj/m'+(c.m.inj/Math.max(1,c.m.n)).toFixed(3),'pen/m'+(c.m.pen/Math.max(1,c.m.n)).toFixed(3),'sub/m'+(c.m.sub/Math.max(1,c.m.n)).toFixed(2),'carrefours'+c.ev.carrefours,'dilemmes'+(c.ev.dilemma||0),'vie'+(c.ev.happening||0),'incidents'+(c.ev.incident||0),'projOK'+c.proj,'proches'+c.proches].join(' ')));
-  console.log('PLAYER'); out.player.forEach(p=>console.log(p.error?JSON.stringify(p):[p.run,p.era,p.pos,p.cause,'age'+p.age,'seasons'+p.seasons,'apps'+p.totals.apps,'goals'+p.totals.goals,'titles'+p.totals.titles,'caps'+p.totals.caps,'ballons'+p.totals.ballons,'note'+p.note,'best'+p.best,'clubs'+p.clubs,'m'+p.p.n,'played'+p.p.played,'starts'+p.p.start,'pen'+p.p.pen,'inj'+p.p.inj,'carrefours'+p.ev.carrefours,'dilemmes'+(p.ev.dilemma||0),'vie'+(p.ev.happening||0),'incidents'+(p.ev.incident||0),'entourage'+p.entourage].join(' ')));
+  console.log('PLAYER'); out.player.forEach(p=>console.log(p.error?JSON.stringify(p):[p.run,p.era,p.pos,p.cause,'age'+p.age,'seasons'+p.seasons,'apps'+p.totals.apps,'goals'+p.totals.goals,'titles'+p.totals.titles,'caps'+p.totals.caps,'ballons'+p.totals.ballons,'note'+p.note,'best'+p.best,'clubs'+p.clubs,'m'+p.p.n,'played'+p.p.played,'starts'+p.p.start,'pen'+p.p.pen,'inj'+p.p.inj,'carrefours'+p.ev.carrefours,'dilemmes'+(p.ev.dilemma||0),'vie'+(p.ev.happening||0),'incidents'+(p.ev.incident||0),'entourage'+p.entourage,'situations'+(p.ev.situation||0),'idle'+p.idle].join(' ')));
   console.log('UI',out.ui||'ok'); console.log('ERRORS:',errors.length?errors.slice(0,10).join('\n'):'none');
   await browser.close();
 })();
