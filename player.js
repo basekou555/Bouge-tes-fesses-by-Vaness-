@@ -267,7 +267,7 @@ function playerFreshState(c){
   const qf=c.qf||(c.qf=pDrawQualityFlaw()); st[qf.q.axe]=clamp(st[qf.q.axe]+qf.q.v); st[qf.f.axe]=clamp(st[qf.f.axe]+qf.f.v);
   const g={corps:75,vestiaire:50,supporters:45,entourage:50}; [c.origin,c.trait].forEach(o=>Object.entries(o.gauges||{}).forEach(([k,v])=>g[k]=clamp(g[k]+v)));
   const nat=c.origin.nat==='AF'?pick(['SN','CI','ML','CM','DZ','MA']):'FR';
-  return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, focus:[], lastFocus:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
+  return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, focus:[], lastFocus:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(64,88),
     stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, benchRun:0, qual:{id:qf.q.id,seen:false}, flaw:{id:qf.f.id,seen:false}, vacPrep:1, vacFatigue:0, clubLeft:null, clubStuck:null, legendOf:null, ended:false, endingText:'', endingCause:null };
 }
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
@@ -464,11 +464,10 @@ function playerShare(){
   const r=pRating(); const rivals=state.squad.filter(p=>p.pos===state.pos&&!p.injury).map(p=>playerRating(p,state.year)).sort((a,b)=>b-a);
   const slots=state.pos==='G'?1:state.pos==='A'?2:4; const nth=rivals[slots-1]||0; const gap=r-nth;
   let share=clamp(.5+gap*.05+(state.coachTrust-50)*.006+(state.forme-60)*.003+(state.minutesBonus||0),0,1);
-  // Un très jeune ne s'impose pas d'emblée, même à niveau égal : le coach le
-  // fait entrer, il ne le lance pas. Mesuré après le passage du départ à 5,0 :
-  // sans ce frein, un joueur de 17 ans jouait 73 % de sa première saison.
-  const age=pAge();
-  if(age<=17) share=Math.min(share,.28); else if(age===18) share=Math.min(share,.45); else if(age===19) share=Math.min(share,.65);
+  // Un très jeune ne s'impose pas d'emblée : le coach le fait entrer, il ne le
+  // lance pas. Le frein réel est dans `playerSelBonus()`, qui décide la compo ;
+  // ce plafond-ci n'est que la lecture affichée, et il suit le même sens.
+  if(pAge()<=18) share=Math.min(share,.6);
   if(state.injury>0) share*=clamp(1-state.injury/20,0,1);
   return share;
 }
