@@ -10,6 +10,115 @@ const PLAYER_ORIGINS=[
 const PLAYER_TRAITS=[
  {id:'bosseur',name:"Bosseur·euse",desc:"Premier·ère arrivé·e, dernier·ère parti·e. Moins de fantaisie.",bonus:{physique:3,mental:2,technique:-2},growth:.2},{id:'genie',name:"Génie instinctif",desc:"Des gestes que personne n'apprend.",bonus:{technique:7,mental:-2},growth:0},{id:'leader',name:"Leader naturel",desc:"Le vestiaire t'écoute déjà à 18 ans. Tu parles plus que tu ne dribbles.",bonus:{mental:5,technique:-2},gauges:{vestiaire:10}},{id:'fragile',name:"Corps fragile",desc:"Talent immense, ischios en papier.",bonus:{technique:5,physique:-3},injury:.1},{id:'fetard',name:"Fêtard·e",desc:"La nuit, tu marques aussi beaucoup.",bonus:{technique:2,mental:-3},gauges:{supporters:5,entourage:-5},scandal:true},{id:'glace',name:"Sang froid",desc:"Un penalty à la 90e ne te fait rien. Le sprint de la 89e, si.",bonus:{mental:7,physique:-3}},
 ];
+/* ---------- L'intersaison, en quatre temps ----------
+   Retour du propriétaire (26/09/2026) : « l'intersaison d'un joueur de foot ne
+   doit pas seulement être résumée en un seul choix. Est-ce qu'il part en
+   vacances, avec les amis, avec la famille, tous ensemble ? Des expériences
+   risquées pour son corps ? Est-ce que pendant ces vacances il va s'entraîner,
+   beaucoup ou pas — s'il s'entraîne beaucoup il sera plus fatigué la saison,
+   donc ça joue à long terme. Est-ce qu'il reçoit des offres ? Et plutôt que de
+   me laisser choisir entre les propositions, ce serait bien que j'aie une
+   proposition sans savoir si j'en aurai de meilleures. Et moi aussi j'ai des
+   envies de club. »
+   Quatre écrans : les vacances → l'été → tes envies → les offres, une par une. */
+
+const PVACANCES=[
+  {id:'famille',icon:'🏡',label:"Deux semaines au calme, en famille",sub:"Rien de spectaculaire. Tout le monde respire.",effects:{entourage:12,pressure:-9,corps:6}},
+  {id:'couple',icon:'🌅',label:"Partir à deux, loin de tout",sub:"Pas de téléphone, pas de maillot, pas de photos.",effects:{entourage:8,pressure:-7,corps:4,money:-.04}},
+  {id:'tous',icon:'🎉',label:"Tout le monde ensemble, la famille et les amis",sub:"Une grande maison, quinze personnes, et toi qui paies.",effects:{entourage:6,pressure:-3,corps:2,money:-.14}},
+  {id:'amis',icon:'🍹',label:"Un mois avec les amis",sub:"Trois villes, des nuits courtes, des vidéos qui circulent.",effects:{supporters:5,entourage:-8,corps:-7,pressure:2,money:-.1}},
+  {id:'extreme',icon:'🏄',label:"Surf, montagne, sensations",sub:"Ton club n'a pas été prévenu. Ton assurance non plus.",effects:{mental:4,supporters:4,corps:-3},risk:.18},
+  {id:'tournee',icon:'✈️',label:"Tournée commerciale et sponsors",sub:"Sept pays, des séances photo, aucun jour off.",effects:{money:.28,supporters:7,corps:-9,entourage:-6,pressure:5}},
+];
+const PSUMMER=[
+  {id:'rien',icon:'🛌',label:"Repos complet",sub:"Tu ne touches pas un ballon avant la reprise.",load:0,fatigue:0,effects:{corps:5}},
+  {id:'entretien',icon:'🚶',label:"Un entretien léger",sub:"Du footing, deux séances par semaine, sans forcer.",load:.4,fatigue:0,effects:{corps:2}},
+  {id:'perso',icon:'🏋️',label:"Un préparateur personnel tout l'été",sub:"Tu reviens en avance sur tout le monde. Tu reviens aussi entamé.",load:1,fatigue:1,effects:{money:-.07}},
+  {id:'stage',icon:'🔥',label:"Stage intensif, deux fois par jour",sub:"Le genre d'été dont on parle en mars, en bien ou en mal.",load:1.5,fatigue:2,effects:{money:-.1,corps:-4},risk:.12},
+];
+const PWISHES=[
+  {id:'rester',icon:'⚓',label:"Rester où je suis",sub:"On ne change pas ce qui marche."},
+  {id:'jouer',icon:'⏱️',label:"Jouer, peu importe le nom du club",sub:"Du temps de jeu avant tout le reste."},
+  {id:'grand',icon:'🏛️',label:"Un grand club, quitte à commencer sur le banc",sub:"Être là où ça se passe, même mal placé."},
+  {id:'argent',icon:'💰',label:"Le meilleur contrat",sub:"Une carrière est courte et tu le sais."},
+  {id:'etranger',icon:'🌍',label:"Partir à l'étranger",sub:"Voir autre chose, apprendre autre chose."},
+  {id:'maison',icon:'🧭',label:"Rentrer près de chez moi",sub:"Les siens dans les tribunes, ça change un match."},
+];
+function pWishById(id){ return PWISHES.find(w=>w.id===id)||PWISHES[1]; }
+
+function playerChooseVacances(i){
+  const v=PVACANCES[i]; if(!v) return;
+  const before=pSnapshot(); const extra=playerApplyEffects(v.effects||{});
+  state.vacances=v.id;
+  // Une expérience risquée se paie parfois tout de suite.
+  if(v.risk&&Math.random()<v.risk){ const w=randInt(2,7); state.injury=(state.injury||0)+w;
+    extra.push(`🩼 Blessé·e ${w} semaines`); state.gauges.corps=clamp(state.gauges.corps-6);
+    log(`🩼 ${v.label} : tu rentres blessé·e, ${w} semaines d'arrêt.`); }
+  else log(`${v.icon} Vacances : ${v.label.toLowerCase()}.`);
+  state.pendingResult={title:`${v.icon} L'été`,subtitle:v.label,narrative:v.sub,before,after:pSnapshot(),extra,next:'ete'};
+  state.pendingChoice='choiceResult'; saveGame(); render();
+}
+function playerChooseSummer(i){
+  const t=PSUMMER[i]; if(!t) return;
+  const before=pSnapshot(); const extra=playerApplyEffects(t.effects||{});
+  state.summerLoad=t.load; state.summerFatigue=t.fatigue; state.summer=t.id;
+  if(t.risk&&Math.random()<t.risk){ const w=randInt(1,4); state.injury=(state.injury||0)+w;
+    extra.push(`🩼 Blessé·e ${w} semaines`); log(`🩼 ${t.label} : ton corps a dit non, ${w} semaines d'arrêt.`); }
+  else log(`${t.icon} Été : ${t.label.toLowerCase()}.`);
+  if(t.fatigue) extra.push(`🫁 Tu commenceras la saison entamé·e (récupération −${t.fatigue===2?'25':'12'} % toute l'année)`);
+  if(t.load>=1) extra.push("📈 Une avance de préparation qui comptera en juin");
+  state.pendingResult={title:`${t.icon} La préparation`,subtitle:t.label,narrative:t.sub,before,after:pSnapshot(),extra,next:'envies'};
+  state.pendingChoice='choiceResult'; saveGame(); render();
+}
+function playerChooseWish(i){
+  const w=PWISHES[i]; if(!w) return;
+  state.wish=w.id; log(`${w.icon} Ce que tu demandes à ton agent : ${w.label.toLowerCase()}.`);
+  playerBuildOfferQueue(); render();
+}
+/* Les offres arrivent une par une, dans un ordre que tes envies influencent.
+   On ne sait pas ce qui vient après : c'est tout l'intérêt. */
+function playerWishScore(o){
+  const w=state.wish, r=pRating();
+  let sc=rand(0,1.2);
+  if(w==='rester'&&o.stay) sc+=4;
+  if(w==='jouer') sc+=o.role==='titulaire'?3:o.role==='rotation'?1:-1;
+  if(w==='grand') sc+=(o.strength-r)*.25+(o.tier==='superclub'||o.tier==='europe'?2:0);
+  if(w==='argent') sc+=o.salary*12;
+  if(w==='etranger') sc+=o.nat!=='FR'?3:-1;
+  if(w==='maison') sc+=o.nat==='FR'?3:-1;
+  return sc;
+}
+function playerBuildOfferQueue(){
+  const offers=playerGenerateOffers();
+  state.offerQueue=offers.map(o=>({o,sc:playerWishScore(o)})).sort((a,b)=>b.sc-a.sc).map(x=>x.o);
+  state.offersSeen=0; state.offersRefused=0;
+  state.noOfferYears=state.offerQueue.length?0:state.noOfferYears+1;
+  state.currentOffers=state.offerQueue; // le tableau de bord et les tests y lisent encore
+  if(!state.offerQueue.length){ state.pendingChoice='offers'; playerCheckEnd(); saveGame(); return; }
+  state.pendingChoice='offerOne'; playerCheckEnd(); saveGame();
+}
+/* Ce que ton agent arrive à te dire de ce qui reste. Plus ton entourage est
+   solide, mieux il est informé — une jauge qui sert enfin à trancher. */
+function playerAgentRead(){
+  const q=state.offerQueue||[], left=Math.max(0,q.length-1), e=state.gauges.entourage;
+  if(e>=70) return left?`Ton agent est sûr de lui : il reste ${left} piste${left>1?'s':''} sérieuse${left>1?'s':''} derrière celle-là.`:"Ton agent est formel : c'est la seule offre sur la table.";
+  if(e>=45) return left>=2?"Ton agent pense qu'il y a autre chose derrière, sans promettre mieux.":left?"Ton agent parle d'une autre piste, du bout des lèvres.":"Ton agent ne voit rien d'autre venir.";
+  return "Ton agent ne sait pas. Il dit que ça bouge encore, mais il dit toujours ça.";
+}
+function playerSignOffer(){
+  const q=state.offerQueue||[]; if(!q.length) return;
+  const idx=state.currentOffers.indexOf(q[0]);
+  playerAcceptOffer(idx>=0?idx:0);
+}
+function playerRefuseOffer(){
+  const q=state.offerQueue||[]; if(!q.length) return;
+  const o=q.shift(); state.offersRefused=(state.offersRefused||0)+1;
+  log(`🙅 Tu refuses ${o.club}${o.stay?' et tu ne prolonges pas':''}.`);
+  state.currentOffers=q;
+  if(!q.length){ state.pendingChoice='offers'; saveGame(); render(); return; }
+  state.offersSeen=(state.offersSeen||0)+1; saveGame(); render();
+}
+
 /* ---------- Ta semaine, avant chaque match ----------
    Retour du propriétaire (26/09/2026) : « le joueur n'a pas assez de choses à
    faire, de responsabilités. On ne joue pas assez sur ses entraînements. Ce qui
@@ -44,9 +153,19 @@ function pTrainingCurveHelp(){
   return `${state.traitName} : l'entraînement pèse normalement sur ta progression (×0,75 à ×1,38).`;
 }
 /* La charge moyenne de la saison, entre 0 (jamais rien) et ~1,2 (tout donné). */
+/* L'été compte pour un tiers de l'année de travail, et la saison pour deux tiers.
+   Des poids fixes, pas un ratio de semaines : sinon l'été était noyé dans les
+   trente-quatre semaines d'un rythme complet (charge mesurée identique à 0,04
+   près quelle que soit la préparation) et pesait au contraire très lourd dans un
+   rythme rapide. Mesuré avant correction, c'est ce qui rendait la préparation
+   d'été invisible. */
+const PSUMMER_WEIGHT=.35;
 function pEffort(){
-  const ss=state.seasonStats; if(!ss||!ss.trainWeeks) return .45;
-  return ss.trainWeeks>0?ss.trainLoad/ss.trainWeeks:.45;
+  const ss=state.seasonStats;
+  const summer=(state.summerLoad==null?.4:state.summerLoad)/1.5;      // 0 → 1
+  const w=(ss&&ss.trainWeeks)||0, l=(ss&&ss.trainLoad)||0;
+  const season=w?Math.min(1,(l/w)/1.2):.375;                          // 0 → 1
+  return (PSUMMER_WEIGHT*summer+(1-PSUMMER_WEIGHT)*season)*1.2;
 }
 /* Vers quoi la charge de la saison a poussé. */
 function pLoadShare(){
@@ -168,9 +287,15 @@ function playerBreakContract(){
   const c=state.club; if(!c) return;
   state.gauges.supporters=clamp(state.gauges.supporters-6); state.gauges.entourage=clamp(state.gauges.entourage-3);
   log(`✂️ Tu demandes ton transfert de ${c.name}. Les supporters s'en souviendront.`);
-  state.currentOffers=playerGenerateOffers({broke:true,noStay:true}); if(!state.currentOffers.length) state.noOfferYears++; saveGame(); render();
+  // Rompre relance la file, sans l'offre de rester.
+  const offers=playerGenerateOffers({broke:true,noStay:true});
+  state.offerQueue=offers.map(o=>({o,sc:playerWishScore(o)})).sort((a,b)=>b.sc-a.sc).map(x=>x.o);
+  state.currentOffers=state.offerQueue; state.offersSeen=0;
+  if(!state.offerQueue.length){ state.noOfferYears++; state.pendingChoice='offers'; }
+  else state.pendingChoice='offerOne';
+  saveGame(); render();
 }
-function playerOpenOffers(){ state.currentOffers=playerGenerateOffers(); state.noOfferYears=state.currentOffers.length?0:state.noOfferYears+1; state.pendingChoice='offers'; playerCheckEnd(); saveGame(); }
+function playerOpenOffers(){ playerBuildOfferQueue(); }
 function playerAcceptOffer(i){
   const o=state.currentOffers[i]; if(!o) return;
   if(o.stay){ state.club.salary=o.salary; state.club.role=o.role; state.club.since++; if(!o.underContract) state.club.contractEnd=state.year+o.duration; }
@@ -224,7 +349,9 @@ function playerShare(){
 }
 function playerStartSeason(){
   const c=state.club; const lg=buildLeagueTeams(c,state.year); c.leagueName=lg.name;
-  state.comp=createCompetition(lg,c.name,state.year); state.phase=0; state.matchday=0; state.match=null; state.seasonStats={apps:0,goals:0,assists:0,notes:[],phases:[],shares:[],starts:0,motm:0,load:{technique:0,physique:0,mental:0},trainLoad:0,trainWeeks:0}; state.minutesBonus=0;
+  state.comp=createCompetition(lg,c.name,state.year); state.phase=0; state.matchday=0; state.match=null; state.seasonStats={apps:0,goals:0,assists:0,notes:[],phases:[],shares:[],starts:0,motm:0,load:{technique:0,physique:0,mental:0},trainLoad:0,trainWeeks:0};
+  // Un été chargé se paie dès la première journée, pas seulement en mars.
+  state.fitness=state.summerFatigue===2?85:state.summerFatigue===1?92:100; state.minutesBonus=0;
   if(!c.formation) c.formation=pick(Object.keys(FORMATIONS)); if(!c.styleId) c.styleId=pick(eraStylePool(state.year)).id;
   state.fitness=100; state.yellows=0; state.suspended=0; state.squad.forEach(p=>{ p.apps=0; p.goals=0; p.assists=0; p.sumRating=0; p.rated=0; p.yellows=0; p.suspended=0; p.fitness=100; });
   log(`📅 Saison ${state.year}-${state.year+1} avec ${c.name} en ${c.leagueName}.`);
@@ -255,7 +382,13 @@ function playerChooseEvent(i){
   log(`${ev.icon} <b>${ev.title}</b> → ${ch.label}. ${ch.result||''}`);
   state.pendingResult={title:`${ev.icon} ${ev.title}`,subtitle:ch.label,narrative:ch.result||'',before,after:pSnapshot(),extra,next:'phase'}; state.currentEvent=null; state.pendingChoice='choiceResult'; saveGame(); render();
 }
-function playerContinueChoiceResult(){ const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null; if(state.ended){ render(); return; } if(r.next==='phase'){ playerSimulatePhase(); render(); return; } if(r.next==='season'){ playerStartSeason(); render(); return; } if(r.next==='offers'){ playerOpenOffers(); render(); return; } playerIntersaison(); render(); }
+function playerContinueChoiceResult(){ const r=state.pendingResult; state.pendingResult=null; state.pendingChoice=null; if(state.ended){ render(); return; }
+  if(r.next==='phase'){ playerSimulatePhase(); render(); return; }
+  if(r.next==='season'){ playerStartSeason(); render(); return; }
+  if(r.next==='ete'){ state.pendingChoice='ete'; saveGame(); render(); return; }
+  if(r.next==='envies'){ state.pendingChoice='envies'; saveGame(); render(); return; }
+  if(r.next==='offers'){ playerOpenOffers(); render(); return; }
+  playerIntersaison(); render(); }
 /* ---------- Une phase = des journées jouées une par une ---------- */
 function playerSimulatePhase(){ playerBeginPhase(); }
 function playerBeginPhase(){
@@ -361,7 +494,11 @@ function playerAfterMatchSim(P){
 }
 function playerWeekPasses(){ const me=playerMe();
   const t=state.lastTraining==='recup'?'recuperation':state.lastTraining==='physique'?'physique':'tactique';
-  recoverSquad([...state.squad,me],state.year,{training:t,staff:50}); playerSyncMe(me); }
+  const f0=fit(me);
+  recoverSquad([...state.squad,me],state.year,{training:t,staff:50}); playerSyncMe(me);
+  // Un été de surcharge se paie toute l'année : la récupération hebdomadaire rend moins.
+  const pen=state.summerFatigue===2?.25:state.summerFatigue===1?.12:0;
+  if(pen&&state.fitness>f0) state.fitness=clamp(f0+(state.fitness-f0)*(1-pen),0,100); }
 function playerAfterMatch(){ if(state.lastMatch) state.alerts=playerAlertsAfter(state.lastMatch); playerWeekPasses(); playerAdvance(); render(); }
 function playerSimPhase(){
   let guard=0; const keep=state.tempo; state.tempo='rapide'; state.alerts=[];
@@ -446,8 +583,9 @@ function playerIntersaison(){
   if(playerCheckEnd()){ render(); return; }
   const n=state.history.length;
   if(n>=3&&n-state.lastRouletteSeason>=5&&state.rouletteCount<2&&Math.random()<.12){ state.currentRoulette={event:pickNoRepeat('p-roulette',PLAYER_ROULETTES),outcomes:shuffledCopy([Math.random()<.5?'end':'malus','jackpot','small','malus'])}; state.rouletteCount++; state.lastRouletteSeason=n; state.pendingChoice='roulette'; return; }
-  // dilemmes et vie hors du terrain : désormais en cours de saison, une fois par phase
-  playerOpenOffers();
+  // L'intersaison n'est plus un écran d'offres : c'est une suite de décisions,
+  // et les offres n'arrivent qu'au bout, une par une.
+  state.pendingChoice='vacances'; saveGame();
 }
 function playerChooseRoulette(i){
   const r=state.currentRoulette, ev=r.event, out=r.outcomes[i];

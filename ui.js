@@ -105,7 +105,8 @@ function render(){
   showGameBanner(); renderFilmstrip();
   if(state.ended){ state.kind==='player'?renderPlayerEnd():renderCoachEnd(); return; }
   const coach={offers:renderOffers,mercato:renderMercato,tactic:renderTactic,event:renderEvent,choiceResult:renderChoiceResult,meeting:renderMeeting,matchResult:renderMatchResult,phaseResult:renderPhaseResult,seasonEnd:renderSeasonEnd,sacked:renderSacked,roulette:renderRoulette,pressureCrisis:renderPressure};
-  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure};
+  const player={offers:renderPOffers,event:renderEvent,choiceResult:renderChoiceResult,prematch:renderPPrematch,penalty:renderPPenalty,matchResult:renderPMatchResult,phaseResult:renderPPhaseResult,seasonEnd:renderPSeasonEnd,roulette:renderRoulette,pressureCrisis:renderPressure,
+    vacances:renderPVacances,ete:renderPSummer,envies:renderPWish,offerOne:renderPOfferOne};
   let fn=(state.kind==='player'?player:coach)[state.pendingChoice]||(state.kind==='player'?renderPOffers:renderOffers);
   if(dashOpen) fn=state.kind==='player'?renderPlayerDashboard:renderDashboard;
   dashButton();
@@ -605,8 +606,56 @@ function playerSidebar(){
     <div class="card"><div class="section-label">Journal</div><div class="log">${state.log.slice(0,30).map(l=>`<div><span class="age">${l.year}</span>${l.msg}</div>`).join('')}</div></div>
     <div class="card"><div class="btn-row"><button class="btn secondary small" onclick="goHomeFromGame()">Accueil (sauvegarde)</button><button class="btn danger small" onclick="if(confirm('Raccrocher les crampons ?')){playerEnd('Tu décides de raccrocher les crampons.','retire');render();}">Retraite</button></div></div>`;
 }
+/* ---------- L'intersaison du joueur·euse, en quatre temps ---------- */
+function pStepHTML(n){ return `<div class="creation-progress"><span>Intersaison · étape ${n}/4</span><div class="track"><i style="width:${n*25}%"></i></div></div>`; }
+function renderPVacances(){
+  const keys=effectKeys(PVACANCES.map(v=>v.effects));
+  return `<div class="card event-card">${pStepHTML(1)}<div class="ico">🌴</div><h2 class="display">L'été commence</h2>
+    <p class="narr">La saison est finie. Six semaines devant toi, et tout le monde attend de savoir avec qui tu les passes.</p>
+    <div class="section-label">Ce que tu fais de tes vacances</div>
+    <div class="choice-list">${PVACANCES.map((v,i)=>`<button class="choice-btn" onclick="playerChooseVacances(${i})"><span class="ico">${v.icon}</span><div class="body"><b>${escapeHtml(v.label)}</b><small>${escapeHtml(v.sub)}</small>${effectChips(v.effects)}${v.risk?`<div class="traits"><i class="minus">🩼 ${Math.round(v.risk*100)} % de risque de blessure</i></div>`:''}</div></button>`).join('')}</div>
+    ${stateTable(keys)}
+    <div class="hint">Six semaines ne se rattrapent pas. Ce que tu prends ici te manquera ailleurs.</div></div>`;
+}
+function renderPSummer(){
+  const keys=effectKeys(PSUMMER.map(t=>t.effects));
+  return `<div class="card event-card">${pStepHTML(2)}<div class="ico">🏋️</div><h2 class="display">La préparation</h2>
+    <p class="narr">Le club reprend dans cinq semaines. Ce que tu fais d'ici là ne se verra pas en août — ça se verra en mars.</p>
+    <div class="section-label">Ton été de travail</div>
+    <div class="choice-list">${PSUMMER.map((t,i)=>`<button class="choice-btn" onclick="playerChooseSummer(${i})"><span class="ico">${t.icon}</span><div class="body"><b>${escapeHtml(t.label)}</b><small>${escapeHtml(t.sub)}</small><div class="traits">${t.load?`<i class="plus">📈 Charge ${t.load.toFixed(1)} — comptera pour ta progression de juin</i>`:'<i class="minus">📈 Aucune avance de préparation</i>'}${t.fatigue?`<i class="minus">🫁 Récupération −${t.fatigue===2?25:12} % toute la saison</i>`:'<i class="plus">🫁 Tu repartiras frais</i>'}</div>${effectChips(t.effects)}${t.risk?`<div class="traits"><i class="minus">🩼 ${Math.round(t.risk*100)} % de risque de blessure</i></div>`:''}</div></button>`).join('')}</div>
+    ${stateTable(keys)}
+    <div class="hint">${escapeHtml(pTrainingCurveHelp())}</div></div>`;
+}
+function renderPWish(){
+  return `<div class="card event-card">${pStepHTML(3)}<div class="ico">📞</div><h2 class="display">Ton agent veut savoir</h2>
+    <p class="narr">« Dis-moi ce que tu cherches, je saurai à qui décrocher le téléphone. » Ce que tu demandes décide de ce qui arrivera — et de ce qui n'arrivera pas.</p>
+    <div class="section-label">Ce que tu lui demandes</div>
+    <div class="choice-list">${PWISHES.map((w,i)=>`<button class="choice-btn" onclick="playerChooseWish(${i})"><span class="ico">${w.icon}</span><div class="body"><b>${escapeHtml(w.label)}</b><small>${escapeHtml(w.sub)}</small></div></button>`).join('')}</div>
+    <div class="hint">Demander une chose, c'est renoncer aux autres : les offres arriveront dans cet ordre-là.</div></div>`;
+}
+function renderPOfferOne(){
+  const q=state.offerQueue||[]; const o=q[0];
+  if(!o) return renderPOffers();
+  const w=pWishById(state.wish);
+  return `<div class="card">${pStepHTML(4)}<h2 class="display">Une proposition</h2>
+    <p class="hint">${state.year} · ${pAge()} ans · tu as demandé : ${w.icon} ${escapeHtml(w.label.toLowerCase())}.${state.offersRefused?` Tu as déjà refusé ${state.offersRefused} offre${state.offersRefused>1?'s':''}.`:''}</p>
+    <div class="offer-grid"><div class="offer-card affordable ${o.poach?'poach':''}">
+      <div class="club">${TIER_INFO[o.tier].icon} ${TIER_INFO[o.tier].label}${o.stay?(o.underContract?' · ton contrat court encore':' · prolonger'):o.poach?' · ils paient la clause':''}</div>
+      <h3>${escapeHtml(o.club)}</h3>
+      <div class="syn narr">${escapeHtml(o.title||'')} Coach : ${escapeHtml(o.coach)}.</div>
+      <div class="meta"><span class="tag gold">${escapeHtml(o.leagueName)}</span><span class="tag">${ROLES[o.role].name} promis·e</span><span class="tag">${$(o.salary)} par saison</span><span class="tag">${o.duration} an${o.duration>1?'s':''}</span><span class="tag">Force ${'★'.repeat(Math.max(1,o.s||1))}</span></div>
+      <div class="offer-hint ${o.role==='titulaire'?'good':''}">${o.role==='titulaire'?'✅ On te promet la place':o.role==='rotation'?'🔄 Tu tourneras':'🪑 Tu commenceras derrière'}</div>
+    </div></div>
+    <div class="msg">📞 ${escapeHtml(playerAgentRead())}</div>
+    <div class="btn-row"><button class="btn" onclick="playerSignOffer()">Signer ✍️</button><button class="btn danger" onclick="playerRefuseOffer()">Refuser</button></div>
+    <div class="hint">Refuser fait disparaître cette offre pour de bon. La suivante peut être meilleure. Ou il n'y en aura pas.</div></div>`;
+}
 function renderPOffers(){
   const offers=state.currentOffers||[];
+  if(!offers.length&&state.offersRefused) return `<div class="card"><h2 class="display">Plus rien sur la table</h2>
+    <p class="narr">Tu as refusé ${state.offersRefused} proposition${state.offersRefused>1?'s':''}, et le téléphone a cessé de sonner. L'été se termine sans club.</p>
+    <div class="hint">Une année sans jouer coûte du niveau, de la fraîcheur et de la cote. C'était le risque.</div>
+    <div class="btn-row"><button class="btn" onclick="playerSkipYear()">Passer l'année →</button></div></div>`;
   if(!offers.length) return `<div class="card"><h2 class="display">Aucune proposition</h2><p class="narr">Ton agent ne répond plus. Le marché t'a oublié·e cette année.</p><div class="btn-row"><button class="btn" onclick="playerSkipYear()">Attendre une année</button></div></div>`;
   const stay=offers.find(o=>o.stay); const under=stay&&stay.underContract;
   return `<div class="card"><h2 class="display">${under?'Intersaison sous contrat':'Ton agent a des propositions'}</h2><p class="hint">${state.year} · ${pAge()} ans · note ${pRating().toFixed(1)} · ton agent vise ${coteLabel(playerTargetStrength())}. ${under?`Ton contrat court jusqu'en ${state.club.contractEnd}. ${offers.length>1?'Un club vient te chercher.':'Aucun club ne s\'est manifesté cette année.'}`:'Le rôle promis pèse sur ton temps de jeu, ta progression et ta pression.'}</p>
