@@ -334,6 +334,10 @@ function renderPlayerDashboard(){
     <div class="section-label">Tes qualités</div>
     ${Object.keys(PSTAT).map(k=>bar(PSTAT[k],st[k])).join('')}
     ${bar('Pression',state.pressure,'pressure')}
+    <div class="section-label">Ce que tu fais de tes semaines</div>
+    ${(()=>{ const e=pEffort(), c=pTrainingCurve(e), sh=pLoadShare(), w=(ss&&ss.trainWeeks)||0;
+      const lt=state.lastTrain;
+      return `<div class="hint">Charge moyenne <b>${e.toFixed(2)}</b> sur ${w} semaine${w>1?'s':''} décidée${w>1?'s':''} · ta progression est multipliée par <b>${c.toFixed(2)}</b>.<br>${escapeHtml(pTrainingCurveHelp())}<br>Tu as poussé : ⚽ ${Math.round(sh.technique*100)} % · 💪 ${Math.round(sh.physique*100)} % · 🧠 ${Math.round(sh.mental*100)} %.${lt?`<br>La saison dernière : charge ${lt.effort}, multiplicateur ${lt.curve}, ${lt.growth>0?'+':''}${lt.growth} de progression appliquée.`:''}</div>`; })()}
     <div class="section-label">Tes quatre jauges</div>
     ${Object.keys(PGAUGE).map(k=>gaugeRow(PGAUGE[k],g[k])).join('')}
     <div class="hint">${escapeHtml(PGAUGE.corps.help)}</div>
@@ -740,7 +744,13 @@ function renderPPrematch(){
     <div class="my-status ${st}"><b>${label}</b><div class="hint">${why}</div><div class="hint">Fraîcheur ${fitBar(state.fitness==null?100:state.fitness)} ${Math.round(state.fitness==null?100:state.fitness)} % · forme ${Math.round(state.forme)} · ${'⚽'} ${state.seasonStats.goals} b · 🅰️ ${state.seasonStats.assists} p · ${state.seasonStats.apps} matchs cette saison${state.yellows?` · 🟨 ${state.yellows}`:''}</div></div>
     <div class="section-label">Le onze du coach (${m.formation})</div><div class="squad">${m.xi.map(id=>P[id]).filter(Boolean).map(p=>`<div class="${p.isMe?'me':''}"><span class="pos-badge pos-${p.pos}">${p.pos}</span> ${escapeHtml(p.name)}${p.isMe?' (toi)':''} <span>${Math.round(effRating(p,state.year))}</span></div>`).join('')}</div>
     ${m.bench.length?`<div class="hint">Banc : ${m.bench.map(id=>P[id]).filter(Boolean).map(p=>`${escapeHtml(p.name)}${p.isMe?' (toi)':''}`).join(', ')}</div>`:''}
-    <div class="btn-row"><button class="btn" onclick="playerKickoff();render()">Jouer le match ⚽</button><button class="btn secondary" onclick="playerSimPhase()">Simuler la fin de la phase ⏩</button></div></div>`;
+    <div class="section-label">Ta semaine</div>
+    <div class="hint">Ce que tu fais de ces jours-là coûte des jambes pour dimanche et se paiera — ou se paiera en juin. ${escapeHtml(pTrainingCurveHelp())}</div>
+    <div class="choice-list">${PTRAINING.map((t,i)=>{
+      const nf=clamp((state.fitness==null?100:state.fitness)+t.fit,0,100);
+      return `<button class="choice-btn" onclick="playerChooseTraining(${i})"><span class="ico">${t.icon}</span><div class="body"><b>${escapeHtml(t.label)}</b><small>${escapeHtml(t.sub)}</small><div class="traits"><i class="${t.fit>=0?'plus':'minus'}">🫁 Fraîcheur <b>${Math.round(state.fitness==null?100:state.fitness)}</b>→<b>${Math.round(nf)}</b></i>${t.aspect?`<i class="plus">${PSTAT[t.aspect]} travaillé</i>`:t.load?'<i>Rien de particulier</i>':'<i class="minus">Aucun travail</i>'}</div></div></button>`;
+    }).join('')}</div>
+    <div class="btn-row"><button class="btn secondary" onclick="playerSimPhase()">Simuler la fin de la phase ⏩</button></div></div>`;
 }
 function renderPPenalty(){
   const m=state.match, pen=m.pending; const chance=Math.round(playerPenaltyChance()*100); const ha=matchHomeAway(m);

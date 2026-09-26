@@ -540,14 +540,28 @@ function coachPlayPhase(){
 }
 function eventKey(e){ return e.id||e.title; }
 function rememberEvent(e){ const m=(state.recentEvents=state.recentEvents||[]); m.push(eventKey(e)); while(m.length>10) m.shift(); }
+/* Ce qui ne se produit qu'une fois dans une vie ne doit pas revenir : la
+   mémoire des dix derniers tirages ne suffisait pas, et le propriétaire a vu
+   « la naissance de ton premier enfant » cinq ou six fois dans une carrière.
+   `once:true` sur un contenu, `when` pour ceux qui dépendent d'une situation. */
+function eventAllowed(e){
+  if(e.once&&state.seenEvents&&state.seenEvents[eventKey(e)]) return false;
+  if(typeof e.when==='function'){ try{ if(!e.when()) return false; }catch(_){ return false; } }
+  return true;
+}
+function markEventSeen(e){
+  if(e.once){ state.seenEvents=state.seenEvents||{}; state.seenEvents[eventKey(e)]=1; }
+  if(e.kid) state.kids=(state.kids||0)+1;
+}
 function weightedDraw(bag){
   const recent=state.recentEvents||[];
+  bag=bag.filter(b=>eventAllowed(b.event));
   let pool=bag.filter(b=>!recent.includes(eventKey(b.event)));
   if(!pool.length) pool=bag;
   if(!pool.length) return null;
   const total=pool.reduce((n,b)=>n+b.w,0); let r=Math.random()*total;
-  for(const b of pool){ r-=b.w; if(r<=0){ rememberEvent(b.event); return {kind:b.kind,event:b.event}; } }
-  const last=pool[pool.length-1]; rememberEvent(last.event); return {kind:last.kind,event:last.event};
+  for(const b of pool){ r-=b.w; if(r<=0){ rememberEvent(b.event); markEventSeen(b.event); return {kind:b.kind,event:b.event}; } }
+  const last=pool[pool.length-1]; rememberEvent(last.event); markEventSeen(last.event); return {kind:last.kind,event:last.event};
 }
 function coachDrawPhaseEvent(){
   const y=state.year, g=state.gauges, ph=state.phase, bag=[];

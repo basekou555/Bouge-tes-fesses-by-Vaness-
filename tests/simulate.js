@@ -16,7 +16,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
         const era=ERAS[run%ERAS.length], mode=COACH_MODES[run%COACH_MODES.length];
         creation={kind:'coach',step:0,name:'C'+run,era,mode,origin:pick(COACH_ORIGINS),nationality:pick(NATIONALITIES),style:pick(STYLES),mentor:pick(COACHES_BY_ERA[era.id]),quality:pick(COACH_QUALITIES),flaw:pick(COACH_FLAWS)};
         launchCoach(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, screens={}, gaps=[], wagesR=[], onceSeen=new Set(), mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0}, dashSeen=false, natSeen=false, projChecks=0;
+        let steps=0, screens={}, gaps=[], wagesR=[], onceSeen=new Set(), onceEv=new Set(), mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0}, dashSeen=false, natSeen=false, projChecks=0;
         while(!state.ended&&steps<6000){
           steps++; const pc=state.pendingChoice; screens[pc]=(screens[pc]||0)+1; if(steps%100===0) await new Promise(r=>setTimeout(r,0)); // laisse respirer le moteur de rendu
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ coachBreakContract(); if(!state.currentOffers.length){ coachSkipYear(); render(); continue; } } coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
@@ -43,6 +43,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
             if(state.squad.length>25) coachSell(state.squad[state.squad.length-1].id); coachCloseMercato(); }
           else if(pc==='tactic'){ coachSetTactic(pick(Object.keys(FORMATIONS)),Math.random()<.6?state.club.styleWanted:state.favoriteStyleId); }
           else if(pc==='event'){ const ce=state.currentEvent;
+            // Ce qui n'arrive qu'une fois dans une vie ne doit jamais revenir.
+            if(ce.event.once){ const k=ce.event.id||ce.event.title;
+              if(onceEv.has(k)) throw new Error('événement unique rejoué : '+k); onceEv.add(k); }
             if(ce.kind==='carrefour'){ cstat.carrefours++; coachChooseCrossroad(rnd(ce.event.menu.length)); }
             else { cstat[ce.kind]=(cstat[ce.kind]||0)+1;
               const j=rnd(ce.event.choices.length), ch=ce.event.choices[j];
@@ -92,13 +95,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
       try{
         localStorage.clear(); const era=ERAS[run%ERAS.length];
         creation={kind:'player',step:0,name:'P'+run,era,pos:PLAYER_POS[run%4],origin:pick(PLAYER_ORIGINS),trait:pick(PLAYER_TRAITS)}; launchPlayer(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0}, pdashSeen=false;
+        let steps=0, pstat={n:0,played:0,start:0,pen:0,g:0,inj:0}, pcar={carrefours:0}, pdashSeen=false, onceEv=new Set();
         while(!state.ended&&steps<5000){
           steps++; const pc=state.pendingChoice; if(steps%100===0) await new Promise(r=>setTimeout(r,0));
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ playerBreakContract(); if(!state.currentOffers.length){ playerSkipYear(); render(); continue; } } playerAcceptOffer(rnd(state.currentOffers.length)); } else playerSkipYear(); }
-          else if(pc==='event'){ const ce=state.currentEvent; if(ce.kind==='carrefour'){ pcar.carrefours++; playerChooseCrossroad(rnd(ce.event.menu.length)); } else { pcar[ce.kind]=(pcar[ce.kind]||0)+1; playerChooseEvent(rnd(ce.event.choices.length)); } }
+          else if(pc==='event'){ const ce=state.currentEvent;
+            // Ce qui n'arrive qu'une fois dans une vie ne doit jamais revenir.
+            if(ce.event.once){ const k=ce.event.id||ce.event.title;
+              if(onceEv.has(k)) throw new Error('événement unique rejoué : '+k); onceEv.add(k); } if(ce.kind==='carrefour'){ pcar.carrefours++; playerChooseCrossroad(rnd(ce.event.menu.length)); } else { pcar[ce.kind]=(pcar[ce.kind]||0)+1; playerChooseEvent(rnd(ce.event.choices.length)); } }
           else if(pc==='choiceResult'){ playerContinueChoiceResult(); }
-          else if(pc==='prematch'){ if(Math.random()<.6) playerSimPhase(); else playerKickoff(); }
+          else if(pc==='prematch'){
+            // L'avant-match est devenu une décision : la semaine d'entraînement.
+            const h=renderPPrematch(); if(!/playerChooseTraining/.test(h)) throw new Error("l'avant-match ne propose pas de semaine d'entraînement");
+            if(Math.random()<.35) playerSimPhase(); else playerChooseTraining(rnd(PTRAINING.length)); }
           else if(pc==='penalty'){ pstat.pen++; playerPenaltyChoice(Math.random()<.7); }
           else if(pc==='matchResult'){ const m=state.lastMatch; pstat.n++; if(m.played) pstat.played++; if(m.start) pstat.start++; pstat.g+=m.gh+m.ga; if(m.inj) pstat.inj++; playerAfterMatch(); }
           else if(pc==='phaseResult'){ if(!pdashSeen){ pdashSeen=true; const h=renderPlayerDashboard(); if(!h||h.length<400) throw new Error('tableau de bord joueur vide'); } playerAfterPhase(); }

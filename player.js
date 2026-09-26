@@ -10,6 +10,65 @@ const PLAYER_ORIGINS=[
 const PLAYER_TRAITS=[
  {id:'bosseur',name:"Bosseur·euse",desc:"Premier·ère arrivé·e, dernier·ère parti·e. Moins de fantaisie.",bonus:{physique:3,mental:2,technique:-2},growth:.2},{id:'genie',name:"Génie instinctif",desc:"Des gestes que personne n'apprend.",bonus:{technique:7,mental:-2},growth:0},{id:'leader',name:"Leader naturel",desc:"Le vestiaire t'écoute déjà à 18 ans. Tu parles plus que tu ne dribbles.",bonus:{mental:5,technique:-2},gauges:{vestiaire:10}},{id:'fragile',name:"Corps fragile",desc:"Talent immense, ischios en papier.",bonus:{technique:5,physique:-3},injury:.1},{id:'fetard',name:"Fêtard·e",desc:"La nuit, tu marques aussi beaucoup.",bonus:{technique:2,mental:-3},gauges:{supporters:5,entourage:-5},scandal:true},{id:'glace',name:"Sang froid",desc:"Un penalty à la 90e ne te fait rien. Le sprint de la 89e, si.",bonus:{mental:7,physique:-3}},
 ];
+/* ---------- Ta semaine, avant chaque match ----------
+   Retour du propriétaire (26/09/2026) : « le joueur n'a pas assez de choses à
+   faire, de responsabilités. On ne joue pas assez sur ses entraînements. Ce qui
+   serait cool, c'est qu'avant ou après un match il décide de plus ou moins
+   s'entraîner : s'il s'entraîne plus il est plus fatigué, donc au match d'après
+   il sera peut-être en moins bonne condition, mais mieux entraîné. »
+   C'était le trou du mode : la progression ne tenait qu'à une formule annuelle
+   d'âge et de temps de jeu, l'entraînement n'existait pas. La décision est posée
+   sur l'écran d'avant-match, qui cesse d'être une fiche à lire : chaque option
+   coûte de la fraîcheur pour le match qui suit et dépose une charge qui, elle,
+   ne paiera qu'en fin de saison. */
+const PTRAINING=[
+  {id:'technique',icon:'⚽',label:"Rester après l'entraînement",sub:"Gammes, frappes, vidéo. Tu rentres à la nuit.",aspect:'technique',load:1.2,fit:-9},
+  {id:'physique',icon:'💪',label:"Salle et sprints",sub:"Du lourd, du répété. Ça fait mal trois jours.",aspect:'physique',load:1.2,fit:-11},
+  {id:'mental',icon:'🧠',label:"Vidéo et préparation mentale",sub:"Deux heures assis à comprendre pourquoi tu rates ces courses.",aspect:'mental',load:1.1,fit:-3},
+  {id:'collectif',icon:'🤝',label:"La semaine du groupe, rien de plus",sub:"Tu fais ce qu'on te demande, comme tout le monde.",aspect:null,load:.45,fit:-2},
+  {id:'recup',icon:'🛌',label:"Lever le pied",sub:"Soins, sommeil, rien dans les jambes. Tu arriveras frais.",aspect:null,load:0,fit:+8},
+];
+function ptrainById(id){ return PTRAINING.find(t=>t.id===id)||PTRAINING[3]; }
+/* Ce que ton archétype fait de l'entraînement. Un bosseur a besoin du volume
+   pour atteindre son niveau ; un génie en tire beaucoup moins, il a déjà le geste. */
+function pTrainingCurve(effort){
+  const t=state.traitId;
+  if(t==='bosseur') return .55+.75*Math.min(1.4,effort);
+  if(t==='genie') return .95+.2*Math.min(1.4,effort);
+  return .75+.45*Math.min(1.4,effort);
+}
+function pTrainingCurveHelp(){
+  const t=state.traitId;
+  if(t==='bosseur') return "Bosseur·euse : sans volume tu plafonnes (×0,55), à plein régime tu progresses plus que les autres (×1,30).";
+  if(t==='genie') return "Génie instinctif : le travail te rapporte peu (×0,95 à ×1,23), ton geste était déjà là.";
+  return `${state.traitName} : l'entraînement pèse normalement sur ta progression (×0,75 à ×1,38).`;
+}
+/* La charge moyenne de la saison, entre 0 (jamais rien) et ~1,2 (tout donné). */
+function pEffort(){
+  const ss=state.seasonStats; if(!ss||!ss.trainWeeks) return .45;
+  return ss.trainWeeks>0?ss.trainLoad/ss.trainWeeks:.45;
+}
+/* Vers quoi la charge de la saison a poussé. */
+function pLoadShare(){
+  const ss=state.seasonStats, l=(ss&&ss.load)||{};
+  const tot=(l.technique||0)+(l.physique||0)+(l.mental||0);
+  if(!tot) return {technique:.34,physique:.33,mental:.33};
+  return {technique:(l.technique||0)/tot,physique:(l.physique||0)/tot,mental:(l.mental||0)/tot};
+}
+function playerChooseTraining(i){
+  const t=PTRAINING[i]; if(!t||!state.match) return;
+  const ss=state.seasonStats;
+  if(ss){ ss.load=ss.load||{technique:0,physique:0,mental:0};
+    if(t.aspect) ss.load[t.aspect]+=t.load;
+    ss.trainLoad=(ss.trainLoad||0)+t.load; ss.trainWeeks=(ss.trainWeeks||0)+1; }
+  state.fitness=clamp((state.fitness==null?100:state.fitness)+t.fit,0,100);
+  // Forcer les jambes use le corps ; lever le pied le répare un peu.
+  state.gauges.corps=clamp(state.gauges.corps+(t.fit<=-9?-1.2:t.fit>0?.8:0));
+  state.lastTraining=t.id;
+  log(`${t.icon} Semaine : ${t.label.toLowerCase()}.`);
+  playerKickoff(false); render();
+}
+
 /* ---------- Où passe ton année : deux chantiers, trois renoncements ---------- */
 const PFOCUS_AREAS={
   technique:{icon:'⚽',label:"Le ballon",desc:"Les heures en plus après l'entraînement, la vidéo, les gammes.",gain:{technique:5},loss:{technique:-2}},
@@ -165,7 +224,7 @@ function playerShare(){
 }
 function playerStartSeason(){
   const c=state.club; const lg=buildLeagueTeams(c,state.year); c.leagueName=lg.name;
-  state.comp=createCompetition(lg,c.name,state.year); state.phase=0; state.matchday=0; state.match=null; state.seasonStats={apps:0,goals:0,assists:0,notes:[],phases:[],shares:[],starts:0,motm:0}; state.minutesBonus=0;
+  state.comp=createCompetition(lg,c.name,state.year); state.phase=0; state.matchday=0; state.match=null; state.seasonStats={apps:0,goals:0,assists:0,notes:[],phases:[],shares:[],starts:0,motm:0,load:{technique:0,physique:0,mental:0},trainLoad:0,trainWeeks:0}; state.minutesBonus=0;
   if(!c.formation) c.formation=pick(Object.keys(FORMATIONS)); if(!c.styleId) c.styleId=pick(eraStylePool(state.year)).id;
   state.fitness=100; state.yellows=0; state.suspended=0; state.squad.forEach(p=>{ p.apps=0; p.goals=0; p.assists=0; p.sumRating=0; p.rated=0; p.yellows=0; p.suspended=0; p.fitness=100; });
   log(`📅 Saison ${state.year}-${state.year+1} avec ${c.name} en ${c.leagueName}.`);
@@ -300,7 +359,9 @@ function playerAfterMatchSim(P){
   log(`${res==='W'?'✅':res==='L'?'❌':'➖'} J${m.matchday+1} : ${ha.home} ${ha.gh}–${ha.ga} ${ha.away}. ${played?`Toi : ${s.min} min, note ${note.toFixed(1)}${s.goals?', '+s.goals+' but'+(s.goals>1?'s':''):''}${s.assists?', '+s.assists+' passe'+(s.assists>1?'s':''):''}.`:m.myStatus==='bench'?'Tu restes sur le banc.':m.myStatus==='injured'?'Blessé·e, tu regardes depuis la tribune.':m.myStatus==='suspended'?'Suspendu·e.':'Pas dans le groupe.'}`);
   state.pendingChoice='matchResult'; saveGame();
 }
-function playerWeekPasses(){ const me=playerMe(); recoverSquad([...state.squad,me],state.year,{training:'tactique',staff:50}); playerSyncMe(me); }
+function playerWeekPasses(){ const me=playerMe();
+  const t=state.lastTraining==='recup'?'recuperation':state.lastTraining==='physique'?'physique':'tactique';
+  recoverSquad([...state.squad,me],state.year,{training:t,staff:50}); playerSyncMe(me); }
 function playerAfterMatch(){ if(state.lastMatch) state.alerts=playerAlertsAfter(state.lastMatch); playerWeekPasses(); playerAdvance(); render(); }
 function playerSimPhase(){
   let guard=0; const keep=state.tempo; state.tempo='rapide'; state.alerts=[];
@@ -353,8 +414,20 @@ function playerEndSeason(){
   if(state.totals.goals>=100) unlockTrophy('p-100'); if(state.totals.apps>=500) unlockTrophy('p-500'); if(avgShare<.2) unlockTrophy('p-bench'); if(state.history.length===0) unlockTrophy('p-first');
   const bad=pAge()>20&&((ss.notes.length>=5&&avgNote<5.7)||avgShare<.15); state.consecutiveBad=bad?state.consecutiveBad+1:0;
   // développement : progression forte jeune, déclin après 31
-  const age=pAge(); const growth=(age<=21?3.2:age<=25?1.8:age<=29?.6:age<=31?-.2:-1.6)*state.growth*(avgShare>=.5?1.1:avgShare>=.2?.85:.7)*(state.potential>r?1:.3);
-  const s=state.stats; s.technique=clamp(s.technique+growth*(state.pos==='G'?.8:1)+(age>=32?-.5:0)); s.physique=clamp(s.physique+growth+(age>=30?-1.5:0)+(state.gauges.corps-50)*.02); s.mental=clamp(s.mental+Math.abs(growth)*.6+(selected?1:0)+(champion?1:0));
+  const age=pAge();
+  // Ce que tu as fait de tes semaines compte autant que ton âge et ton temps de
+  // jeu : `effort` est la charge moyenne des semaines où tu as décidé, la courbe
+  // dépend de ton archétype, et `share` dit vers quoi tu as poussé.
+  const effort=pEffort(), curve=pTrainingCurve(effort), share=pLoadShare();
+  const growth=(age<=21?3.2:age<=25?1.8:age<=29?.6:age<=31?-.2:-1.6)*state.growth*(avgShare>=.5?1.1:avgShare>=.2?.85:.7)*(state.potential>r?1:.3);
+  // Le travail accélère une progression et freine un déclin, jamais l'inverse.
+  const g=growth>0?growth*curve:growth*(2-curve);
+  const dir=k=>1+(share[k]-1/3)*1.35; // pousser un aspect le fait monter plus vite, les autres moins
+  const s=state.stats;
+  s.technique=clamp(s.technique+g*dir('technique')*(state.pos==='G'?.8:1)+(age>=32?-.5:0));
+  s.physique=clamp(s.physique+g*dir('physique')+(age>=30?-1.5:0)+(state.gauges.corps-50)*.02);
+  s.mental=clamp(s.mental+Math.abs(g)*.6*dir('mental')+(selected?1:0)+(champion?1:0));
+  state.lastTrain={effort:Math.round(effort*100)/100,curve:Math.round(curve*100)/100,weeks:(ss.trainWeeks||0),share,growth:Math.round(g*10)/10};
   state.gauges.corps=clamp(state.gauges.corps+8-(age>=32?4:0)); state.forme=clamp(state.forme+12); state.pressure=clamp(state.pressure-6);
   state.gauges.supporters=clamp(state.gauges.supporters+(champion?8:0)+(bad?-5:2)); state.gauges.entourage=clamp(state.gauges.entourage+(selected?3:0)+(bad?-2:1));
   const season={year,club:c.name,league:c.leagueName,tier:c.tier,role:c.role,pos,teams:N,champion,relegated,cupWon:cup.won,cupRounds:cup.roundsReached,euro:euro?{name:euro.name,won:euro.won,rounds:euro.roundsReached}:null,apps:ss.apps,goals:ss.goals,assists:ss.assists,note:avgNote,share:avgShare,selected,caps,capGoals,ballon,boot,bad,salary:c.salary,table:table.map(t=>({...t})),age};
