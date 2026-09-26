@@ -22,13 +22,20 @@ const PLAYER_TRAITS=[
    envies de club. »
    Quatre écrans : les vacances → l'été → tes envies → les offres, une par une. */
 
+/* Six semaines, un seul choix, et **quatre raisons différentes** de le faire
+   (retour du propriétaire, 26/09/2026 : « en famille au calme, à deux loin de tout,
+   tous ensemble dans une grande maison, c'est un peu la même chose » — les trois sont
+   fusionnées ; « partir un mois avec les amis, qu'est-ce qu'il y a de positif ? Il
+   manque ce point de vue. La famille ça peut être +2 au mental, les amis +4 mais plus
+   fatigant physiquement »). Chaque option porte donc trois choses : ce qu'elle donne,
+   ce qu'elle coûte au corps, et **ce qu'elle laisse de l'été pour travailler**
+   (`prep`) — « c'est une période où je ne m'entraîne pas, donc je suis moins
+   performant le reste de l'année ». Un mois d'absence rogne la préparation de 45 %. */
 const PVACANCES=[
-  {id:'famille',icon:'🏡',label:"Deux semaines au calme, en famille",sub:"Rien de spectaculaire. Tout le monde respire.",effects:{entourage:12,pressure:-9,corps:6}},
-  {id:'couple',icon:'🌅',label:"Partir à deux, loin de tout",sub:"Pas de téléphone, pas de maillot, pas de photos.",effects:{entourage:8,pressure:-7,corps:4,money:-.04}},
-  {id:'tous',icon:'🎉',label:"Tout le monde ensemble, la famille et les amis",sub:"Une grande maison, quinze personnes, et toi qui paies.",effects:{entourage:6,pressure:-3,corps:2,money:-.14}},
-  {id:'amis',icon:'🍹',label:"Un mois avec les amis",sub:"Trois villes, des nuits courtes, des vidéos qui circulent.",effects:{supporters:5,entourage:-8,corps:-7,pressure:2,money:-.1}},
-  {id:'extreme',icon:'🏄',label:"Surf, montagne, sensations",sub:"Ton club n'a pas été prévenu. Ton assurance non plus.",effects:{mental:4,supporters:4,corps:-3},risk:.18},
-  {id:'tournee',icon:'✈️',label:"Tournée commerciale et sponsors",sub:"Sept pays, des séances photo, aucun jour off.",effects:{money:.28,supporters:7,corps:-9,entourage:-6,pressure:5}},
+  {id:'proches',icon:'🏡',label:"Du temps avec les proches, au calme",sub:"La maison, les enfants, deux semaines sans téléphone. Personne ne te demande rien, et il reste tout l'été pour travailler.",effects:{entourage:12,pressure:-10,corps:7,mental:2,forme:-5},prep:1,fatigue:0},
+  {id:'amis',icon:'🍹',label:"Un mois avec les amis",sub:"Trois villes, des nuits courtes, l'impression d'avoir vingt ans. Tu rentres léger dans la tête et lourd dans les jambes — et il ne reste qu'une quinzaine avant la reprise.",effects:{mental:4,supporters:3,entourage:-8,corps:-8,pressure:-4,forme:-12,money:-.1},prep:.55,fatigue:1,risk:.1},
+  {id:'sensations',icon:'🏄',label:"Surf, montagne, sensations",sub:"Ton club n'a pas été prévenu. Ton assurance non plus. Tu bouges tous les jours, mais pas comme un footballeur.",effects:{mental:5,physique:1,supporters:3,corps:-4,entourage:-3,forme:-4},prep:.9,fatigue:0,risk:.18},
+  {id:'tournee',icon:'✈️',label:"Tournée commerciale et sponsors",sub:"Sept pays, des séances photo, aucun jour off. Tu rentres riche, connu et cuit.",effects:{money:.3,supporters:7,corps:-9,entourage:-6,pressure:5,forme:-8},prep:.6,fatigue:1},
 ];
 const PSUMMER=[
   {id:'rien',icon:'🛌',label:"Repos complet",sub:"Tu ne touches pas un ballon avant la reprise.",load:0,fatigue:0,effects:{corps:5}},
@@ -49,7 +56,9 @@ function pWishById(id){ return PWISHES.find(w=>w.id===id)||PWISHES[1]; }
 function playerChooseVacances(i){
   const v=PVACANCES[i]; if(!v) return;
   const before=pSnapshot(); const extra=playerApplyEffects(v.effects||{});
-  state.vacances=v.id;
+  state.vacances=v.id; state.vacPrep=v.prep==null?1:v.prep; state.vacFatigue=v.fatigue||0;
+  if(state.vacPrep<1) extra.push(`⏳ Ta préparation ne comptera qu'à ${Math.round(state.vacPrep*100)} % : l'été est déjà entamé`);
+  if(state.vacFatigue) extra.push("🫁 Tu rentres entamé·e : ça s'ajoutera à la fatigue de ta préparation");
   // Une expérience risquée se paie parfois tout de suite.
   if(v.risk&&Math.random()<v.risk){ const w=randInt(2,7); state.injury=(state.injury||0)+w;
     extra.push(`🩼 Blessé·e ${w} semaines`); state.gauges.corps=clamp(state.gauges.corps-6);
@@ -61,12 +70,15 @@ function playerChooseVacances(i){
 function playerChooseSummer(i){
   const t=PSUMMER[i]; if(!t) return;
   const before=pSnapshot(); const extra=playerApplyEffects(t.effects||{});
-  state.summerLoad=t.load; state.summerFatigue=t.fatigue; state.summer=t.id;
+  // Ce que tes vacances ont laissé de l'été décide de ce que ta préparation peut donner.
+  const prep=state.vacPrep==null?1:state.vacPrep;
+  state.summerLoad=Math.round(t.load*prep*100)/100; state.summerFatigue=Math.min(2,t.fatigue+(state.vacFatigue||0)); state.summer=t.id;
   if(t.risk&&Math.random()<t.risk){ const w=randInt(1,4); state.injury=(state.injury||0)+w;
     extra.push(`🩼 Blessé·e ${w} semaines`); log(`🩼 ${t.label} : ton corps a dit non, ${w} semaines d'arrêt.`); }
   else log(`${t.icon} Été : ${t.label.toLowerCase()}.`);
-  if(t.fatigue) extra.push(`🫁 Tu commenceras la saison entamé·e (récupération −${t.fatigue===2?'25':'12'} % toute l'année)`);
-  if(t.load>=1) extra.push("📈 Une avance de préparation qui comptera en juin");
+  if(state.summerFatigue) extra.push(`🫁 Tu commenceras la saison entamé·e (récupération −${state.summerFatigue>=2?'25':'12'} % toute l'année)`);
+  if(prep<1&&t.load) extra.push(`⏳ Charge retenue : ${state.summerLoad.toFixed(2)} au lieu de ${t.load.toFixed(2)} — tes vacances ont mangé une partie de l'été`);
+  if(state.summerLoad>=1) extra.push("📈 Une avance de préparation qui comptera en juin");
   state.pendingResult={title:`${t.icon} La préparation`,subtitle:t.label,narrative:t.sub,before,after:pSnapshot(),extra,next:'envies'};
   state.pendingChoice='choiceResult'; saveGame(); render();
 }
@@ -207,7 +219,7 @@ function playerFreshState(c){
   const g={corps:75,vestiaire:50,supporters:45,entourage:50}; [c.origin,c.trait].forEach(o=>Object.entries(o.gauges||{}).forEach(([k,v])=>g[k]=clamp(g[k]+v)));
   const nat=c.origin.nat==='AF'?pick(['SN','CI','ML','CM','DZ','MA']):'FR';
   return { kind:'player', name:c.name, year:c.era.start, startYear:c.era.start, startEra:c.era.id, rouletteEcho:null, focus:[], lastFocus:null, age:c.origin.age||17, born:c.era.start-(c.origin.age||17), pos:c.pos.id, posName:c.pos.name, posIcon:c.pos.icon, nat, originName:c.origin.name, traitName:c.trait.name, traitId:c.trait.id, injuryMod:c.trait.injury||0, growth:1+(c.trait.growth||0), potential:randInt(78,96),
-    stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, benchRun:0, clubLeft:null, clubStuck:null, legendOf:null, ended:false, endingText:'', endingCause:null };
+    stats:st, gauges:g, pressure:8, coachTrust:50, forme:70, injury:0, fitness:100, yellows:0, suspended:0, tempo:'temps_forts', skipped:[], sinceLast:[], alerts:[], lastStatus:null, club:null, squad:[], usedNames:[], comp:null, phase:0, matchday:0, match:null, phaseMatches:[], seasonStats:null, history:[], totals:{apps:0,goals:0,assists:0,titles:0,cups:0,euros:0,caps:0,capGoals:0,ballons:0,boots:0,earned:0}, clubs:[], selected:false, selectionBoost:0, bigOfferNext:false, log:[], pendingChoice:null, currentEvent:null, currentRoulette:null, pendingResult:null, currentOffers:[], newBadges:[], lastRouletteSeason:-99, rouletteCount:0, noOfferYears:0, consecutiveBad:0, benchRun:0, vacPrep:1, vacFatigue:0, clubLeft:null, clubStuck:null, legendOf:null, ended:false, endingText:'', endingCause:null };
 }
 function pRating(){ const s=state.stats; const w=state.pos==='G'?{technique:.3,physique:.3,mental:.4}:state.pos==='D'?{technique:.3,physique:.4,mental:.3}:state.pos==='M'?{technique:.4,physique:.25,mental:.35}:{technique:.45,physique:.3,mental:.25}; return s.technique*w.technique+s.physique*w.physique+s.mental*w.mental; }
 function pAge(){ return state.year-state.born; }
