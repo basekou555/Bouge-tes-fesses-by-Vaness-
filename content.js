@@ -204,11 +204,11 @@ const COACH_HAPPENINGS=[
   {label:"Organiser un match de gala",result:"Tes anciens joueurs viennent. Le club survit, ton mois de juin disparaît.",effects:{reputation:3,reseau:2,supporters:2,proches:-5,pressure:2}},
   {label:"Donner de ta poche",result:"Discret et efficace. L'économie de la maison encaisse.",effects:{pressure:-2,proches:-4,reputation:1}},
   {label:"Ne rien faire",result:"Le club disparaît. Tu y penses souvent.",effects:{pressure:3,reputation:-2}}]},
- {id:'h-diplome',icon:'📜',title:"Réforme des diplômes",text:"La fédération exige un nouveau diplôme pour entraîner au plus haut niveau.",choices:[
+ {id:'h-diplome',once:true,icon:'📜',title:"Réforme des diplômes",text:"La fédération exige un nouveau diplôme pour entraîner au plus haut niveau.",choices:[
   {label:"Passer le diplôme",result:"Six week-ends de cours. Tu apprends des choses, tu manques six dimanches.",effects:{technique:4,pressure:3,proches:-6}},
   {label:"Demander une dérogation",result:"Accordée, mais la presse en parle et la fédération s'en souvient.",effects:{reputation:-3,reseau:-3}},
   {label:"Contester la réforme",result:"Tu deviens le porte-parole des vieux briscards.",effects:{reseau:3,reputation:-2,confidence:-4}}]},
- {id:'h-ecole',icon:'🏫',title:"Ouvrir ton académie",text:"Des investisseurs proposent de créer une académie de football à ton nom.",minYear:2000,choices:[
+ {id:'h-ecole',once:true,icon:'🏫',title:"Ouvrir ton académie",text:"Des investisseurs proposent de créer une académie de football à ton nom.",minYear:2000,choices:[
   {label:"Se lancer à fond",result:"Un projet passionnant, chronophage, et qui ne dort jamais.",effects:{formation:8,reseau:3,pressure:6,proches:-10},
    seed:{in:3,icon:'🏫',title:"La première promotion",text:"Trois gamins de ton académie signent pro la même année. On associe ton nom à leur trajectoire.",effects:{formation:7,reputation:5,reseau:3}}},
   {label:"Prêter ton nom seulement",result:"Un chèque, une signature, et une académie que tu ne contrôles pas.",effects:{reseau:3,reputation:-4,formation:1}},
@@ -380,7 +380,7 @@ const PLAYER_INCIDENTS=[
   {label:"Le virer et prendre un grand agent",result:"Un agent de stars te représente. Il demande beaucoup.",effects:{entourage:8,money:-.1,reputation:1}},
   {label:"Le virer et te gérer seul",result:"Personne ne t'appelle plus. Tu apprends le métier.",effects:{entourage:-6,mental:3}},
   {label:"Fermer les yeux",result:"Il continue, toi aussi.",effects:{entourage:-2,money:.05}}]},
- {id:'p-famille',icon:'👶',title:"Naissance",text:"Ton premier enfant naît la nuit précédant un quart de finale.",choices:[
+ {id:'p-famille',icon:'👶',title:"Naissance",text:"Ton premier enfant naît la nuit précédant un quart de finale.",once:true,kid:true,choices:[
   {label:"Rester à la maternité",result:"Le coach comprend. Ou pas.",effects:{coachTrust:-3,entourage:8,mental:4,pressure:-4}},
   {label:"Jouer et repartir",result:"Un match héroïque et une nuit sans sommeil.",effects:{coachTrust:4,supporters:4,corps:-2,entourage:2}}]},
  {id:'p-rival',icon:'🥊',title:"Ton concurrent au poste te provoque",text:"Le joueur qui joue à ta place te traite de « touriste » devant le groupe.",choices:[
@@ -425,13 +425,13 @@ const PLAYER_HAPPENINGS=[
   {label:"Profiter",result:"Une rentrée difficile.",effects:{forme:-8,supporters:2,reputation:-2,mental:2}},
   {label:"Trois jours puis stage",result:"Le compromis du pro : personne n'est tout à fait content.",effects:{forme:-2,mental:1,entourage:-2}},
   {label:"Rester au vert tout l'été",result:"Tu reprends en avance, sans avoir vu personne.",effects:{forme:5,coachTrust:3,entourage:-6}}]},
- {id:'ph-mariage',icon:'💍',title:"Mariage médiatique",text:"Ton mariage attire les magazines et une chaîne de télé.",minYear:1990,choices:[
+ {id:'ph-mariage',once:true,icon:'💍',title:"Mariage médiatique",text:"Ton mariage attire les magazines et une chaîne de télé.",minYear:1990,choices:[
   {label:"Vendre l'exclusivité",result:"Un chèque, des photos et quelques moqueries.",effects:{money:.3,reputation:-2,entourage:3}},
   {label:"Mariage privé",result:"Une journée à toi, payée par toi, et des magazines vexés.",effects:{entourage:7,mental:2,money:-.08,supporters:-3}}]},
  {id:'ph-livre',icon:'📚',title:"Autobiographie",text:"Un éditeur veut raconter ta vie, à 26 ans.",choices:[
   {label:"Accepter",result:"Des chapitres sur tes coachs qui ne passent pas.",effects:{money:.1,reputation:2,coachTrust:-3}},
   {label:"Attendre la retraite",result:"Sage. L'éditeur ira voir un autre joueur, et le chèque avec lui.",effects:{mental:1,reputation:-2}}]},
- {id:'ph-fondation',icon:'🤲',title:"Créer une fondation",text:"Un ami te propose de créer une fondation pour les enfants de ton quartier d'origine.",choices:[
+ {id:'ph-fondation',once:true,icon:'🤲',title:"Créer une fondation",text:"Un ami te propose de créer une fondation pour les enfants de ton quartier d'origine.",choices:[
   {label:"Se lancer",result:"Un engagement qui te dépasse.",effects:{reputation:5,supporters:4,money:-.1,pressure:2}},
   {label:"Donner sans s'exposer",result:"Discret.",effects:{money:-.05,mental:2}},
   {label:"Plus tard",result:"Le foot d'abord. Le quartier te l'a entendu dire.",effects:{reputation:-3,entourage:-3}}]},
@@ -475,10 +475,11 @@ const PLAYER_HAPPENINGS=[
   {label:"Cours intensifs tous les soirs",result:"Le vestiaire te voit autrement. Tes soirées disparaissent.",effects:{vestiaire:9,mental:3,coachTrust:4,entourage:-6,forme:-2}},
   {label:"Rester avec les autres expatriés",result:"Confortable, et une bulle dont tu ne sors plus.",effects:{entourage:5,vestiaire:-6,coachTrust:-3}},
   {label:"Un interprète pour tout",result:"Pratique. On finit par te parler à travers quelqu'un d'autre.",effects:{money:-.04,vestiaire:-3,mental:-1}}]},
- {id:'ph-enfant',icon:'👶',title:"Tu deviens parent",text:"Un premier enfant, en plein mois de mars, à quatre jours d'un match décisif.",choices:[
-  {label:"Tout arrêter deux semaines",result:"Le club comprend à moitié, le coach retient surtout ton absence.",effects:{entourage:14,coachTrust:-6,forme:-4,mental:3}},
-  {label:"Jouer le match, rentrer la nuit",result:"Le compromis de tous les pères du métier. Il coûte des deux côtés.",effects:{entourage:-3,forme:-2,mental:-2}},
-  {label:"Faire venir toute la famille près du club",result:"Tout le monde déménage pour toi. Personne ne dit rien.",effects:{entourage:6,money:-.1,mental:2}}]},
+ {id:'ph-enfant2',icon:'👶',title:"La famille s'agrandit",kid:true,when:()=>(state.kids||0)>=1,
+  text:"Un enfant de plus, en plein mois de mars, à quatre jours d'un match décisif. Tu connais déjà les nuits qui suivent.",choices:[
+  {label:"Tout arrêter deux semaines",result:"Le club comprend à moitié, le coach retient surtout ton absence.",effects:{entourage:12,coachTrust:-6,forme:-4,mental:3}},
+  {label:"Jouer le match, rentrer la nuit",result:"Le compromis de tous les pères du métier. Il coûte des deux côtés.",effects:{entourage:-4,forme:-2,mental:-2}},
+  {label:"Faire venir toute la famille près du club",result:"Tout le monde déménage pour toi. Personne ne dit rien.",effects:{entourage:6,money:-.12,mental:2}}]},
  {id:'ph-reseaux',icon:'📱',title:"Ton compte explose",text:"Une vidéo de toi tourne partout. Deux millions d'abonnés en une semaine, et autant d'avis sur ta vie.",minYear:2012,choices:[
   {label:"En faire un vrai métier parallèle",result:"Des revenus, une image, et une notification toutes les six secondes.",effects:{money:.25,supporters:9,mental:-5,forme:-3}},
   {label:"Déléguer les comptes à un community manager",result:"Lisse, efficace, et plus tout à fait toi.",effects:{supporters:4,money:.06,entourage:-3}},
