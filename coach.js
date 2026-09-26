@@ -385,8 +385,32 @@ function coachArmLeague(){
   const d=Math.round((now-was)*10)/10;
   return d?{league:comp.name,delta:d,total:now,gap:Math.round(gap*10)/10}:null;
 }
+/* Les autres clubs vivent aussi. Retour du propriétaire (26/09/2026) : « il y a
+   un décalage entre l'évolution de mes joueurs et l'évolution des joueurs des
+   autres équipes ». C'était exact : tes joueurs progressent par `developSquad()`,
+   tandis qu'un club adverse n'est qu'un nombre figé, recalculé à l'identique
+   chaque saison. Chacun suit désormais sa propre marche aléatoire, mémorisée par
+   championnat et par club : un cinquième devient candidat au titre en quatre
+   ans, un habitué du podium se délite. Indépendant de `leagueArms`, qui est une
+   réaction à *toi* ; celle-ci est la vie du championnat sans toi. */
+function leagueDrift(league,club){
+  const d=state.leagueDrift=state.leagueDrift||{};
+  const k=`${league}|${club}`;
+  if(d[k]==null) d[k]=0;
+  return d[k];
+}
+function coachDriftLeague(lg){
+  const d=state.leagueDrift=state.leagueDrift||{};
+  lg.teams.forEach(t=>{ const k=`${lg.name}|${t.name}`;
+    const was=d[k]==null?0:d[k];
+    // Rappel vers zéro : un club ne s'échappe pas indéfiniment dans un sens.
+    d[k]=Math.round(clamp(was*.88+rand(-1.6,1.6),-7,7)*10)/10;
+  });
+}
 function coachStartSeason(){
   const c=state.club; const lg=buildLeagueTeams(c,state.year); c.leagueName=lg.name;
+  coachDriftLeague(lg);
+  lg.teams.forEach(t=>{ t.strength=Math.round((t.strength+leagueDrift(lg.name,t.name))*10)/10; });
   const arms=leagueArms(lg.name);
   if(arms) lg.teams.forEach(t=>{ t.strength=Math.round((t.strength+arms)*10)/10; });
   c.leagueArms=arms;
@@ -531,8 +555,15 @@ function coachDrawPhaseEvent(){
   // La reprise est toujours un carrefour : c'est le moment où l'on décide de l'année,
   // et il arrive par la préparation, pas par un écran de réglages.
   if(ph===0){ const pre=COACH_CROSSROADS.filter(x=>x.phase===0); return weightedDraw(pre.map(x=>({kind:'carrefour',event:x,w:1}))); }
-  // une jauge au fond réclame une réponse : le dilemme passe devant
-  COACH_DILEMMAS.filter(d=>low.includes(d.gauge)).forEach(d=>bag.push({kind:'dilemma',event:d,w:g[d.gauge]<25?8:5}));
+  // Une jauge au fond réclame une réponse, mais la porte était trop étroite :
+  // en n'admettant un dilemme que sous 40, dix des vingt n'apparaissaient
+  // **jamais** — mesuré sur 46 saisons — parce que Supporters, Staff, Formation
+  // et Proches ne descendent jamais si bas dans une carrière tenue. La jauge
+  // pèse maintenant sur le poids, plus sur l'admission : sous 25 le dilemme
+  // s'impose, sous 55 il est probable, au-dessus il reste possible.
+  COACH_DILEMMAS.forEach(d=>{ const v=g[d.gauge]; if(v==null) return;
+    const w=v<25?9:v<40?6:v<55?2.5:.8;
+    bag.push({kind:'dilemma',event:d,w}); });
   COACH_CROSSROADS.filter(x=>x.phase==null||x.phase===ph).forEach(x=>bag.push({kind:'carrefour',event:x,w:x.phase===ph?9:4}));
   COACH_INCIDENTS.filter(e=>(!e.minYear||y>=e.minYear)&&(!e.maxYear||y<=e.maxYear)&&(!e.tiers||e.tiers.includes(state.club.tier))&&(!e.gauge||low.includes(e.gauge)))
     .forEach(e=>bag.push({kind:'incident',event:e,w:1.8*state.mode.incidentMult}));
@@ -727,6 +758,31 @@ function coachDrawMeeting(fx){
   return mt;
 }
 
+/* ---------- Deux mémoires, pas une ----------
+   `state.metFor` est remis à zéro chaque saison : il évite qu'une histoire
+   revienne deux fois dans l'année. Mais certaines ne se jouent qu'**une fois
+   pour un joueur donné**, sur toute la carrière — le président qui réclame son
+   gros salaire, le capitaine qui plaide pour un mis à l'écart, l'agent qui vient
+   négocier. Retour du propriétaire (26/09/2026) : « il y a des dilemmes qui
+   doivent apparaître qu'une fois, et qui apparaissent dix fois dans la carrière
+   avec les mêmes joueurs. » Celles qui se répètent légitimement (un blessé, un
+   carton qui pend) restent sur la mémoire de saison. */
+function metOnce(kind,id){ return !!(state.seenFor&&state.seenFor[`${kind}:${id}`]); }
+function markOnce(kind,id){ state.seenFor=state.seenFor||{}; state.seenFor[`${kind}:${id}`]=1; }
+/* Un même écran cent fois dans une carrière, c'est le même problème sous un
+   autre angle : chaque famille tire une scène parmi plusieurs, jamais la même
+   que la fois précédente. */
+function pickScene(kind,scenes){
+  if(scenes.length<2) return scenes[0];
+  state.lastScene=state.lastScene||{};
+  const last=state.lastScene[kind];
+  const pool=scenes.filter((_,i)=>i!==last);
+  const i=Math.floor(Math.random()*pool.length);
+  const chosen=pool[i];
+  state.lastScene[kind]=scenes.indexOf(chosen);
+  return chosen;
+}
+
 /* Un cadre est absent : quelqu'un doit prendre sa place, et ce quelqu'un s'en souviendra. */
 function coachMeetingInjured(m){
   const y=state.year;
@@ -818,11 +874,13 @@ function coachMeetingOpponent(m,it,left){
 function coachMeetingPresident(m,it,left){
   if(it.score<1) return null;
   const y=state.year, c=state.club;
-  const costly=state.squad.filter(p=>p.wage>0).sort((a,b)=>b.wage-a.wage)[0];
+  const costly=state.squad.filter(p=>p.wage>0&&!metOnce('president',p.id)).sort((a,b)=>b.wage-a.wage)[0];
   if(!costly) return null;
   const benched=!state.match.xi.includes(costly.id);
   if(!benched) return null;
-  return {kind:'president',side:'vie',icon:'🕴️',title:`${capitalize(c.presidentName)} veut voir ${costly.name} jouer`,
+  markOnce('president',costly.id);
+  const aboutId=costly.id;
+  return {kind:'president',side:'vie',aboutId,icon:'🕴️',title:`${capitalize(c.presidentName)} veut voir ${costly.name} jouer`,
     text:`« Je paie ${$(costly.wage)} par an pour qu'il regarde les matchs ? » ${costly.name} (niveau ${playerRating(costly,y)}) est le plus gros salaire du club, et il n'est pas dans ton onze.`,
     choices:[
       {label:"Le titulariser",sub:"Le président se tait. Le vestiaire comprend qui décide.",plan:{forceIn:costly.id},effects:{confidence:6,vestiaire:-5}},
@@ -835,9 +893,11 @@ function coachMeetingPresident(m,it,left){
 function coachMeetingCaptain(m,it,left){
   const y=state.year, P=coachSquadMap();
   const cap=state.captainId!=null?P[state.captainId]:null; if(!cap) return null;
-  const sad=state.squad.filter(p=>p.morale<50&&p!==cap&&!state.match.xi.includes(p.id)).sort((a,b)=>a.morale-b.morale)[0];
+  const sad=state.squad.filter(p=>p.morale<50&&p!==cap&&!state.match.xi.includes(p.id)&&!metOnce('capitaine',p.id)).sort((a,b)=>a.morale-b.morale)[0];
   if(!sad) return null;
-  return {kind:'capitaine',side:'vie',icon:'🎽',title:`${cap.name} vient te parler de ${sad.name}`,
+  markOnce('capitaine',sad.id);
+  const aboutId=sad.id;
+  return {kind:'capitaine',side:'vie',aboutId,icon:'🎽',title:`${cap.name} vient te parler de ${sad.name}`,
     text:`« Il ne dort plus, il ne parle plus à personne. Si tu ne fais rien, on va le perdre — et pas seulement lui. » ${sad.name} n'a plus joué depuis longtemps.`,
     choices:[
       {label:`Le remettre dans le onze`,sub:"Un geste, tout de suite, devant tout le monde.",plan:{forceIn:sad.id,bonus:-.5},effects:{vestiaire:7}},
@@ -851,9 +911,24 @@ function coachMeetingCaptain(m,it,left){
 function coachMeetingPress(m,it,left){
   const c=state.club, f=(state.comp.form&&state.comp.form[c.name])||[];
   const bad=f.slice(-3).filter(r=>r==='L').length>=2;
-  return {kind:'presse',side:'vie',icon:'🎙️',title:bad?"La conférence d'avant-match":"Le micro tendu",
-    text:bad?`Trois questions sur ta série, une sur ton avenir. ${m.themName} arrive, et la salle attend que tu dises quelque chose.`
-      :`Avant ${m.themName}, on te demande si ton équipe a le niveau. La réponse fera le titre de demain.`,
+  const good=f.slice(-3).filter(r=>r==='W').length>=2;
+  const sc=pickScene('presse',bad?[
+    {t:"La conférence d'avant-match",x:`Trois questions sur ta série, une sur ton avenir. ${m.themName} arrive, et la salle attend que tu dises quelque chose.`},
+    {t:"Le journaliste qui a son angle",x:`Il a préparé sa question et il la reposera trois fois. Elle commence par « est-ce que vous avez encore les moyens de… ».`},
+    {t:"La salle à moitié vide",x:`Deux caméras, six chaises occupées. C'est pire qu'une salle pleine : personne n'attend plus rien de toi avant ${m.themName}.`},
+    {t:"On te ressort une phrase",x:`Un confrère a retrouvé ce que tu disais en août. Il le lit à voix haute, lentement, avant de te demander si tu maintiens.`},
+  ]:good?[
+    {t:"Le micro tendu",x:`Avant ${m.themName}, on te demande si ton équipe a le niveau. La réponse fera le titre de demain.`},
+    {t:"On te parle déjà du titre",x:`Personne ne parle de ${m.themName} : on te demande si tu y crois, combien de points il te faut, et ce que tu diras au président.`},
+    {t:"La question sur ton avenir",x:`Trois clubs sont cités dans la presse du matin. On ne te demandera pas autre chose pendant vingt minutes.`},
+    {t:"Le compliment piégé",x:`« Vous avez transformé cette équipe. » Puis, dans la même phrase : « alors pourquoi certains ne jouent jamais ? »`},
+  ]:[
+    {t:"Le micro tendu",x:`Avant ${m.themName}, on te demande si ton équipe a le niveau. La réponse fera le titre de demain.`},
+    {t:"Rien à raconter",x:`Pas de crise, pas d'exploit, un adversaire quelconque. Il faut quand même remplir vingt minutes, et tout ce que tu diras sera gardé.`},
+    {t:"La question qu'on n'attendait pas",x:`Au bout de dix minutes de banalités, quelqu'un demande pourquoi l'ambiance a changé au centre d'entraînement.`},
+    {t:"Le confrère qui te défend",x:`Un journaliste prend ton parti devant les autres. C'est agréable, et ça t'engage plus que tu ne voudrais.`},
+  ]);
+  return {kind:'presse',side:'vie',icon:'🎙️',title:sc.t,text:sc.x,
     choices:[
       {label:"Protéger tes joueurs",sub:"Tout prendre sur toi, devant tout le monde.",effects:{vestiaire:6,pressure:5,confidence:-2}},
       {label:"Mettre la pression au groupe",sub:"Les nommer, presque. Ça réveille ou ça casse.",plan:{bonus:.7},effects:{vestiaire:-6,supporters:2}},
@@ -866,8 +941,12 @@ function coachMeetingPress(m,it,left){
 function coachMeetingBonus(m,it,left){
   if(it.score<3) return null;
   const c=state.club;
-  return {kind:'prime',side:'vie',icon:'💰',title:"Les joueurs demandent une prime",
-    text:`Le match contre ${m.themName} vaut cher, et le groupe le sait. Les cadres sont venus à deux, poliment.`,
+  const sc=pickScene('prime',[
+    {t:"Les joueurs demandent une prime",x:`Le match contre ${m.themName} vaut cher, et le groupe le sait. Les cadres sont venus à deux, poliment.`},
+    {t:"Le capitaine parle d'argent",x:`Il s'excuse presque avant de commencer. « Ce n'est pas moi, c'est le groupe. » Pour ${m.themName}, ils veulent savoir ce qui est prévu.`},
+    {t:"La prime dont tout le monde parle",x:`L'information a fuité : un club rival a promis une prime énorme pour ce match-là. Ton vestiaire l'a appris avant toi.`},
+  ]);
+  return {kind:'prime',side:'vie',icon:'💰',title:sc.t,text:sc.x,
     choices:[
       {label:"Payer la prime sur le budget",sub:"Ils l'auront, et ils le sauront.",plan:{bonus:.9},effects:{budget:-.06,vestiaire:5,confidence:-3}},
       {label:"La promettre en cas de victoire",sub:"Rien ne sort si on perd.",plan:{bonus:.6},effects:{vestiaire:2,pressure:3}},
@@ -878,10 +957,13 @@ function coachMeetingBonus(m,it,left){
 /* Un joueur revient de blessure : trop tôt, c'est deux mois de plus. */
 function coachMeetingReturn(m,it,left){
   const y=state.year;
-  const back=state.squad.filter(p=>p.injury===0&&p.fitness!=null&&p.fitness<62&&playerRating(p,y)>=state.club.strength-2&&!(state.metFor||[]).includes(-p.id))[0];
+  // Un revenant peut se blesser plusieurs fois, mais pas dix fois avec la même
+  // conversation : une fois par joueur et par carrière.
+  const back=state.squad.filter(p=>p.injury===0&&p.fitness!=null&&p.fitness<62&&playerRating(p,y)>=state.club.strength-2&&!metOnce('retour',p.id))[0];
   if(!back) return null;
-  (state.metFor=state.metFor||[]).push(-back.id);
-  return {kind:'retour',side:'terrain',icon:'🧑‍⚕️',title:`${back.name} veut rejouer`,
+  markOnce('retour',back.id);
+  const aboutId=back.id;
+  return {kind:'retour',side:'terrain',aboutId,icon:'🧑‍⚕️',title:`${back.name} veut rejouer`,
     text:`Il est remis, sur le papier. Fraîcheur ${Math.round(fit(back))} %, et il n'a pas joué depuis longtemps. Le staff propose de le ménager.`,
     choices:[
       {label:"Le titulariser tout de suite",sub:"Il en a besoin, l'équipe aussi.",plan:{forceIn:back.id,bonus:.5},effects:{staff:-4,vestiaire:2},
@@ -912,8 +994,15 @@ function coachMeetingPrep(m,it,left){
   if(left<2||it.score>=4||Math.random()<.45) return null;
   const tr=TRAINING[state.training]||TRAINING.tactique;
   const fitAvg=state.squad.reduce((n,p)=>n+fit(p),0)/Math.max(1,state.squad.length);
-  return {kind:'semaine',side:'terrain',icon:'📋',title:"La semaine d'avant",
-    text:`Cinq séances avant ${m.themName}. Ton adjoint attend de savoir sur quoi on travaille. Pour l'instant la semaine type est « ${tr.label.toLowerCase()} », fraîcheur du groupe ${Math.round(fitAvg)} %.`,
+  const état=`Semaine type « ${tr.label.toLowerCase()} », fraîcheur du groupe ${Math.round(fitAvg)} %.`;
+  const sc=pickScene('semaine',[
+    {t:"La semaine d'avant",x:`Cinq séances avant ${m.themName}. Ton adjoint attend de savoir sur quoi on travaille. ${état}`},
+    {t:"Le tableau blanc vide",x:`Lundi matin, personne n'a encore écrit le programme. Trois membres du staff te regardent, marqueur en main. ${état}`},
+    {t:"Ton adjoint a une idée",x:`Il a préparé sa semaine, dans un classeur, avec des schémas. Tu peux la prendre, ou imposer la tienne. ${état}`},
+    {t:"Ce que réclame le groupe",x:`Deux cadres sont venus dire que les séances étaient trop longues. Ils n'ont pas tort, et ce n'est pas à eux de le décider. ${état}`},
+    {t:"La semaine sans match",x:`Une semaine pleine avant ${m.themName}, la première depuis longtemps. On peut vraiment travailler quelque chose. ${état}`},
+  ]);
+  return {kind:'semaine',side:'terrain',icon:'📋',title:sc.t,text:sc.x,
     choices:[
       {label:"Tout sur le plan de jeu",sub:"Vidéo, placements, répétitions jusqu'à l'écœurement.",plan:{training:'tactique',bonus:.6},effects:{vestiaire:-2}},
       {label:"Une semaine athlétique",sub:"Du foncier. Ça fait mal maintenant, ça paie en mars.",plan:{training:'physique',bonus:-.3},effects:{staff:3}},
@@ -1005,11 +1094,12 @@ function coachMeetingPitch(m,it,left){
 /* L'agent d'un joueur : le football est aussi un bureau. */
 function coachMeetingAgent(m,it,left){
   const y=state.year, c=state.club;
-  const p=state.squad.filter(x=>x.contractEnd&&x.contractEnd<=y+1&&playerRating(x,y)>=c.strength-1&&!(state.metFor||[]).includes(2000+x.id))
+  const p=state.squad.filter(x=>x.contractEnd&&x.contractEnd<=y+1&&playerRating(x,y)>=c.strength-1&&!metOnce('agent',x.id))
     .sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
   if(!p) return null;
-  (state.metFor=state.metFor||[]).push(2000+p.id);
-  return {kind:'agent',side:'vie',icon:'💼',title:`L'agent de ${p.name} s'est invité`,
+  markOnce('agent',p.id);
+  const aboutId=p.id;
+  return {kind:'agent',side:'vie',aboutId,icon:'💼',title:`L'agent de ${p.name} s'est invité`,
     text:`Costume clair, café pris au bar du stade. « Mon joueur est bien ici, mais il a ${playerAge(p,y)} ans et son contrat finit en ${p.contractEnd}. Vous comprenez. » ${p.name} vaut ${$(playerValue(p,y))} et touche ${$(p.wage)}.`,
     choices:[
       {label:"Prolonger au prix qu'il demande",sub:"Le garder coûte, le perdre coûterait plus.",effects:{budget:-.04,vestiaire:4,confidence:-3}},
@@ -1027,9 +1117,19 @@ function coachMeetingFans(m,it,left){
   const f=(state.comp.form&&state.comp.form[c.name])||[];
   const bad=f.slice(-4).filter(r=>r==='L').length>=2;
   if(g.supporters>=48&&!bad) return null;
-  return {kind:'tribune',side:'vie',icon:'📣',title:g.supporters<35?"Une banderole au centre d'entraînement":"Une délégation demande à te voir",
-    text:g.supporters<35?`Ils sont venus à l'aube accrocher deux draps sur les grilles. Supporters ${Math.round(g.supporters)}/100, et le message ne parle pas que des joueurs.`
-      :`Trois représentants du kop attendent à l'accueil depuis une heure. Ils veulent « comprendre ». Supporters ${Math.round(g.supporters)}/100.`,
+  const j=`Supporters ${Math.round(g.supporters)}/100.`;
+  const sc=pickScene('tribune',g.supporters<35?[
+    {t:"Une banderole au centre d'entraînement",x:`Ils sont venus à l'aube accrocher deux draps sur les grilles. Le message ne parle pas que des joueurs. ${j}`},
+    {t:"Le parcage est resté muet",x:`Quatre-vingt-dix minutes sans un chant, pancartes retournées. C'est plus dur à encaisser que des sifflets. ${j}`},
+    {t:"Ils attendent le bus",x:`Une trentaine à la sortie du centre, pas agressifs, juste debout dans le froid à regarder passer les voitures. ${j}`},
+    {t:"La lettre ouverte",x:`Deux pages publiées ce matin, signées par trois groupes, qui te citent nommément quatre fois. ${j}`},
+  ]:[
+    {t:"Une délégation demande à te voir",x:`Trois représentants du kop attendent à l'accueil depuis une heure. Ils veulent « comprendre ». ${j}`},
+    {t:"Le café des abonnés",x:`Un groupe d'abonnés historiques t'invite à leur réunion mensuelle. Ils ont préparé des questions et acheté des viennoiseries. ${j}`},
+    {t:"Le porte-parole te tend la main",x:`Le chef du kop propose une trêve : ils soutiennent à fond jusqu'à la trêve, si tu leur expliques où tu vas. ${j}`},
+    {t:"Une pétition circule",x:`Elle ne demande pas ta tête, elle demande « des explications ». Elle a déjà quatre mille signatures. ${j}`},
+  ]);
+  return {kind:'tribune',side:'vie',icon:'📣',title:sc.t,text:sc.x,
     choices:[
       {label:"Les recevoir, longuement",sub:"Leur ouvrir la porte, écouter, expliquer. Ça prend l'après-midi.",plan:{bonus:-.3},effects:{supporters:9,pressure:4}},
       {label:"Leur donner raison en public",sub:"Dire tout haut ce qu'ils pensent. Le président lira.",effects:{supporters:12,confidence:-7,reputation:2}},
