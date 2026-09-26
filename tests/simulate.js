@@ -16,7 +16,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
         const era=ERAS[run%ERAS.length], mode=COACH_MODES[run%COACH_MODES.length];
         creation={kind:'coach',step:0,name:'C'+run,era,mode,origin:pick(COACH_ORIGINS),nationality:pick(NATIONALITIES),style:pick(STYLES),mentor:pick(COACHES_BY_ERA[era.id]),quality:pick(COACH_QUALITIES),flaw:pick(COACH_FLAWS)};
         launchCoach(); state.tempo=pick(Object.keys(TEMPOS));
-        let steps=0, screens={}, gaps=[], wagesR=[], mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0}, dashSeen=false, natSeen=false, projChecks=0;
+        let steps=0, screens={}, gaps=[], wagesR=[], onceSeen=new Set(), mstat={n:0,g:0,y:0,r:0,inj:0,pen:0,sub:0,ht:0}, cstat={carrefours:0}, dashSeen=false, natSeen=false, projChecks=0;
         while(!state.ended&&steps<6000){
           steps++; const pc=state.pendingChoice; screens[pc]=(screens[pc]||0)+1; if(steps%100===0) await new Promise(r=>setTimeout(r,0)); // laisse respirer le moteur de rendu
           if(pc==='offers'){ if(state.currentOffers.length){ const stay=state.currentOffers.findIndex(o=>o.stay); if(stay>=0&&state.currentOffers[stay].underContract&&Math.random()<.1){ coachBreakContract(); if(!state.currentOffers.length){ coachSkipYear(); render(); continue; } } coachAcceptOffer(stay>=0&&Math.random()<.7?stay:rnd(state.currentOffers.length)); } else coachSkipYear(); }
@@ -55,6 +55,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE||'playwright-core');
           else if(pc==='choiceResult'){ coachContinueChoiceResult(); }
           else if(pc==='meeting'){ const mt=state.meeting; mstat.ht++; (cstat[mt.kind]=(cstat[mt.kind]||0)+1);
             if(!mt.choices.length) throw new Error('rendez-vous sans option : '+mt.title);
+            // Ces histoires ne se jouent qu'une fois par joueur et par carrière :
+            // leur intitulé porte son nom, il ne doit donc jamais revenir.
+            if(mt.aboutId!=null){
+              const key=mt.kind+':'+mt.aboutId;
+              if(onceSeen.has(key)) throw new Error(`histoire rejouée sur le même joueur : ${key} (${mt.title})`);
+              onceSeen.add(key); }
             const h=renderMeeting(); if(!h||h.length<300) throw new Error('écran de rendez-vous vide');
             coachChooseMeeting(rnd(mt.choices.length)); }
           else if(pc==='matchResult'){ const m=state.lastMatch; mstat.n++; mstat.g+=m.gh+m.ga; mstat.y+=m.events.filter(e=>e.kind==='yellow').length; mstat.r+=m.events.filter(e=>e.kind==='red'&&e.side==='us').length; mstat.inj+=m.events.filter(e=>e.kind==='injury').length; mstat.pen+=m.events.filter(e=>e.kind==='goal'&&/penalty/.test(e.text)||e.kind==='penmiss').length; mstat.sub+=m.events.filter(e=>e.kind==='sub').length; if(!m.ratings||!Object.keys(m.ratings).length) throw new Error('no ratings'); coachAfterMatch(); }
