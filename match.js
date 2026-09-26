@@ -105,7 +105,7 @@ function matchLambdas(m){
   const sU=m.strengthUs+(m.home?2:0)-m.redUs*3.5, sT=m.themStrength+(m.home?0:2)-m.redThem*3.5;
   const mu=styleMatchup(m.ourStyle,m.themStyle)*2.2; const a=APPROACHES[m.approach]||APPROACHES.equilibre;
   const open=(styleFamily(m.ourStyle)==='direct'?1.06:1)*(styleFamily(m.themStyle)==='direct'?1.06:1)*(m.talkBoost||1);
-  const xU=(m.home?1.35:1.05)*Math.exp((sU+mu-sT)/19)*a.atk*open, xT=(m.home?1.05:1.35)*Math.exp((sT-sU-mu)/19)*a.def*open;
+  const xU=tameXG((m.home?1.35:1.05)*Math.exp((sU+mu-sT)/19)*a.atk*open), xT=tameXG((m.home?1.05:1.35)*Math.exp((sT-sU-mu)/19)*a.def*open);
   return [xU/90,xT/90];
 }
 function pickWeighted(list,wfn){ const ws=list.map(wfn); const tot=ws.reduce((n,x)=>n+x,0); if(tot<=0) return list[0]; let r=Math.random()*tot; for(let i=0;i<list.length;i++){ r-=ws[i]; if(r<=0) return list[i]; } return list[list.length-1]; }

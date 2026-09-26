@@ -254,7 +254,14 @@ function roundRobin(teamIds){
   const back=rounds.map(rd=>rd.map(([a,b])=>[b,a]));
   return rounds.concat(back);
 }
-function simMatch(sH,sA){ const xh=1.35*Math.exp((sH+2-sA)/19), xa=1.05*Math.exp((sA-sH-2)/19); return [poisson(xh),poisson(xa)]; }
+/* Le football sature : une équipe très supérieure ne dispose pas de quatre-vingt-dix
+   minutes infinies, et l'adversaire finit par se recroqueviller. L'espérance de buts
+   était une exponentielle sans borne (`exp(écart/19)`), qui attendait 9,4 buts à +35
+   de force — d'où les 12-0 et 15-0 signalés. On laisse les matchs ordinaires
+   intacts et on comprime la queue : au-delà de 2,6 buts attendus, les gains
+   supplémentaires fondent, avec une asymptote à 4,8. */
+function tameXG(x){ return x<=2.6?x:2.6+(x-2.6)/(1+(x-2.6)/2.2); }
+function simMatch(sH,sA){ const xh=tameXG(1.35*Math.exp((sH+2-sA)/19)), xa=tameXG(1.05*Math.exp((sA-sH-2)/19)); return [poisson(xh),poisson(xa)]; }
 function newSeasonTable(teams){ return teams.map(t=>({name:t.name,pts:0,w:0,d:0,l:0,gf:0,ga:0,me:!!t.me})); }
 function applyResult(table,h,a,gh,ga){ const H=table.find(t=>t.name===h),A=table.find(t=>t.name===a); H.gf+=gh;H.ga+=ga;A.gf+=ga;A.ga+=gh; if(gh>ga){H.pts+=3;H.w++;A.l++;} else if(gh<ga){A.pts+=3;A.w++;H.l++;} else {H.pts++;A.pts++;H.d++;A.d++;} }
 /* Enregistre un résultat dans le classement et la forme récente (cinq derniers matchs) */

@@ -642,7 +642,21 @@ function coachMatchInterest(m){
    Intention : on ne compose pas, on tranche. Le calendrier tourne seul et ne
    s'arrête que quand une décision se présente ; le match qui suit est le
    résultat de cette décision, et on le lit. */
+/* Tirage pondéré générique : sert à répartir les familles de rendez-vous. */
+function pickByWeight(list,wFn){
+  if(!list||!list.length) return null;
+  const ws=list.map(wFn), total=ws.reduce((a,b)=>a+b,0);
+  if(!(total>0)) return pick(list);
+  let r=Math.random()*total;
+  for(let i=0;i<list.length;i++){ r-=ws[i]; if(r<=0) return list[i]; }
+  return list[list.length-1];
+}
 const MEETING_QUOTA={complet:10,temps_forts:8,rapide:4};
+/* Combien de fois une même famille peut revenir dans une saison. Sans ce
+   plafond, les familles toujours applicables (le symptôme, la semaine, la
+   tribune) occupaient 15 % des écrans chacune quand les autres n'apparaissaient
+   jamais — « les problèmes revenaient trop vite, trop souvent ». */
+const MEETING_CAP=3;
 const MEETING_WEIGHT=2.2;
 /* Combien de temps une décision porte, et comment elle s'éteint. Une phase
    entière rendait la saison trop facile (retour du propriétaire, 22/09/2026 :
@@ -686,10 +700,15 @@ function coachDrawMeeting(fx){
     .map(b=>b(m,it,left)).filter(Boolean);
   if(!cands.length) return null;
   const seen=state.recentMeetings||[];
-  // Dix-neuf familles : on écarte les cinq derniers genres, pas trois, sinon les
-  // rendez-vous toujours disponibles (la semaine, le symptôme) font le papier peint.
-  const fresh=cands.filter(x=>!seen.includes(x.kind));
-  let pool=fresh.length?fresh:cands;
+  // Écarter les cinq derniers genres ne suffisait pas : les familles toujours
+  // applicables (le symptôme, la semaine) remontaient dès la sortie du tampon et
+  // occupaient 15 % des écrans chacune. On garde un petit tampon dur contre la
+  // répétition immédiate, et surtout on tire **au poids** : chaque passage d'une
+  // famille dans la saison divise sa chance d'être retirée.
+  const counts=(state.seasonStats&&(state.seasonStats.kindCount=state.seasonStats.kindCount||{}))||{};
+  const fresh=cands.filter(x=>!seen.slice(-3).includes(x.kind)&&(counts[x.kind]||0)<MEETING_CAP);
+  let pool=fresh.length?fresh:cands.filter(x=>!seen.slice(-2).includes(x.kind));
+  if(!pool.length) pool=cands;
   // Le sujet du jeu, c'est l'équilibre entre une vie et un métier : un côté ne
   // peut pas manger l'autre. Le sportif était monté à 84 % des rendez-vous parce
   // que ses familles sont presque toujours applicables. On tire donc du côté qui
@@ -699,7 +718,8 @@ function coachDrawMeeting(fx){
   // prévisible, et deux rendez-vous de terrain d'affilée sont une saison normale.
   const want=sd.terrain-sd.vie>=2?'vie':sd.vie-sd.terrain>=2?'terrain':null;
   if(want){ const p2=pool.filter(x=>x.side===want); if(p2.length) pool=p2; }
-  const mt=pick(pool);
+  const mt=pickByWeight(pool,x=>1/Math.pow(1+(counts[x.kind]||0),1.8))||pick(pool);
+  counts[mt.kind]=(counts[mt.kind]||0)+1;
   sd[mt.side==='vie'?'vie':'terrain']++;
   state.recentMeetings=[...seen,mt.kind].slice(-5);
   state.phaseStops=(state.phaseStops||0)+1;
@@ -776,7 +796,7 @@ function coachMeetingSquad(m,it,left){
 
 /* L'adversaire joue de telle manière : comment tu abordes ça. */
 function coachMeetingOpponent(m,it,left){
-  if(it.score<3) return null;
+  if(it.score<2) return null;
   const theirs=m.themStyle, tf=styleFamily(theirs), ti=FAMILY_INFO[tf];
   const counter=Object.keys(FAMILY_INFO).find(f=>FAMILY_INFO[f].beats===tf);
   const counterStyle=STYLES.filter(x=>styleFamily(x.id)===counter&&x.prestige*60<=state.stats.talent+10)
@@ -796,7 +816,7 @@ function coachMeetingOpponent(m,it,left){
 
 /* Le président a un avis, et il ne demande pas vraiment. */
 function coachMeetingPresident(m,it,left){
-  if(it.score<2) return null;
+  if(it.score<1) return null;
   const y=state.year, c=state.club;
   const costly=state.squad.filter(p=>p.wage>0).sort((a,b)=>b.wage-a.wage)[0];
   if(!costly) return null;
@@ -829,7 +849,6 @@ function coachMeetingCaptain(m,it,left){
 
 /* La presse attend une phrase, et elle la sortira de son contexte. */
 function coachMeetingPress(m,it,left){
-  if(it.score<2) return null;
   const c=state.club, f=(state.comp.form&&state.comp.form[c.name])||[];
   const bad=f.slice(-3).filter(r=>r==='L').length>=2;
   return {kind:'presse',side:'vie',icon:'🎙️',title:bad?"La conférence d'avant-match":"Le micro tendu",
@@ -845,7 +864,7 @@ function coachMeetingPress(m,it,left){
 }
 /* Une prime se demande avant, jamais après. */
 function coachMeetingBonus(m,it,left){
-  if(it.score<4) return null;
+  if(it.score<3) return null;
   const c=state.club;
   return {kind:'prime',side:'vie',icon:'💰',title:"Les joueurs demandent une prime",
     text:`Le match contre ${m.themName} vaut cher, et le groupe le sait. Les cadres sont venus à deux, poliment.`,
@@ -873,7 +892,7 @@ function coachMeetingReturn(m,it,left){
 }
 /* Un déplacement lointain se prépare, ou se subit. */
 function coachMeetingTravel(m,it,left){
-  if(m.home||it.score<3) return null;
+  if(m.home||it.score<2) return null;
   return {kind:'voyage',side:'terrain',icon:'🚌',title:`Le déplacement à ${m.themName}`,
     text:"Six heures de route, ou un vol la veille et une nuit d'hôtel. Le club regarde la facture.",
     choices:[
@@ -950,7 +969,7 @@ function coachMeetingCards(m,it,left){
   const y=state.year;
   const risk=state.squad.filter(p=>(p.yellows||0)>=2&&availableForMatch(p)&&playerRating(p,y)>=state.club.strength-1&&!(state.metFor||[]).includes(1000+p.id))
     .sort((a,b)=>playerRating(b,y)-playerRating(a,y))[0];
-  if(!risk||it.score<2) return null;
+  if(!risk) return null;
   (state.metFor=state.metFor||[]).push(1000+risk.id);
   return {kind:'cartons',side:'terrain',icon:'🟨',title:`${risk.name} est à un carton de la suspension`,
     text:`Deux avertissements au compteur, et il joue ${m.themName} ${m.home?'à domicile':'à l\'extérieur'}. Un troisième et il saute le prochain — qui peut compter plus que celui-ci.`,
@@ -964,7 +983,7 @@ function coachMeetingCards(m,it,left){
 
 /* Le terrain et le ciel : le football se joue dehors. */
 function coachMeetingPitch(m,it,left){
-  if(m.home||state.phase!==1||it.score<2) return null;
+  if(m.home||(state.phase!==1&&state.phase!==3)) return null;
   const froid=Math.random()<.5;
   return {kind:'pelouse',side:'terrain',icon:froid?'❄️':'🌧️',title:froid?`Il va geler à ${m.themName}`:`La pelouse de ${m.themName} est un champ`,
     text:froid?"Moins quatre annoncé au coup d'envoi, terrain dur comme du béton. Le jeu au sol va être une loterie."
